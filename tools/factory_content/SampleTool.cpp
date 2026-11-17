@@ -15,7 +15,11 @@
 // `wav` writes any file CyDAW reads (FLAC, AIFF, OGG...) as a 24-bit WAV,
 // as it is, for the tools that read only WAV (the companion's analysis).
 
-#include <juce_audio_formats/juce_audio_formats.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Value.h>
 
 #include <algorithm>
 #include <cmath>
@@ -24,33 +28,33 @@
 
 namespace {
 
-int fail(const juce::String& message)
+int fail(const cydaw::base::Text& message)
 {
-    std::cout << "{\"error\": " << juce::JSON::toString(message).toStdString() << "}" << std::endl;
+    std::cout << "{\"error\": " << cydaw::base::JSON::toString(message).toStdString() << "}" << std::endl;
     return 1;
 }
 
-double option(const juce::StringArray& arguments, const juce::String& name, const double fallback)
+double option(const cydaw::base::TextList& arguments, const cydaw::base::Text& name, const double fallback)
 {
     const auto at = arguments.indexOf(name);
     return at >= 0 && at + 1 < arguments.size() ? arguments[at + 1].getDoubleValue() : fallback;
 }
 
-int convert(const juce::StringArray& arguments)
+int convert(const cydaw::base::TextList& arguments)
 {
     if (arguments.size() < 3)
         return fail("usage: convert <in> <out.flac> [options]");
-    const juce::File input(arguments[1]);
-    const juce::File output(arguments[2]);
+    const cydaw::base::File input(arguments[1]);
+    const cydaw::base::File output(arguments[2]);
     const auto bits = static_cast<int>(option(arguments, "--bits", 16.0));
     const auto floorDb = option(arguments, "--floor-db", -70.0);
     const auto fadeMs = option(arguments, "--fade-ms", 60.0);
     const auto preMs = option(arguments, "--pre-ms", 3.0);
     const auto tailMs = option(arguments, "--tail-ms", 120.0);
 
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     formats.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(input));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(input));
     if (reader == nullptr)
         return fail("cannot read " + input.getFullPathName());
     const auto channels = std::clamp(static_cast<int>(reader->numChannels), 1, 2);
@@ -58,7 +62,7 @@ int convert(const juce::StringArray& arguments)
     const auto rate = reader->sampleRate;
     if (frames <= 0 || rate <= 0.0)
         return fail("empty " + input.getFullPathName());
-    juce::AudioBuffer<float> audio(channels, frames);
+    cydaw::audio::SampleBuffer<float> audio(channels, frames);
     reader->read(&audio, 0, frames, 0, true, channels > 1);
     reader.reset();
 
@@ -97,12 +101,12 @@ int convert(const juce::StringArray& arguments)
             lastWindow = index;
     const auto end = std::min(frames, (lastWindow + 1) * window + static_cast<int>(rate * tailMs * 0.001));
     const auto length = std::max(1, end - start);
-    juce::AudioBuffer<float> kept(channels, length);
+    cydaw::audio::SampleBuffer<float> kept(channels, length);
     for (int channel = 0; channel < channels; ++channel)
         kept.copyFrom(channel, 0, audio, channel, start, length);
     const auto fade = std::min(length / 2, static_cast<int>(rate * fadeMs * 0.001));
     for (auto index = 0; index < fade; ++index) {
-        const auto gain = static_cast<float>(0.5 + 0.5 * std::cos(juce::MathConstants<double>::pi
+        const auto gain = static_cast<float>(0.5 + 0.5 * std::cos(cydaw::base::MathConstants<double>::pi
                                                                   * static_cast<double>(index + 1) / fade));
         for (int channel = 0; channel < channels; ++channel)
             kept.setSample(channel, length - fade + index, kept.getSample(channel, length - fade + index) * gain);
@@ -119,12 +123,12 @@ int convert(const juce::StringArray& arguments)
 
     output.getParentDirectory().createDirectory();
     output.deleteFile();
-    juce::FlacAudioFormat flac;
+    cydaw::integration::FlacFormat flac;
     auto stream = output.createOutputStream();
     if (stream == nullptr)
         return fail("cannot write " + output.getFullPathName());
-    std::unique_ptr<juce::OutputStream> owned(stream.release());
-    auto options = juce::AudioFormatWriterOptions {}
+    std::unique_ptr<cydaw::base::OutputStream> owned(stream.release());
+    auto options = cydaw::audio::AudioFormatWriterOptions {}
                        .withSampleRate(rate)
                        .withNumChannels(channels)
                        .withBitsPerSample(bits)
@@ -132,55 +136,57 @@ int convert(const juce::StringArray& arguments)
     auto writer = flac.createWriterFor(owned, options);
     if (writer == nullptr)
         return fail("no FLAC writer for " + output.getFullPathName());
-    writer->writeFromAudioSampleBuffer(kept, 0, length);
+    if (!writer->writeFromAudioSampleBuffer(kept, 0, length) || !writer->finish())
+        return fail("failed to finish " + output.getFullPathName());
     writer.reset();
 
-    auto* result = new juce::DynamicObject();
+    auto* result = new cydaw::base::Object();
     result->setProperty("frames", length);
     result->setProperty("rate", rate);
     result->setProperty("channels", channels);
     result->setProperty("cut", start);
-    result->setProperty("peakDb", juce::Decibels::gainToDecibels(peak));
+    result->setProperty("peakDb", (20.0 * std::log10(peak)));
     result->setProperty("bytes", output.getSize());
-    std::cout << juce::JSON::toString(juce::var(result), true).toStdString() << std::endl;
+    std::cout << cydaw::base::JSON::toString(cydaw::base::Value(result), true).toStdString() << std::endl;
     return 0;
 }
 
-int toWav(const juce::StringArray& arguments)
+int toWav(const cydaw::base::TextList& arguments)
 {
     if (arguments.size() < 3)
         return fail("usage: wav <in> <out.wav>");
-    const juce::File input(arguments[1]);
-    const juce::File output(arguments[2]);
-    juce::AudioFormatManager formats;
+    const cydaw::base::File input(arguments[1]);
+    const cydaw::base::File output(arguments[2]);
+    cydaw::audio::AudioFormatManager formats;
     formats.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(input));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(input));
     if (reader == nullptr)
         return fail("cannot read " + input.getFullPathName());
     const auto channels = static_cast<int>(reader->numChannels);
     const auto frames = static_cast<int>(reader->lengthInSamples);
-    juce::AudioBuffer<float> audio(channels, frames);
+    cydaw::audio::SampleBuffer<float> audio(channels, frames);
     reader->read(&audio, 0, frames, 0, true, true);
     output.getParentDirectory().createDirectory();
     output.deleteFile();
     auto stream = output.createOutputStream();
     if (stream == nullptr)
         return fail("cannot write " + output.getFullPathName());
-    std::unique_ptr<juce::OutputStream> owned(stream.release());
-    juce::WavAudioFormat wav;
-    auto writer = wav.createWriterFor(owned, juce::AudioFormatWriterOptions {}
+    std::unique_ptr<cydaw::base::OutputStream> owned(stream.release());
+    cydaw::integration::WaveFormat wav;
+    auto writer = wav.createWriterFor(owned, cydaw::audio::AudioFormatWriterOptions {}
                                                  .withSampleRate(reader->sampleRate)
                                                  .withNumChannels(channels)
                                                  .withBitsPerSample(24));
     if (writer == nullptr)
         return fail("no WAV writer for " + output.getFullPathName());
-    writer->writeFromAudioSampleBuffer(audio, 0, frames);
+    if (!writer->writeFromAudioSampleBuffer(audio, 0, frames) || !writer->finish())
+        return fail("failed to finish " + output.getFullPathName());
     writer.reset();
-    auto* result = new juce::DynamicObject();
+    auto* result = new cydaw::base::Object();
     result->setProperty("frames", frames);
     result->setProperty("rate", reader->sampleRate);
     result->setProperty("channels", channels);
-    std::cout << juce::JSON::toString(juce::var(result), true).toStdString() << std::endl;
+    std::cout << cydaw::base::JSON::toString(cydaw::base::Value(result), true).toStdString() << std::endl;
     return 0;
 }
 
@@ -188,9 +194,9 @@ int toWav(const juce::StringArray& arguments)
 
 int main(int argc, char* argv[])
 {
-    juce::StringArray arguments;
+    cydaw::base::TextList arguments;
     for (auto index = 1; index < argc; ++index)
-        arguments.add(juce::String::fromUTF8(argv[index]));
+        arguments.add(cydaw::base::Text::fromUTF8(argv[index]));
     if (arguments.isEmpty())
         return fail("usage: cydaw_sample_tool convert <in> <out.flac> [options]");
     if (arguments[0] == "convert")

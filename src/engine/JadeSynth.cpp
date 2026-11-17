@@ -1,3 +1,5 @@
+#include <cydaw/engine/DspHistory.h>
+#include <cydaw/engine/DspSampleBiquad.h>
 // Jade: a modelled electric piano of the synth family. A key throws a felt
 // hammer (softer or harder, and harder still as the key is struck harder)
 // at one of three vibrating parts, each read by its own pickup:
@@ -298,71 +300,35 @@ using namespace parts;
 // Hermite).
 class Line {
 public:
-    void prepare(const double samples)
-    {
-        std::size_t size = 64;
-        while (static_cast<double>(size) < samples + 8.0)
-            size *= 2;
-        buffer_.assign(size, 0.0f);
-        mask_ = static_cast<int>(size) - 1;
-        write_ = 0;
-    }
-    [[nodiscard]] bool ready() const noexcept { return !buffer_.empty(); }
-    // The longest delay it reads.
-    [[nodiscard]] double longest() const noexcept { return static_cast<double>(std::max(2, mask_ - 4)); }
-    void clear() noexcept
-    {
-        std::fill(buffer_.begin(), buffer_.end(), 0.0f);
-        write_ = 0;
-    }
-    void push(const double x) noexcept
-    {
-        if (buffer_.empty())
-            return;
-        write_ = (write_ + 1) & mask_;
-        buffer_[static_cast<std::size_t>(write_)] = static_cast<float>(x);
-    }
-    // What was pushed `samples` ago (0: the last one; at least two).
-    [[nodiscard]] double read(double samples) const noexcept
-    {
-        if (buffer_.empty())
-            return 0.0;
-        samples = std::clamp(samples, 2.0, longest());
-        const auto position = static_cast<double>(write_) - samples;
-        const auto whole = std::floor(position);
-        const auto t = position - whole;
-        const auto at = static_cast<int>(whole);
-        const auto sample = [this](const int index) { return static_cast<double>(buffer_[static_cast<std::size_t>(index & mask_)]); };
-        const auto before = sample(at - 1);
-        const auto x0 = sample(at);
-        const auto x1 = sample(at + 1);
-        const auto x2 = sample(at + 2);
-        const auto c1 = 0.5 * (x1 - before);
-        const auto c2 = before - 2.5 * x0 + 2.0 * x1 - 0.5 * x2;
-        const auto c3 = 0.5 * (x2 - before) + 1.5 * (x0 - x1);
-        return ((c3 * t + c2) * t + c1) * t + x0;
-    }
+  void prepare(double samples)
+  {
+      std::size_t size = 64;
+      while (double(size) < samples + 8)
+          size *= 2;
+      history_.prepare(1, size);
+  }
+  bool ready() const noexcept { return history_.capacity() != 0; }
+  double longest() const noexcept { return double(std::max<std::size_t>(2, history_.capacity() - 5)); }
+  void clear() noexcept { history_.reset(); }
+  void push(double x) noexcept
+  {
+      if (ready())
+      {
+          const double rounded = static_cast<float>(x);
+          history_.push({&rounded, 1});
+      }
+  }
+  double read(double samples) const noexcept
+  {
+      return ready() ? history_.read(0, std::clamp(samples, 2.0, longest()), cydsp::HistoryInterpolation::catmullRom) : 0;
+  }
 
 private:
-    std::vector<float> buffer_;
-    int mask_ {};
-    int write_ {};
+  DspHistory<double> history_;
 };
 
 // One biquad section and its state.
-struct Biquad {
-    BiquadCoefficients c;
-    double z1 {};
-    double z2 {};
-    void reset() noexcept { z1 = z2 = 0.0; }
-    double run(const double x) noexcept
-    {
-        const auto y = c.b0 * x + z1;
-        z1 = c.b1 * x - c.a1 * y + z2;
-        z2 = c.b2 * x - c.a2 * y;
-        return y;
-    }
-};
+using Biquad = DspSampleBiquad;
 
 // A band-pass of two poles (state variable), its gain one at its centre:
 // the noises' colours.
@@ -597,10 +563,11 @@ public:
         // drive (a tube's curve, leaning to one side as it is pushed), the
         // tone stack.
         const auto dcFollow = 1.0 - std::exp(-2.0 * kPi * character.lowCut / rate_);
-        coil_.c = designEqBand(EqBandType::highCut, std::clamp(v(pickupTone), 200.0, 30'000.0), 0.0, character.coilQ, 0, 0, rate_);
+        coil_.setCoefficients(
+            designEqBand(EqBandType::highCut, std::clamp(v(pickupTone), 200.0, 30'000.0), 0.0, character.coilQ, 0, 0, rate_));
         const auto colourOn = std::abs(character.colourDb) > 0.01;
         if (colourOn)
-            colour_.c = designEqBand(EqBandType::bell, character.colourHz, character.colourDb, character.colourQ, 0, 0, rate_);
+            colour_.setCoefficients(designEqBand(EqBandType::bell, character.colourHz, character.colourDb, character.colourQ, 0, 0, rate_));
         const auto drive = std::clamp(v(driveAmount), 0.0, 1.0);
         const auto driveOn = drive > 1.0e-4;
         const auto driveGain = 0.05 + 14.0 * std::pow(drive, 1.6);
@@ -615,11 +582,11 @@ public:
         const auto bodyOn = std::abs(bodyDb) > 0.01;
         const auto trebleOn = std::abs(trebleDb) > 0.01;
         if (bassOn)
-            bass_.c = designEqBand(EqBandType::lowShelf, 150.0, bassDb, 0.7, 0, 0, rate_);
+            bass_.setCoefficients(designEqBand(EqBandType::lowShelf, 150.0, bassDb, 0.7, 0, 0, rate_));
         if (bodyOn)
-            body_.c = designEqBand(EqBandType::bell, 650.0, bodyDb, 0.8, 0, 0, rate_);
+            body_.setCoefficients(designEqBand(EqBandType::bell, 650.0, bodyDb, 0.8, 0, 0, rate_));
         if (trebleOn)
-            treble_.c = designEqBand(EqBandType::highShelf, 3'500.0, trebleDb, 0.7, 0, 0, rate_);
+            treble_.setCoefficients(designEqBand(EqBandType::highShelf, 3'500.0, trebleDb, 0.7, 0, 0, rate_));
         // The level: the velocity's (the motion already follows it), the
         // mechanism's, the keyboard evened out (a tine's treble lifted a
         // little, a reed's bass); then the output, the master, the expression.
@@ -805,29 +772,37 @@ public:
 
             const auto noisy = thump_ > 1.0e-7 || knock_ > 1.0e-7 || click_ > 1.0e-7;
             for (int i = 0; i < length; ++i) {
-                const auto t = static_cast<double>(i + 1) * inverse;
                 auto y = motion[static_cast<std::size_t>(i)] * pre;
                 if (noisy) {
-                    y += thumpFilter_.run(random()) * thump_ + knockFilter_.run(random()) * knock_ + clickFilter_.run(random()) * click_;
+                    // Sequence the draws explicitly: the old compound expression left
+                    // their association to the three noise filters compiler-dependent.
+                    const auto thumpNoise = random();
+                    const auto knockNoise = random();
+                    const auto clickNoise = random();
+                    y += thumpFilter_.run(thumpNoise) * thump_ + knockFilter_.run(knockNoise) * knock_ +
+                         clickFilter_.run(clickNoise) * click_;
                     thump_ *= thumpFall_;
                     knock_ *= knockFall_;
                     click_ *= clickFall_;
                 }
                 dcLow_ += dcFollow * (y - dcLow_);
-                y = coil_.run(y - dcLow_);
-                if (colourOn)
-                    y = colour_.run(y);
-                if (driveOn) {
-                    y = (std::tanh(driveGain * y + bias) - biasTanh) * driveNorm;
-                    driveLow_ += driveFollow * (y - driveLow_);
-                    y -= driveLow_;
-                }
-                if (bassOn)
-                    y = bass_.run(y);
-                if (bodyOn)
-                    y = body_.run(y);
-                if (trebleOn)
-                    y = treble_.run(y);
+                motion[static_cast<std::size_t>(i)]=y-dcLow_;
+            }
+            // Coefficients are constant for this control step. Batch each
+            // feed-forward stage; avoid validating a one-frame layout per sample.
+            const std::span<double> block(motion.data(),static_cast<std::size_t>(length));
+            coil_.process(block);
+            if(colourOn) colour_.process(block);
+            if(driveOn) for(auto& y:block) {
+                y=(std::tanh(driveGain*y+bias)-biasTanh)*driveNorm;
+                driveLow_+=driveFollow*(y-driveLow_); y-=driveLow_;
+            }
+            if(bassOn) bass_.process(block);
+            if(bodyOn) body_.process(block);
+            if(trebleOn) treble_.process(block);
+            for(int i=0;i<length;++i) {
+                const auto t=static_cast<double>(i+1)*inverse;
+                const auto y=motion[static_cast<std::size_t>(i)];
                 chorus_.push(y);
                 auto outLeft = y;
                 auto outRight = y;

@@ -1,6 +1,9 @@
+#include <cydaw/base/Socket.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
+
 
 #include <functional>
 #include <string>
@@ -10,12 +13,12 @@ namespace cydaw::app {
 // The local control port an agent talks to (see tools/mcp): one JSON
 // object per line in, one per line out, every request answered on the
 // message thread. Listens on the loopback address only.
-class RemoteControlServer final : private juce::Thread {
+class RemoteControlServer final : private cydaw::base::Thread {
 public:
-    using Handler = std::function<juce::var(const juce::var&)>;
+    using Handler = std::function<cydaw::base::Value(const cydaw::base::Value&)>;
 
     // With a token, a request must carry {"token": …} to be answered.
-    RemoteControlServer(int port, Handler handler, juce::String token = {});
+    RemoteControlServer(int port, Handler handler, cydaw::base::Text token = {});
     ~RemoteControlServer() override;
 
     [[nodiscard]] bool isListening() const noexcept { return listening_; }
@@ -23,14 +26,14 @@ public:
 
 private:
     void run() override;
-    void serve(juce::StreamingSocket& client);
+    void serve(cydaw::base::StreamingSocket& client);
     // The reply to one line: the handler's answer, or why there is none.
-    [[nodiscard]] juce::String respond(const juce::String& line) const;
+    [[nodiscard]] cydaw::base::Text respond(const cydaw::base::Text& line) const;
 
     int port_ {};
     Handler handler_;
-    juce::String token_;
-    juce::StreamingSocket listener_;
+    cydaw::base::Text token_;
+    cydaw::base::StreamingSocket listener_;
     bool listening_ {};
 };
 

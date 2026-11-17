@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
 #include "Widgets.h"
 
 #include "Icons.h"
@@ -32,7 +34,7 @@ namespace cydaw::v2::ui {
 namespace {
 
 bool gFrench = true;
-juce::String gLanguage { "fr" };
+cydaw::base::Text gLanguage { "fr" };
 // Another language's translations, keyed by the English text, and the
 // translation each English literal (by address) was found to have.
 std::unordered_map<std::string, std::string> gDictionary;
@@ -109,9 +111,9 @@ void setFrench(const bool value)
     setLanguage(value ? "fr" : "en");
 }
 
-void setLanguage(const juce::String& code)
+void setLanguage(const cydaw::base::Text& code)
 {
-    gLanguage = code.isNotEmpty() ? code : juce::String("en");
+    gLanguage = code.isNotEmpty() ? code : cydaw::base::Text("en");
     gFrench = gLanguage == "fr";
     cyui::setLocale(gLanguage.toRawUTF8());
     gTranslated.clear();
@@ -119,20 +121,20 @@ void setLanguage(const juce::String& code)
     bumpLanguageRevision();
     if (gLanguage == "fr" || gLanguage == "en")
         return;
-    const auto file = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+    const auto file = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
                           .getSiblingFile("i18n")
                           .getChildFile("v2")
                           .getChildFile(gLanguage + ".json");
     if (!file.existsAsFile() || file.getSize() > 8 * 1024 * 1024)
         return;
     // The parsed value owns the object: kept alive while it is read.
-    const auto parsed = juce::JSON::parse(file);
+    const auto parsed = cydaw::base::JSON::parse(file);
     if (const auto* object = parsed.getDynamicObject())
         for (const auto& property : object->getProperties())
             gDictionary.emplace(property.name.toString().toStdString(), property.value.toString().toStdString());
 }
 
-juce::String language()
+cydaw::base::Text language()
 {
     return gLanguage;
 }
@@ -374,8 +376,8 @@ LearnTrackScope::~LearnTrackScope()
     learnState().tracks.pop_back();
 }
 
-LearnParameterScope::LearnParameterScope(const juce::String& binding, const juce::String& label, const std::string& prefix,
-                                         const juce::String& trackName)
+LearnParameterScope::LearnParameterScope(const cydaw::base::Text& binding, const cydaw::base::Text& label, const std::string& prefix,
+                                         const cydaw::base::Text& trackName)
 {
     auto& state = learnState();
     std::string key;
@@ -779,18 +781,18 @@ void centredText(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour, const c
 { cyui::centredText(list, min, max, colour, text); }
 
 
-juce::String sizeText(const juce::int64 bytes)
+cydaw::base::Text sizeText(const std::int64_t bytes)
 {
     const auto value = static_cast<double>(bytes);
-    juce::String text;
+    cydaw::base::Text text;
     if (value >= 1e9)
-        text = juce::String(value / 1e9, 1) + L(" Go", " GB");
+        text = cydaw::base::Text(value / 1e9, 1) + L(" Go", " GB");
     else if (value >= 1e6)
-        text = juce::String(juce::roundToInt(value / 1e6)) + L(" Mo", " MB");
+        text = cydaw::base::Text(cydaw::base::roundToInt(value / 1e6)) + L(" Mo", " MB");
     else if (value >= 1e3)
-        text = juce::String(juce::roundToInt(value / 1e3)) + L(" Ko", " kB");
+        text = cydaw::base::Text(cydaw::base::roundToInt(value / 1e3)) + L(" Ko", " kB");
     else
-        text = juce::String(bytes) + L(" o", " B");
+        text = cydaw::base::Text(bytes) + L(" o", " B");
     return french() ? text.replaceCharacter('.', ',') : text;
 }
 

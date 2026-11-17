@@ -4937,6 +4937,7 @@ int main()
     controlModifiersShapeAndGiveBack();
     controlRouterMovesTargetsAndFeedsBack();
     djDeckPlaysAtItsTempo();
+    djCueReturnHoldsItsPosition();
     djChannelKillsItsBands();
     djEffectsPlayInTime();
     djAnalysisFindsTempoAndKey();

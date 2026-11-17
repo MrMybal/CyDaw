@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "InstrumentEffects.h"
 
 #include "Icons.h"
@@ -12,8 +13,8 @@ namespace cydaw::v2::instrument_effects {
 using ui::dp;
 using ui::L;
 
-void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const juce::String& ownType,
-          const juce::String& instrumentName, const std::span<const Choice> choices, const ImU32 colour)
+void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const cydaw::base::Text& ownType,
+          const cydaw::base::Text& instrumentName, const std::span<const Choice> choices, const ImU32 colour)
 {
     auto* slot = studio.graphFor(track);
     if (slot == nullptr)
@@ -21,8 +22,8 @@ void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const juce:
     auto& graph = slot->graph();
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("%s", (ui::french()
-                                   ? juce::String::fromUTF8("Les effets de la piste, après ") + instrumentName
-                                         + juce::String::fromUTF8(", dans l'ordre où ils sont ajoutés (Périphériques les "
+                                   ? cydaw::base::Text::fromUTF8("Les effets de la piste, après ") + instrumentName
+                                         + cydaw::base::Text::fromUTF8(", dans l'ordre où ils sont ajoutés (Périphériques les "
                                                                   "montre aussi). Un clic en ajoute un ; la croix le retire.")
                                    : "The track's effects, after " + instrumentName
                                          + ", in the order they are added (Devices shows them too). A click adds one; the "
@@ -31,7 +32,7 @@ void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const juce:
     ImGui::PopTextWrapPos();
     for (const auto& choice : choices) {
         ImGui::PushID(choice.key);
-        const auto label = juce::String("+ ") + (ui::french() ? juce::String::fromUTF8(choice.french) : juce::String(choice.english));
+        const auto label = cydaw::base::Text("+ ") + (ui::french() ? cydaw::base::Text::fromUTF8(choice.french) : cydaw::base::Text(choice.english));
         if (ImGui::Button(label.toRawUTF8())) {
             if (const auto result = studio.insertDevice(track, choice.key); result.failed()) {
                 state.status = result.getErrorMessage();

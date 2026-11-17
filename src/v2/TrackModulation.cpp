@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
 #include "TrackModulation.h"
 
 #include <cydaw/engine/EffectCatalogue.h>
@@ -11,14 +13,14 @@
 namespace cydaw::v2::modulation {
 namespace {
 
-double number(const juce::DynamicObject& object, const char* key, const double fallback)
+double number(const cydaw::base::Object& object, const char* key, const double fallback)
 {
     return object.hasProperty(key) ? static_cast<double>(object.getProperty(key)) : fallback;
 }
 
 } // namespace
 
-std::vector<Assignment> readAssignments(const juce::var& array)
+std::vector<Assignment> readAssignments(const cydaw::base::Value& array)
 {
     std::vector<Assignment> out;
     if (const auto* values = array.getArray())
@@ -38,11 +40,11 @@ std::vector<Assignment> readAssignments(const juce::var& array)
     return out;
 }
 
-juce::var writeAssignments(const std::vector<Assignment>& assignments)
+cydaw::base::Value writeAssignments(const std::vector<Assignment>& assignments)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& assignment : assignments) {
-        auto object = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto object = cydaw::base::Object::Ptr(new cydaw::base::Object());
         object->setProperty("binding", assignment.binding);
         object->setProperty("label", assignment.label);
         object->setProperty("base", assignment.base);
@@ -50,16 +52,16 @@ juce::var writeAssignments(const std::vector<Assignment>& assignments)
         object->setProperty("maximum", assignment.maximum);
         object->setProperty("amount", assignment.amount);
         object->setProperty("enabled", assignment.enabled);
-        values.add(juce::var(object.get()));
+        values.add(cydaw::base::Value(object.get()));
     }
-    return juce::var(values);
+    return cydaw::base::Value(values);
 }
 
-double evaluate(const juce::var& state, const double timeSeconds)
+double evaluate(const cydaw::base::Value& state, const double timeSeconds)
 {
     struct ValueNode {
         std::uint64_t id {};
-        juce::String type;
+        cydaw::base::Text type;
         float rate { 1.0f };
         float depth { 1.0f };
         float offset {};
@@ -83,13 +85,13 @@ double evaluate(const juce::var& state, const double timeSeconds)
             if (object == nullptr)
                 continue;
             ValueNode node;
-            node.id = static_cast<std::uint64_t>(static_cast<juce::int64>(object->getProperty("id")));
+            node.id = static_cast<std::uint64_t>(static_cast<std::int64_t>(object->getProperty("id")));
             node.type = object->getProperty("type").toString();
             if (const auto* parameters = object->getProperty("parameters").getDynamicObject()) {
-                node.rate = juce::jlimit(0.01f, 40.0f, static_cast<float>(number(*parameters, "modulationRateHz", 1.0)));
-                node.depth = juce::jlimit(0.0f, 1.0f, static_cast<float>(number(*parameters, "modulationDepth", 1.0)));
-                node.offset = juce::jlimit(-1.0f, 1.0f, static_cast<float>(number(*parameters, "modulationOffset", 0.0)));
-                node.shape = juce::jlimit(0, 3, static_cast<int>(std::lround(number(*parameters, "modulationShape", 0.0))));
+                node.rate = cydaw::base::limit(0.01f, 40.0f, static_cast<float>(number(*parameters, "modulationRateHz", 1.0)));
+                node.depth = cydaw::base::limit(0.0f, 1.0f, static_cast<float>(number(*parameters, "modulationDepth", 1.0)));
+                node.offset = cydaw::base::limit(-1.0f, 1.0f, static_cast<float>(number(*parameters, "modulationOffset", 0.0)));
+                node.shape = cydaw::base::limit(0, 3, static_cast<int>(std::lround(number(*parameters, "modulationShape", 0.0))));
                 node.operand = static_cast<float>(number(*parameters, "valueOperand", 0.0));
                 node.minimum = static_cast<float>(number(*parameters, "valueMinimum", -1.0));
                 node.maximum = static_cast<float>(number(*parameters, "valueMaximum", 1.0));
@@ -100,8 +102,8 @@ double evaluate(const juce::var& state, const double timeSeconds)
     if (const auto* values = root->getProperty("connections").getArray())
         for (const auto& value : *values)
             if (const auto* object = value.getDynamicObject())
-                links.push_back({ static_cast<std::uint64_t>(static_cast<juce::int64>(object->getProperty("source"))),
-                                  static_cast<std::uint64_t>(static_cast<juce::int64>(object->getProperty("destination"))) });
+                links.push_back({ static_cast<std::uint64_t>(static_cast<std::int64_t>(object->getProperty("source"))),
+                                  static_cast<std::uint64_t>(static_cast<std::int64_t>(object->getProperty("destination"))) });
 
     std::vector<std::uint64_t> visiting;
     std::function<double(std::uint64_t)> evaluateNode = [&](const std::uint64_t nodeId) -> double {
@@ -116,7 +118,7 @@ double evaluate(const juce::var& state, const double timeSeconds)
         const auto& type = found->type;
         if (type == "lfo") {
             const auto phase = std::fmod(std::max(0.0, timeSeconds) * found->rate, 1.0);
-            auto waveform = std::sin(juce::MathConstants<double>::twoPi * phase);
+            auto waveform = std::sin(cydaw::base::MathConstants<double>::twoPi * phase);
             if (found->shape == 1)
                 waveform = 1.0 - 4.0 * std::abs(phase - 0.5);
             else if (found->shape == 2)
@@ -159,7 +161,7 @@ double evaluate(const juce::var& state, const double timeSeconds)
         } else if (type == "value-max") {
             result = std::max(result, static_cast<double>(found->operand));
         } else if (type == "value-clamp") {
-            result = juce::jlimit(static_cast<double>(std::min(found->minimum, found->maximum)),
+            result = cydaw::base::limit(static_cast<double>(std::min(found->minimum, found->maximum)),
                                   static_cast<double>(std::max(found->minimum, found->maximum)), result);
         } else if (type == "value-abs") {
             result = std::abs(result);
@@ -216,7 +218,7 @@ struct Field {
     }
 };
 
-std::optional<Field> fieldFor(const juce::String& suffix)
+std::optional<Field> fieldFor(const cydaw::base::Text& suffix)
 {
     using P = engine::NativeDspNodeParameters;
     if (suffix == "drive.db")
@@ -258,7 +260,7 @@ std::optional<Field> fieldFor(const juce::String& suffix)
 
 // node.<id>.<suffix>: the node and the field.
 template <typename Graph>
-auto resolve(Graph& graph, const juce::String& binding)
+auto resolve(Graph& graph, const cydaw::base::Text& binding)
     -> std::optional<std::pair<decltype(&graph.nodes.front().parameters), Field>>
 {
     if (!binding.startsWith("node."))
@@ -278,7 +280,7 @@ auto resolve(Graph& graph, const juce::String& binding)
 
 } // namespace
 
-std::optional<NativeTarget> nativeTargetFor(const juce::String& binding)
+std::optional<NativeTarget> nativeTargetFor(const cydaw::base::Text& binding)
 {
     if (!binding.startsWith("node."))
         return std::nullopt;
@@ -297,17 +299,17 @@ std::optional<NativeTarget> nativeTargetFor(const juce::String& binding)
     return target;
 }
 
-bool applyToNativeGraph(engine::NativeDspGraph& graph, const juce::String& binding, const double value)
+bool applyToNativeGraph(engine::NativeDspGraph& graph, const cydaw::base::Text& binding, const double value)
 {
     const auto found = resolve(graph, binding);
     if (!found)
         return false;
     auto& [parameters, field] = *found;
-    field.write(*parameters, juce::jlimit(field.minimum, field.maximum, static_cast<float>(value)));
+    field.write(*parameters, cydaw::base::limit(field.minimum, field.maximum, static_cast<float>(value)));
     return true;
 }
 
-std::optional<double> readFromNativeGraph(const engine::NativeDspGraph& graph, const juce::String& binding)
+std::optional<double> readFromNativeGraph(const engine::NativeDspGraph& graph, const cydaw::base::Text& binding)
 {
     const auto found = resolve(graph, binding);
     if (!found)
@@ -316,7 +318,7 @@ std::optional<double> readFromNativeGraph(const engine::NativeDspGraph& graph, c
     return static_cast<double>(field.read(*parameters));
 }
 
-LfoSettings firstLfo(const juce::var& valueGraph)
+LfoSettings firstLfo(const cydaw::base::Value& valueGraph)
 {
     LfoSettings settings;
     if (const auto* root = valueGraph.getDynamicObject())
@@ -335,7 +337,7 @@ LfoSettings firstLfo(const juce::var& valueGraph)
     return settings;
 }
 
-bool setFirstLfo(juce::var& valueGraph, const LfoSettings& settings)
+bool setFirstLfo(cydaw::base::Value& valueGraph, const LfoSettings& settings)
 {
     if (const auto* root = valueGraph.getDynamicObject())
         if (const auto* nodes = root->getProperty("nodes").getArray())
@@ -343,13 +345,13 @@ bool setFirstLfo(juce::var& valueGraph, const LfoSettings& settings)
                 if (auto* object = value.getDynamicObject(); object != nullptr && object->getProperty("type").toString() == "lfo") {
                     auto* parameters = object->getProperty("parameters").getDynamicObject();
                     if (parameters == nullptr) {
-                        object->setProperty("parameters", juce::var(new juce::DynamicObject()));
+                        object->setProperty("parameters", cydaw::base::Value(new cydaw::base::Object()));
                         parameters = object->getProperty("parameters").getDynamicObject();
                     }
-                    parameters->setProperty("modulationRateHz", juce::jlimit(0.01, 40.0, settings.rate));
-                    parameters->setProperty("modulationDepth", juce::jlimit(0.0, 1.0, settings.depth));
-                    parameters->setProperty("modulationOffset", juce::jlimit(-1.0, 1.0, settings.offset));
-                    parameters->setProperty("modulationShape", juce::jlimit(0, 3, settings.shape));
+                    parameters->setProperty("modulationRateHz", cydaw::base::limit(0.01, 40.0, settings.rate));
+                    parameters->setProperty("modulationDepth", cydaw::base::limit(0.0, 1.0, settings.depth));
+                    parameters->setProperty("modulationOffset", cydaw::base::limit(-1.0, 1.0, settings.offset));
+                    parameters->setProperty("modulationShape", cydaw::base::limit(0, 3, settings.shape));
                     return true;
                 }
     return false;

@@ -89,6 +89,10 @@ void DeckPlayer::reset() noexcept
     stretched_ = false;
     fadeLeft_ = 0;
     lastSpeed_ = 0.0;
+    lastOutput_ = {};
+    stopFrom_ = {};
+    stopFadeLeft_ = 0;
+    stoppedAt_ = false;
 }
 
 void DeckPlayer::setTrack(const TrackAudio* const track) noexcept
@@ -108,6 +112,16 @@ void DeckPlayer::jump(const double frame) noexcept
         fadeLeft_ = fadeLength_;
     }
     position_ = frame;
+}
+
+void DeckPlayer::stopAt(const double frame) noexcept
+{
+    const auto previous = lastOutput_;
+    reset();
+    position_ = frame;
+    stopFrom_ = previous;
+    stopFadeLeft_ = fadeLength_;
+    stoppedAt_ = true;
 }
 
 void DeckPlayer::setLoop(const double start, const double end) noexcept
@@ -179,8 +193,26 @@ void DeckPlayer::render(float* const left, float* const right, const int count, 
         std::fill_n(left, count, 0.0f);
         std::fill_n(right, count, 0.0f);
         lastSpeed_ = speed;
+        lastOutput_ = {};
         return;
     }
+    // A stationary platter cannot produce a constant sample into the shared
+    // master. Fade its last output, hold the playhead and keep effects' tails
+    // outside the reader intact. This also covers initial load and paused seeks.
+    if (speed == 0.0 && !stoppedAt_)
+        stopAt(position_);
+    if (stoppedAt_ && speed == 0.0) {
+        for (int i = 0; i < count; ++i) {
+            const auto gain = stopFadeLeft_ > 0
+                ? static_cast<float>(--stopFadeLeft_) / static_cast<float>(fadeLength_) : 0.0f;
+            left[i] = stopFrom_[0] * gain;
+            right[i] = stopFrom_[1] * gain;
+        }
+        lastOutput_ = { left[count - 1], right[count - 1] };
+        return;
+    }
+    stoppedAt_ = false;
+    stopFadeLeft_ = 0;
     const auto from = lastSpeed_;
     int done = 0;
     while (done < count) {
@@ -191,6 +223,7 @@ void DeckPlayer::render(float* const left, float* const right, const int count, 
         done += n;
     }
     lastSpeed_ = speed;
+    lastOutput_ = { left[count - 1], right[count - 1] };
 }
 
 void DeckPlayer::renderBlock(float* const left, float* const right, const int count, const double from, const double to,

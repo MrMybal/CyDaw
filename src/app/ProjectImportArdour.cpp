@@ -1,7 +1,12 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Xml.h>
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
-#include <juce_audio_basics/juce_audio_basics.h>
+#include <cydaw/midi/StandardMidiFile.h>
 
 #include <map>
 
@@ -21,13 +26,13 @@ constexpr double ticksPerBeat = 1'920.0;
 
 class ArdourReader {
 public:
-    ArdourReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
+    ArdourReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
-        const auto document = juce::XmlDocument::parse(file_);
+        const auto document = cydaw::base::XmlDocument::parse(file_);
         if (document == nullptr || !document->hasTagName("Session"))
-            return juce::Result::fail("Not an Ardour session: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not an Ardour session: " + file_.getFileName());
         out_.format = "ardour";
         out_.application = "Ardour (session " + document->getStringAttribute("version") + ")";
         out_.name = document->getStringAttribute("name");
@@ -44,20 +49,20 @@ public:
         if (const auto* routes = document->getChildByName("Routes"))
             for (const auto* route : routes->getChildWithTagNameIterator("Route"))
                 readRoute(*route);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
-    void readTempo(const juce::XmlElement& session)
+    void readTempo(const cydaw::base::XmlElement& session)
     {
         const auto* map = session.getChildByName("TempoMap");
         if (map == nullptr)
             return;
         superclocks_ = map->getDoubleAttribute("superclocks-per-second", superclocks_);
-        const juce::XmlElement* tempo = nullptr;
-        const juce::XmlElement* meter = nullptr;
+        const cydaw::base::XmlElement* tempo = nullptr;
+        const cydaw::base::XmlElement* meter = nullptr;
         auto tempos = 0;
-        std::function<void(const juce::XmlElement&)> walk = [&](const juce::XmlElement& element) {
+        std::function<void(const cydaw::base::XmlElement&)> walk = [&](const cydaw::base::XmlElement& element) {
             for (const auto* child : element.getChildIterator()) {
                 if (child->hasTagName("Tempo")) {
                     ++tempos;
@@ -76,19 +81,19 @@ private:
             const auto noteType = tempo->getDoubleAttribute("note-type", 4.0);
             if (noteType > 0.0)
                 bpm *= 4.0 / noteType;
-            out_.tempo = juce::jlimit(20.0, 999.0, bpm);
+            out_.tempo = cydaw::base::limit(20.0, 999.0, bpm);
         }
         if (tempos > 1)
-            out_.warnings.add("The tempo changes along the session: CyDAW keeps " + juce::String(out_.tempo, 2) + " BPM.");
+            out_.warnings.add("The tempo changes along the session: CyDAW keeps " + cydaw::base::Text(out_.tempo, 2) + " BPM.");
         if (meter != nullptr) {
-            out_.numerator = juce::jlimit(1, 32, static_cast<int>(meter->getDoubleAttribute("divisions-per-bar", 4.0)));
-            out_.denominator = juce::jlimit(
+            out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(meter->getDoubleAttribute("divisions-per-bar", 4.0)));
+            out_.denominator = cydaw::base::limit(
                 1, 32, static_cast<int>(meter->getDoubleAttribute("note-value", meter->getDoubleAttribute("note-type", 4.0))));
         }
     }
 
     // A time in seconds, whichever way it is written.
-    [[nodiscard]] double seconds(const juce::String& text) const
+    [[nodiscard]] double seconds(const cydaw::base::Text& text) const
     {
         const auto value = text.trim();
         if (value.startsWithChar('a'))
@@ -98,7 +103,7 @@ private:
         return value.getDoubleValue() / sampleRate_;
     }
 
-    [[nodiscard]] double beats(const juce::String& text) const
+    [[nodiscard]] double beats(const cydaw::base::Text& text) const
     {
         const auto value = text.trim();
         if (value.startsWithChar('b'))
@@ -106,7 +111,7 @@ private:
         return out_.secondsToBeats(seconds(value));
     }
 
-    static const juce::XmlElement* controllable(const juce::XmlElement& element, const juce::String& name)
+    static const cydaw::base::XmlElement* controllable(const cydaw::base::XmlElement& element, const cydaw::base::Text& name)
     {
         for (const auto* child : element.getChildIterator()) {
             if (child->hasTagName("Controllable") && child->getStringAttribute("name") == name)
@@ -117,11 +122,11 @@ private:
         return nullptr;
     }
 
-    void readRoute(const juce::XmlElement& route)
+    void readRoute(const cydaw::base::XmlElement& route)
     {
         const auto* presentation = route.getChildByName("PresentationInfo");
         // Where it says what it is: its PresentationInfo, or (Ardour 3 to 4) the route itself.
-        const auto flags = (presentation != nullptr ? presentation->getStringAttribute("flags") : juce::String()) + ","
+        const auto flags = (presentation != nullptr ? presentation->getStringAttribute("flags") : cydaw::base::Text()) + ","
                            + route.getStringAttribute("flags");
         const auto* gain = controllable(route, "gaincontrol");
         if (flags.contains("MasterOut")) {
@@ -137,30 +142,30 @@ private:
         if (gain != nullptr)
             track.gainDb = linearToDb(gain->getDoubleAttribute("value", 1.0));
         if (const auto* pan = controllable(route, "pan-azimuth"))
-            track.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, pan->getDoubleAttribute("value", 0.5) * 2.0 - 1.0));
+            track.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, pan->getDoubleAttribute("value", 0.5) * 2.0 - 1.0));
         if (const auto* mute = controllable(route, "mute"))
             track.muted = mute->getDoubleAttribute("value", 0.0) > 0.5;
         if (const auto* solo = controllable(route, "solo"))
             track.solo = solo->getDoubleAttribute("value", 0.0) > 0.5 || solo->getBoolAttribute("self-solo", false);
         if (presentation != nullptr && presentation->hasAttribute("color")) {
-            const auto colour = static_cast<juce::uint32>(presentation->getStringAttribute("color").getLargeIntValue());
+            const auto colour = static_cast<std::uint32_t>(presentation->getStringAttribute("color").getLargeIntValue());
             // RGBA.
             if (colour != 0)
-                track.colour = opaque(static_cast<juce::uint8>(colour >> 24), static_cast<juce::uint8>(colour >> 16),
-                                      static_cast<juce::uint8>(colour >> 8));
+                track.colour = opaque(static_cast<std::uint8_t>(colour >> 24), static_cast<std::uint8_t>(colour >> 16),
+                                      static_cast<std::uint8_t>(colour >> 8));
         }
         if (flags.contains("AudioBus") || flags.contains("MidiBus"))
             out_.warnings.add("Bus \"" + track.name + "\" came in as a track without clips; its sends were left out.");
         // Its plug-ins, in their order: on a MIDI track the first is its instrument.
         for (const auto* processor : route.getChildWithTagNameIterator("Processor")) {
             const auto type = processor->getStringAttribute("type");
-            static const juce::StringArray plugins { "lv2", "vst", "lxvst", "vst3", "ladspa", "au", "mac-vst", "luaproc" };
+            static const cydaw::base::TextList plugins { "lv2", "vst", "lxvst", "vst3", "ladspa", "au", "mac-vst", "luaproc" };
             if (!plugins.contains(type))
                 continue;
             ImportedDevice device;
             device.name = processor->getStringAttribute("name");
             device.plugin = type != "luaproc";
-            device.type = device.plugin ? juce::String() : device.name;
+            device.type = device.plugin ? cydaw::base::Text() : device.name;
             device.format = type == "vst3" ? "VST3" : type.startsWith("vst") || type == "lxvst" || type == "mac-vst" ? "VST2"
                             : type == "au" ? "AU" : type.toUpperCase();
             device.instrument = track.midi && !track.hadInstrument;
@@ -169,7 +174,7 @@ private:
             track.chain.push_back(std::move(device));
         }
         // Its regions.
-        const juce::XmlElement* playlist = nullptr;
+        const cydaw::base::XmlElement* playlist = nullptr;
         for (const auto* key : { "audio-playlist", "midi-playlist" })
             if (const auto found = playlists_.find(route.getStringAttribute(key)); found != playlists_.end())
                 playlist = found->second;
@@ -182,20 +187,20 @@ private:
         out_.tracks.push_back(std::move(track));
     }
 
-    [[nodiscard]] juce::File sourceFile(const juce::XmlElement& source, const juce::String& kind) const
+    [[nodiscard]] cydaw::base::File sourceFile(const cydaw::base::XmlElement& source, const cydaw::base::Text& kind) const
     {
         const auto name = source.getStringAttribute("name");
         const auto origin = source.getStringAttribute("origin");
         const auto session = out_.name.isNotEmpty() ? out_.name : file_.getFileNameWithoutExtension();
         for (const auto& candidate : { folder_.getChildFile("interchange").getChildFile(session).getChildFile(kind).getChildFile(name),
-                                       juce::File::isAbsolutePath(name) ? juce::File(name) : juce::File(),
-                                       juce::File::isAbsolutePath(origin) ? juce::File(origin) : juce::File() })
-            if (candidate != juce::File() && candidate.existsAsFile())
+                                       cydaw::base::File::isAbsolutePath(name) ? cydaw::base::File(name) : cydaw::base::File(),
+                                       cydaw::base::File::isAbsolutePath(origin) ? cydaw::base::File(origin) : cydaw::base::File() })
+            if (candidate != cydaw::base::File() && candidate.existsAsFile())
                 return candidate;
         return resolveProjectAudioFile(folder_, name);
     }
 
-    void readRegion(const juce::XmlElement& region, ImportedTrack& track)
+    void readRegion(const cydaw::base::XmlElement& region, ImportedTrack& track)
     {
         const auto found = sources_.find(region.getStringAttribute("source-0"));
         if (found == sources_.end())
@@ -212,28 +217,20 @@ private:
             clip.lengthBeats = std::max(0.25, beats(region.getStringAttribute("length")));
             const auto offset = beats(region.getStringAttribute("start"));
             const auto file = sourceFile(source, "midifiles");
-            if (file == juce::File()) {
+            if (file == cydaw::base::File()) {
                 out_.missingFiles.addIfNotAlreadyThere(source.getStringAttribute("name"));
             } else {
-                juce::FileInputStream input(file);
-                juce::MidiFile smf;
-                if (input.openedOk() && smf.readFrom(input)) {
-                    const auto perQuarter = std::max<short>(1, smf.getTimeFormat());
-                    for (int index = 0; index < smf.getNumTracks(); ++index) {
-                        juce::MidiMessageSequence sequence(*smf.getTrack(index));
-                        sequence.updateMatchedPairs();
-                        for (const auto* event : sequence) {
-                            if (!event->message.isNoteOn() || event->noteOffObject == nullptr)
-                                continue;
-                            const auto start = event->message.getTimeStamp() / perQuarter - offset;
-                            const auto end = event->noteOffObject->message.getTimeStamp() / perQuarter - offset;
-                            if (start < -1.0e-9 || start >= clip.lengthBeats)
-                                continue;
-                            clip.notes.push_back({ event->message.getNoteNumber(), start,
-                                                   std::max(1.0e-3, std::min(end, clip.lengthBeats) - start),
-                                                   event->message.getFloatVelocity() });
+                cyaudio::MidiFile smf;
+                if (cydaw::midi::loadStandardFile(file,smf).wasOk()) {
+                    const auto perQuarter = std::max<int>(1,static_cast<std::int16_t>(smf.division));
+                    for (const auto& events : smf.tracks)
+                        for (const auto& note : cydaw::midi::pairedNotes(events)) {
+                            if (!note.end) continue;
+                            const auto start = double(note.tick)/perQuarter-offset;
+                            const auto end = double(*note.end)/perQuarter-offset;
+                            if (start < -1.0e-9 || start >= clip.lengthBeats) continue;
+                            clip.notes.push_back({int(note.key),start,std::max(1.0e-3,std::min(end,clip.lengthBeats)-start),float(note.velocity)/127.f});
                         }
-                    }
                 }
             }
             track.midi = true;
@@ -244,12 +241,12 @@ private:
         clip.name = name;
         clip.originalPath = source.getStringAttribute("name");
         clip.file = sourceFile(source, "audiofiles");
-        if (clip.file == juce::File())
+        if (clip.file == cydaw::base::File())
             out_.missingFiles.addIfNotAlreadyThere(clip.originalPath);
         // A stereo region: its two mono files (left, right) made one.
-        if (const auto right = sources_.find(region.getStringAttribute("source-1")); right != sources_.end() && clip.file != juce::File()) {
+        if (const auto right = sources_.find(region.getStringAttribute("source-1")); right != sources_.end() && clip.file != cydaw::base::File()) {
             const auto rightFile = sourceFile(*right->second, "audiofiles");
-            if (rightFile != juce::File())
+            if (rightFile != cydaw::base::File())
                 clip.file = joinChannels(clip.file, rightFile, out_.name.isNotEmpty() ? out_.name : file_.getFileNameWithoutExtension(),
                                          clip.originalPath.upToLastOccurrenceOf(".", false, false).upToLastOccurrenceOf("%", false, false),
                                          out_);
@@ -266,19 +263,19 @@ private:
         track.audioClips.push_back(std::move(clip));
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
     double sampleRate_ { 48'000.0 };
     double superclocks_ { 282'240'000.0 };
-    std::map<juce::String, const juce::XmlElement*> sources_;
-    std::map<juce::String, const juce::XmlElement*> playlists_;
-    std::map<juce::String, const juce::XmlElement*> playlistsByName_;
+    std::map<cydaw::base::Text, const cydaw::base::XmlElement*> sources_;
+    std::map<cydaw::base::Text, const cydaw::base::XmlElement*> playlists_;
+    std::map<cydaw::base::Text, const cydaw::base::XmlElement*> playlistsByName_;
 };
 
 } // namespace
 
-juce::Result importArdourSession(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importArdourSession(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     ArdourReader reader(file, out);

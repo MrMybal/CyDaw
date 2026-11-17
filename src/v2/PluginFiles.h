@@ -1,19 +1,21 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
-#include <juce_core/juce_core.h>
+
 namespace cydaw::v2::plugin_files
 {
-inline juce::File scripts()
+inline cydaw::base::File scripts()
 {
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("CyDAW/JSFX");
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::userDocumentsDirectory).getChildFile("CyDAW/JSFX");
 }
-inline juce::Array<juce::File> folders()
+inline cydaw::base::Array<cydaw::base::File> folders()
 {
-    juce::Array<juce::File> result;
-    auto user = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
-#if JUCE_WINDOWS
-    auto common = juce::File::getSpecialLocation(juce::File::windowsProgramFilesCommon);
-    const auto localPath=juce::SystemStats::getEnvironmentVariable("LOCALAPPDATA",{});
-    if(juce::File::isAbsolutePath(localPath))for(auto format:{"VST3","CLAP"})result.add(juce::File(localPath).getChildFile("Programs/Common").getChildFile(format));
+    cydaw::base::Array<cydaw::base::File> result;
+    auto user = cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory);
+#if defined(_WIN32)
+    auto common = cydaw::base::File::getSpecialLocation(cydaw::base::File::windowsProgramFilesCommon);
+    const auto localPath=cydaw::base::SystemStats::getEnvironmentVariable("LOCALAPPDATA",{});
+    if(cydaw::base::File::isAbsolutePath(localPath))for(auto format:{"VST3","CLAP"})result.add(cydaw::base::File(localPath).getChildFile("Programs/Common").getChildFile(format));
     for (auto format : {"VST3", "CLAP", "LV2"})
     {
         result.add(common.getChildFile(format));
@@ -21,43 +23,43 @@ inline juce::Array<juce::File> folders()
     }
     result.add(user.getChildFile("LV2"));
     result.add(user.getChildFile("CLAP"));
-#elif JUCE_MAC
+#elif defined(__APPLE__)
     for (auto format : {"VST3", "CLAP", "LV2"})
     {
-        result.add(juce::File("/Library/Audio/Plug-Ins").getChildFile(format));
-        result.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+        result.add(cydaw::base::File("/Library/Audio/Plug-Ins").getChildFile(format));
+        result.add(cydaw::base::File::getSpecialLocation(cydaw::base::File::userHomeDirectory)
                        .getChildFile("Library/Audio/Plug-Ins")
                        .getChildFile(format));
     }
 #else
     for (auto format : {"vst3", "clap", "lv2"})
     {
-        result.add(juce::File("/usr/lib").getChildFile(format));
-        result.add(juce::File("/usr/local/lib").getChildFile(format));
-        result.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-                       .getChildFile("." + juce::String(format)));
+        result.add(cydaw::base::File("/usr/lib").getChildFile(format));
+        result.add(cydaw::base::File("/usr/local/lib").getChildFile(format));
+        result.add(cydaw::base::File::getSpecialLocation(cydaw::base::File::userHomeDirectory)
+                       .getChildFile("." + cydaw::base::Text(format)));
     }
 #endif
     for (auto name : {"CLAP_PATH", "LV2_PATH"})
-        for (auto path : juce::StringArray::fromTokens(juce::SystemStats::getEnvironmentVariable(name, {}),
-#if JUCE_WINDOWS
+        for (auto path : cydaw::base::TextList::fromTokens(cydaw::base::SystemStats::getEnvironmentVariable(name, {}),
+#if defined(_WIN32)
                                                        ";",
 #else
                                                        ":",
 #endif
                                                        ""))
-            if (juce::File::isAbsolutePath(path))
-                result.add(juce::File(path));
+            if (cydaw::base::File::isAbsolutePath(path))
+                result.add(cydaw::base::File(path));
     result.add(scripts());
-    result.add(juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("JSFX"));
+    result.add(cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile).getSiblingFile("JSFX"));
     result.add(user.getChildFile("REAPER/Effects"));
     return result;
 }
-inline bool candidate(const juce::File &file)
+inline bool candidate(const cydaw::base::File &file)
 {
     const auto path = file.getFullPathName();
     for (auto extension : {".vst3", ".lv2", ".clap"})
-        if (path.containsIgnoreCase(juce::String(extension) + juce::File::getSeparatorString()))
+        if (path.containsIgnoreCase(cydaw::base::Text(extension) + cydaw::base::File::getSeparatorString()))
             return false;
     if (file.hasFileExtension("vst3;clap;lv2;jsfx;cyplugin"))
         return true;
@@ -66,15 +68,15 @@ inline bool candidate(const juce::File &file)
         auto stream = file.createInputStream();
         if (stream)
         {
-            juce::MemoryBlock head;
+            cydaw::base::MemoryBlock head;
             stream->readIntoMemoryBlock(head, 4096);
-            return juce::String::fromUTF8(static_cast<const char *>(head.getData()), int(head.getSize()))
+            return cydaw::base::Text::fromUTF8(static_cast<const char *>(head.getData()), int(head.getSize()))
                 .containsIgnoreCase("desc:");
         }
     }
     return false;
 }
-inline juce::String format(const juce::File &file)
+inline cydaw::base::Text format(const cydaw::base::File &file)
 {
     return file.hasFileExtension("vst3")   ? "VST3"
            : file.hasFileExtension("clap") ? "CLAP"

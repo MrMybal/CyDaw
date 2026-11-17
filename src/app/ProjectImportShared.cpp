@@ -1,7 +1,12 @@
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
-#include <juce_audio_formats/juce_audio_formats.h>
 
 #include <mutex>
 
@@ -9,34 +14,34 @@ namespace cydaw::app::project_import {
 namespace {
 
 std::mutex folderLock;
-juce::File folder;
+cydaw::base::File folder;
 
 } // namespace
 
-void setImportedAudioFolder(const juce::File& where)
+void setImportedAudioFolder(const cydaw::base::File& where)
 {
     const std::scoped_lock lock(folderLock);
     folder = where;
 }
 
-juce::File importedAudioFolder()
+cydaw::base::File importedAudioFolder()
 {
     const std::scoped_lock lock(folderLock);
-    return folder != juce::File() ? folder
-                                  : juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("CyDAW Imported Audio");
+    return folder != cydaw::base::File() ? folder
+                                  : cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory).getChildFile("CyDAW Imported Audio");
 }
 
 namespace shared {
 
-juce::File joinChannels(const juce::File& left, const juce::File& right, const juce::String& project, const juce::String& name,
+cydaw::base::File joinChannels(const cydaw::base::File& left, const cydaw::base::File& right, const cydaw::base::Text& project, const cydaw::base::Text& name,
                         ImportedProject& out)
 {
-    auto safe = juce::File::createLegalFileName(name.isNotEmpty() ? name : left.getFileNameWithoutExtension());
+    auto safe = cydaw::base::File::createLegalFileName(name.isNotEmpty() ? name : left.getFileNameWithoutExtension());
     // Beside the project it comes from (it moves with it), else in CyDAW's
     // own folder for imported audio.
     auto where = out.source.getParentDirectory().getChildFile("CyDAW Imported Audio");
-    if (out.source == juce::File() || where.createDirectory().failed())
-        where = importedAudioFolder().getChildFile(juce::File::createLegalFileName(project));
+    if (out.source == cydaw::base::File() || where.createDirectory().failed())
+        where = importedAudioFolder().getChildFile(cydaw::base::File::createLegalFileName(project));
     const auto target = where.getChildFile(safe + ".wav");
     if (!out.warnings.contains("Stereo files made from the left and right recordings: " + where.getFullPathName()))
         out.warnings.add("Stereo files made from the left and right recordings: " + where.getFullPathName());
@@ -44,10 +49,10 @@ juce::File joinChannels(const juce::File& left, const juce::File& right, const j
     if (target.existsAsFile() && target.getLastModificationTime() >= left.getLastModificationTime()
         && target.getLastModificationTime() >= right.getLastModificationTime())
         return target;
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> leftReader(formats.createReaderFor(left));
-    std::unique_ptr<juce::AudioFormatReader> rightReader(formats.createReaderFor(right));
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    std::unique_ptr<cydaw::audio::AudioFormatReader> leftReader(formats.createReaderFor(left));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> rightReader(formats.createReaderFor(right));
     if (leftReader == nullptr || rightReader == nullptr) {
         out.warnings.add("\"" + name + "\": its two channels could not be read together; its left one plays.");
         return left;
@@ -58,19 +63,19 @@ juce::File joinChannels(const juce::File& left, const juce::File& right, const j
     }
     const auto length = std::max(leftReader->lengthInSamples, rightReader->lengthInSamples);
     (void) target.deleteFile();
-    juce::WavAudioFormat wav;
-    std::unique_ptr<juce::OutputStream> stream(target.createOutputStream());
+    cydaw::integration::WaveFormat wav;
+    std::unique_ptr<cydaw::base::OutputStream> stream(target.createOutputStream());
     if (stream == nullptr)
         return left;
     const auto bits = std::max(16, std::min(24, static_cast<int>(leftReader->bitsPerSample)));
-    std::unique_ptr<juce::AudioFormatWriter> writer(
+    std::unique_ptr<cydaw::audio::AudioFormatWriter> writer(
         wav.createWriterFor(stream.get(), leftReader->sampleRate, 2, bits, {}, 0));
     if (writer == nullptr)
         return left;
     (void) stream.release();
-    juce::AudioBuffer<float> block(2, 65'536);
-    for (juce::int64 at = 0; at < length; at += block.getNumSamples()) {
-        const auto count = static_cast<int>(std::min<juce::int64>(block.getNumSamples(), length - at));
+    cydaw::audio::SampleBuffer<float> block(2, 65'536);
+    for (std::int64_t at = 0; at < length; at += block.getNumSamples()) {
+        const auto count = static_cast<int>(std::min<std::int64_t>(block.getNumSamples(), length - at));
         block.clear();
         auto* channels = block.getArrayOfWritePointers();
         (void) leftReader->read(&channels[0], 1, at, count);

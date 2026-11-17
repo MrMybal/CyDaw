@@ -1,3 +1,13 @@
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/audio/Denormals.h>
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
+#include <cydaw/audio/Sources.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/Text.h>
 #include "VirtualAudioBus.h"
 
 #include <cydaw/engine/ChannelLayout.h>
@@ -13,14 +23,14 @@ VirtualAudioBus normaliseBus(VirtualAudioBus bus)
     if (bus.name.isEmpty())
         bus.name = bus.direction == VirtualBusDirection::input
             ? "Input" : "Output";
-    bus.channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus.channels);
+    bus.channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus.channels);
     bus.physicalChannelA = std::max(0, bus.physicalChannelA);
     bus.physicalChannelB = std::max(0, bus.physicalChannelB);
     bus.destinationChannelA = std::max(0, bus.destinationChannelA);
     bus.destinationChannelB = std::max(0, bus.destinationChannelB);
     for (auto& channel : bus.moreChannels)
         channel = std::max(0, channel);
-    bus.gainDb = juce::jlimit(-60.0f, 24.0f, bus.gainDb);
+    bus.gainDb = cydaw::base::limit(-60.0f, 24.0f, bus.gainDb);
     return bus;
 }
 
@@ -35,7 +45,7 @@ std::shared_ptr<NativeDspRuntime> makeBusRuntime(
 constexpr auto maximumChannels = static_cast<std::size_t>(VirtualAudioBus::maximumChannels);
 }
 
-VirtualBusRouter::VirtualBusRouter(juce::AudioSource& source)
+VirtualBusRouter::VirtualBusRouter(cydaw::audio::AudioSource& source)
     : source_(source)
 {
     resetToDefaults();
@@ -43,14 +53,14 @@ VirtualBusRouter::VirtualBusRouter(juce::AudioSource& source)
 
 std::vector<VirtualAudioBus> VirtualBusRouter::buses() const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     return buses_;
 }
 
 std::optional<VirtualAudioBus> VirtualBusRouter::bus(
     const std::uint64_t busId) const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = std::find_if(
         buses_.begin(), buses_.end(), [busId](const auto& candidate) {
             return candidate.id == busId;
@@ -61,7 +71,7 @@ std::optional<VirtualAudioBus> VirtualBusRouter::bus(
 
 std::uint64_t VirtualBusRouter::addBus(const VirtualBusDirection direction)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     if (buses_.size() >= maximumBusCount)
         return 0;
     const auto ordinal = static_cast<int>(std::count_if(
@@ -72,8 +82,8 @@ std::uint64_t VirtualBusRouter::addBus(const VirtualBusDirection direction)
     bus.id = nextBusId_++;
     bus.direction = direction;
     bus.name = direction == VirtualBusDirection::input
-        ? "Input " + juce::String(ordinal)
-        : "Output " + juce::String(ordinal);
+        ? "Input " + cydaw::base::Text(ordinal)
+        : "Output " + cydaw::base::Text(ordinal);
     bus.monitor = false;
     buses_.push_back(bus);
     graphs_[bus.id] = makeBusRuntime(
@@ -87,7 +97,7 @@ std::uint64_t VirtualBusRouter::addBus(const VirtualBusDirection direction)
 
 bool VirtualBusRouter::updateBus(const VirtualAudioBus& updated)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = std::find_if(
         buses_.begin(), buses_.end(), [&updated](const auto& candidate) {
             return candidate.id == updated.id;
@@ -107,7 +117,7 @@ bool VirtualBusRouter::updateBus(const VirtualAudioBus& updated)
 
 bool VirtualBusRouter::removeBus(const std::uint64_t busId)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = std::find_if(
         buses_.begin(), buses_.end(), [busId](const auto& candidate) {
             return candidate.id == busId;
@@ -139,7 +149,7 @@ bool VirtualBusRouter::removeBus(const std::uint64_t busId)
 
 void VirtualBusRouter::replaceBuses(std::vector<VirtualAudioBus> buses)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     std::vector<std::uint64_t> ids;
     buses.erase(std::remove_if(
                     buses.begin(), buses.end(), [&ids](auto& bus) {
@@ -212,7 +222,7 @@ void VirtualBusRouter::replaceBuses(std::vector<VirtualAudioBus> buses)
 
 void VirtualBusRouter::resetToDefaults()
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     buses_.clear();
     graphs_.clear();
     nextBusId_ = 1;
@@ -269,17 +279,17 @@ void VirtualBusRouter::publishSnapshot()
     snapshot_.store(std::move(snapshot));
 }
 
-juce::Result VirtualBusRouter::setGraph(
+cydaw::base::Result VirtualBusRouter::setGraph(
     const std::uint64_t busId,
     const cydaw::engine::NativeDspGraph& graph)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto bus = std::find_if(
         buses_.begin(), buses_.end(), [busId](const auto& candidate) {
             return candidate.id == busId;
         });
     if (bus == buses_.end())
-        return juce::Result::fail("Unknown virtual bus");
+        return cydaw::base::Result::fail("Unknown virtual bus");
     auto& runtime = graphs_[busId];
     if (runtime == nullptr)
         runtime = makeBusRuntime(sampleRate_, maximumBlockSize_, bus->channels);
@@ -289,11 +299,11 @@ juce::Result VirtualBusRouter::setGraph(
     return result;
 }
 
-juce::Result VirtualBusRouter::updateGraphParameters(
+cydaw::base::Result VirtualBusRouter::updateGraphParameters(
     const std::uint64_t busId,
     const cydaw::engine::NativeDspGraph& graph)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto bus = std::find_if(
         buses_.begin(), buses_.end(), [busId](const auto& candidate) {
             return candidate.id == busId;
@@ -301,14 +311,14 @@ juce::Result VirtualBusRouter::updateGraphParameters(
     const auto runtime = graphs_.find(busId);
     if (bus == buses_.end() || runtime == graphs_.end()
         || runtime->second == nullptr)
-        return juce::Result::fail("Unknown virtual bus");
+        return cydaw::base::Result::fail("Unknown virtual bus");
     return runtime->second->updateParameters(graph);
 }
 
 std::vector<std::pair<std::uint64_t, float>> VirtualBusRouter::controlValues(
     const std::uint64_t busId) const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = graphs_.find(busId);
     return found != graphs_.end() && found->second != nullptr
                ? found->second->controlValues()
@@ -318,7 +328,7 @@ std::vector<std::pair<std::uint64_t, float>> VirtualBusRouter::controlValues(
 cydaw::engine::NativeDspGraph VirtualBusRouter::graph(
     const std::uint64_t busId) const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = graphs_.find(busId);
     return found != graphs_.end() && found->second != nullptr
                ? found->second->graph()
@@ -337,7 +347,7 @@ void VirtualBusRouter::prepareToPlay(const int samplesPerBlockExpected,
     for (auto& buffer : inputsAfter_)
         buffer.setSize(VirtualAudioBus::maximumChannels, maximumBlockSize_, false, true, true);
     {
-        const juce::ScopedLock lock(busesLock_);
+        const cydaw::base::ScopedLock lock(busesLock_);
         for (const auto& bus : buses_)
             if (auto found = graphs_.find(bus.id);
                 found != graphs_.end() && found->second != nullptr)
@@ -359,14 +369,14 @@ void VirtualBusRouter::applyBusLevel(
     const VirtualAudioBus& bus, float* const* channels,
     const int numSamples) noexcept
 {
-    const auto gain = bus.muted ? 0.0f : juce::Decibels::decibelsToGain(bus.gainDb, -90.0f);
+    const auto gain = bus.muted ? 0.0f : cydaw::audio::Decibels::decibelsToGain(bus.gainDb, -90.0f);
     for (auto channel = 0; channel < bus.channels; ++channel) {
         if (channels[channel] == nullptr)
             continue;
         if (gain == 0.0f)
-            juce::FloatVectorOperations::clear(channels[channel], numSamples);
+            cydaw::audio::VectorMath::clear(channels[channel], numSamples);
         else if (gain != 1.0f)
-            juce::FloatVectorOperations::multiply(channels[channel], gain, numSamples);
+            cydaw::audio::VectorMath::multiply(channels[channel], gain, numSamples);
     }
 }
 
@@ -383,7 +393,7 @@ void VirtualBusRouter::publishMeter(const std::size_t slot,
     for (auto channel = 0; channel < channelCount; ++channel) {
         if (channels[channel] == nullptr)
             continue;
-        const auto range = juce::FloatVectorOperations::findMinAndMax(channels[channel], numSamples);
+        const auto range = cydaw::audio::VectorMath::findMinAndMax(channels[channel], numSamples);
         const auto peak = std::max(std::abs(range.getStart()), std::abs(range.getEnd()));
         const auto side = cydaw::engine::speakerSide(cydaw::engine::speakerRole(channelCount, channel));
         if (side <= 0)
@@ -396,12 +406,12 @@ void VirtualBusRouter::publishMeter(const std::size_t slot,
 }
 
 void VirtualBusRouter::getNextAudioBlock(
-    const juce::AudioSourceChannelInfo& bufferToFill)
+    const cydaw::audio::AudioSourceChannelInfo& bufferToFill)
 {
     // The whole session renders under this call: denormals flushed to zero for
     // all of it (a reverb's or a resonator's tail decaying in silence would
     // otherwise keep the processor busy on numbers too small to hear).
-    const juce::ScopedNoDenormals noDenormals;
+    const cydaw::audio::ScopedNoDenormals noDenormals;
     if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0)
         return;
     if (bufferToFill.numSamples > sourceBuffer_.getNumSamples()) {
@@ -409,7 +419,7 @@ void VirtualBusRouter::getNextAudioBlock(
         return;
     }
     sourceBuffer_.clear();
-    juce::AudioSourceChannelInfo sourceInfo(
+    cydaw::audio::AudioSourceChannelInfo sourceInfo(
         &sourceBuffer_, 0, bufferToFill.numSamples);
     source_.getNextAudioBlock(sourceInfo);
     bufferToFill.clearActiveBufferRegion();
@@ -428,12 +438,12 @@ void VirtualBusRouter::getNextAudioBlock(
         const auto& bus = entry.bus;
         if (bus.direction != VirtualBusDirection::output)
             continue;
-        const auto channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus.channels);
+        const auto channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus.channels);
         std::array<float*, maximumChannels> lanes {};
         for (auto channel = 0; channel < channels; ++channel)
             lanes[static_cast<std::size_t>(channel)] = inputBusBuffer_.getWritePointer(channel);
         for (auto channel = 0; channel < channels; ++channel)
-            juce::FloatVectorOperations::clear(lanes[static_cast<std::size_t>(channel)], count);
+            cydaw::audio::VectorMath::clear(lanes[static_cast<std::size_t>(channel)], count);
         // The master in the bus's format (a mono output folds it, a quad one
         // keeps it to the front), then what tracks send it directly.
         if (bus.carriesMaster)
@@ -443,14 +453,14 @@ void VirtualBusRouter::getNextAudioBlock(
             if (directOutputs_ != nullptr)
                 if (const auto* direct = directOutputs_->directOutput(bus.id, count, beforeEffects))
                     for (auto channel = 0; channel < std::min(channels, direct->getNumChannels()); ++channel)
-                        juce::FloatVectorOperations::add(lanes[static_cast<std::size_t>(channel)],
+                        cydaw::audio::VectorMath::add(lanes[static_cast<std::size_t>(channel)],
                                                          direct->getReadPointer(channel), count);
         };
         // Through its effects: the master and the tracks sent before them;
         // then the tracks sent after them; then its level.
         addDirect(true);
         if (entry.graph != nullptr) {
-            juce::AudioBuffer<float> view(lanes.data(), channels, count);
+            cydaw::audio::SampleBuffer<float> view(lanes.data(), channels, count);
             (void) entry.graph->process(view, 0, count);
         }
         addDirect(false);
@@ -474,7 +484,7 @@ void VirtualBusRouter::renderInputBus(
 {
     if (outputs == nullptr || numSamples <= 0)
         return;
-    const auto channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus.channels);
+    const auto channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus.channels);
     for (auto channel = 0; channel < channels; ++channel) {
         auto* output = outputs[channel];
         if (output == nullptr)
@@ -482,9 +492,9 @@ void VirtualBusRouter::renderInputBus(
         const auto device = bus.deviceChannel(channel);
         if (inputChannelData != nullptr && device >= 0 && device < numInputChannels
             && inputChannelData[device] != nullptr)
-            juce::FloatVectorOperations::copy(output, inputChannelData[device], numSamples);
+            cydaw::audio::VectorMath::copy(output, inputChannelData[device], numSamples);
         else
-            juce::FloatVectorOperations::clear(output, numSamples);
+            cydaw::audio::VectorMath::clear(output, numSamples);
     }
     applyBusLevel(bus, outputs, numSamples);
 }
@@ -501,18 +511,18 @@ void VirtualBusRouter::renderInputBus(
     std::array<float*, 2> outputs { outputA, pair.channels > 1 ? outputB : nullptr };
     renderInputBus(pair, inputChannelData, numInputChannels, outputs.data(), numSamples);
     if (outputB != nullptr && pair.channels == 1)
-        juce::FloatVectorOperations::clear(outputB, numSamples);
+        cydaw::audio::VectorMath::clear(outputB, numSamples);
 }
 
 void VirtualBusRouter::audioDeviceIOCallbackWithContext(
     const float* const* inputChannelData, const int numInputChannels,
     float* const* outputChannelData, const int numOutputChannels,
     const int numSamples,
-    const juce::AudioIODeviceCallbackContext&)
+    const cydaw::audio::DeviceCallbackContext&)
 {
     for (int channel = 0; channel < numOutputChannels; ++channel)
         if (outputChannelData != nullptr && outputChannelData[channel] != nullptr)
-            juce::FloatVectorOperations::clear(
+            cydaw::audio::VectorMath::clear(
                 outputChannelData[channel], numSamples);
     inputSamples_ = 0;
     inputIds_.fill(0);
@@ -529,7 +539,7 @@ void VirtualBusRouter::audioDeviceIOCallbackWithContext(
         const auto& bus = entry.bus;
         if (bus.direction != VirtualBusDirection::input)
             continue;
-        const auto channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus.channels);
+        const auto channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus.channels);
         auto& before = inputsBefore_[slot];
         auto& after = inputsAfter_[slot];
         if (before.getNumSamples() < numSamples || after.getNumSamples() < numSamples)
@@ -539,10 +549,10 @@ void VirtualBusRouter::audioDeviceIOCallbackWithContext(
             lanes[static_cast<std::size_t>(channel)] = after.getWritePointer(channel);
         renderInputBus(bus, inputChannelData, numInputChannels, lanes.data(), numSamples);
         for (auto channel = 0; channel < channels; ++channel)
-            juce::FloatVectorOperations::copy(before.getWritePointer(channel), lanes[static_cast<std::size_t>(channel)],
+            cydaw::audio::VectorMath::copy(before.getWritePointer(channel), lanes[static_cast<std::size_t>(channel)],
                                               numSamples);
         if (entry.graph != nullptr) {
-            juce::AudioBuffer<float> view(lanes.data(), channels, numSamples);
+            cydaw::audio::SampleBuffer<float> view(lanes.data(), channels, numSamples);
             (void) entry.graph->process(view, 0, numSamples);
         }
         inputIds_[slot] = bus.id;
@@ -588,7 +598,7 @@ bool VirtualBusRouter::inputBusBlock(const std::uint64_t busId, const bool after
 
 void VirtualBusRouter::setTaps(const std::uint64_t busId, const std::vector<NativeDspRuntime::TapRequest>& taps)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     if (const auto found = graphs_.find(busId); found != graphs_.end() && found->second != nullptr)
         found->second->setTaps(taps);
 }
@@ -596,12 +606,12 @@ void VirtualBusRouter::setTaps(const std::uint64_t busId, const std::vector<Nati
 bool VirtualBusRouter::readTap(const std::uint64_t busId, const std::uint64_t nodeId, const bool input,
                                cydaw::engine::AudioAnalysisFrame& frame) const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = graphs_.find(busId);
     return found != graphs_.end() && found->second != nullptr && found->second->readTap(nodeId, input, frame);
 }
 
-void VirtualBusRouter::audioDeviceAboutToStart(juce::AudioIODevice* device)
+void VirtualBusRouter::audioDeviceAboutToStart(cydaw::audio::Device* device)
 {
     if (device == nullptr)
         return;
@@ -614,7 +624,7 @@ void VirtualBusRouter::audioDeviceAboutToStart(juce::AudioIODevice* device)
         buffer.setSize(VirtualAudioBus::maximumChannels, maximumBlockSize_, false, true, true);
     inputSamples_ = 0;
     {
-        const juce::ScopedLock lock(busesLock_);
+        const cydaw::base::ScopedLock lock(busesLock_);
         for (const auto& bus : buses_)
             if (auto found = graphs_.find(bus.id);
                 found != graphs_.end() && found->second != nullptr)

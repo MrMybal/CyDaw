@@ -1,6 +1,9 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_audio_formats/juce_audio_formats.h>
 
 #include <array>
 #include <atomic>
@@ -22,9 +25,9 @@
 namespace cydaw::v2 {
 
 struct DjTrack {
-    juce::File file;
-    juce::String title;
-    juce::String artist;
+    cydaw::base::File file;
+    cydaw::base::Text title;
+    cydaw::base::Text artist;
     double seconds {};
     double bpm {};
     double firstBeat {};
@@ -32,23 +35,23 @@ struct DjTrack {
     int key { -1 };
     double loudness { -70.0 };
     bool analysed {};
-    juce::String error;  // why it could not be read
+    cydaw::base::Text error;  // why it could not be read
     double cuePoint {};
     std::array<double, 8> hotCues {};
-    juce::int64 size {};
-    juce::int64 modified {};
+    std::int64_t size {};
+    std::int64_t modified {};
     int plays {};
-    juce::int64 lastPlayed {};
+    std::int64_t lastPlayed {};
 
     DjTrack() { hotCues.fill(-1.0); }
 };
 
-class DjLibrary final : private juce::Thread {
+class DjLibrary final : private cydaw::base::Thread {
 public:
     DjLibrary();
     ~DjLibrary() override;
 
-    [[nodiscard]] static juce::File collectionFile();
+    [[nodiscard]] static cydaw::base::File collectionFile();
     // Read once at the start (the folders scanned again).
     void load();
     // Saved now when it changed.
@@ -56,9 +59,9 @@ public:
     // Called each frame: saves two seconds after a change.
     void tick();
 
-    [[nodiscard]] juce::StringArray folders() const;
-    void addFolder(const juce::File& folder);
-    void removeFolder(const juce::File& folder);
+    [[nodiscard]] cydaw::base::TextList folders() const;
+    void addFolder(const cydaw::base::File& folder);
+    void removeFolder(const cydaw::base::File& folder);
     // The folders looked through again on the thread.
     void rescan();
 
@@ -66,43 +69,43 @@ public:
     // takes them again).
     [[nodiscard]] int revision() const noexcept { return revision_.load(std::memory_order_acquire); }
     [[nodiscard]] std::vector<DjTrack> tracks() const;
-    [[nodiscard]] std::optional<DjTrack> find(const juce::File& file) const;
+    [[nodiscard]] std::optional<DjTrack> find(const cydaw::base::File& file) const;
     // A track loaded from elsewhere: kept in the collection.
-    void remember(const juce::File& file);
+    void remember(const cydaw::base::File& file);
     // What a deck learned of a track (analysis, cues, grid, a play).
     void update(const DjTrack& track);
-    void analyse(const juce::File& file);
+    void analyse(const cydaw::base::File& file);
     // Every track not analysed yet.
     void analyseAll();
 
     struct Progress {
         bool scanning {};
         int waiting {};
-        juce::String current;
+        cydaw::base::Text current;
     };
     [[nodiscard]] Progress progress() const;
 
 private:
     void run() override;
     void scan();
-    void analyseNow(juce::AudioFormatManager& formats, const juce::File& file);
+    void analyseNow(cydaw::audio::AudioFormatManager& formats, const cydaw::base::File& file);
     void changed();
-    [[nodiscard]] juce::var toJson() const;
-    void fromJson(const juce::var& document);
-    [[nodiscard]] std::size_t indexOf(const juce::File& file) const;
+    [[nodiscard]] cydaw::base::Value toJson() const;
+    void fromJson(const cydaw::base::Value& document);
+    [[nodiscard]] std::size_t indexOf(const cydaw::base::File& file) const;
 
     mutable std::mutex lock_;
     std::vector<DjTrack> tracks_;
-    juce::StringArray folders_;
-    std::deque<juce::File> queue_;
+    cydaw::base::TextList folders_;
+    std::deque<cydaw::base::File> queue_;
     bool scanWanted_ {};
     bool scanning_ {};
-    juce::String current_;
+    cydaw::base::Text current_;
     std::atomic<int> revision_ {};
     std::atomic<bool> dirty_ {};
     double dirtySince_ {};
     bool saving_ { true };
-    juce::WaitableEvent wake_;
+    cydaw::base::WaitableEvent wake_;
 };
 
 } // namespace cydaw::v2

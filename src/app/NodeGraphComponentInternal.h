@@ -1,9 +1,10 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <cydaw/engine/EffectCatalogue.h>
 #include <cydaw/engine/SynthFamily.h>
 
-#include <juce_core/juce_core.h>
+#include <cydaw/base/Utilities.h>
 
 namespace cydaw::app::detail {
 
@@ -15,11 +16,11 @@ namespace cydaw::app::detail {
 // It lives in a header rather than one translation unit because the factory
 // catalogue and the interactive editor are separate translation units and
 // both have to agree on the mapping.
-[[nodiscard]] inline juce::String primitiveProcessorKeyForType(
-    const juce::String& key)
+[[nodiscard]] inline cydaw::base::Text primitiveProcessorKeyForType(
+    const cydaw::base::Text& key)
 {
     if (const auto* effect = cydaw::engine::effectForType(key.toStdString()))
-        return juce::String(std::string(effect->processorKey));
+        return cydaw::base::Text(std::string(effect->processorKey));
     if (key == "voice-allocator") return "core.voice-allocator";
     if (key == "poly-oscillator") return "core.oscillator";
     if (key == "envelope") return "core.adsr";
@@ -45,7 +46,7 @@ namespace cydaw::app::detail {
     if (key == "prism-synth") return "core.prism-synth";
     if (key == "kick-synth") return "core.kick-synth";
     if (const auto model = cydaw::engine::synth::modelForType(key.toStdString()); model != cydaw::engine::synth::Model::none)
-        return juce::String(cydaw::engine::synth::info(model).processorKey);
+        return cydaw::base::Text(cydaw::engine::synth::info(model).processorKey);
     if (key == "highpass") return "core.highpass";
     if (key == "hard-clip") return "core.hard-clip";
     if (key == "stereo-width") return "core.stereo-width";

@@ -167,7 +167,7 @@ std::optional<DeviceSignals::Level> DeviceSignals::instrumentLevel() const
     return std::nullopt;
 }
 
-const app::NodeGraphComponent::EditorNativeSpan* DeviceSignals::span(const std::uint64_t cardId) const
+const app::GraphDocument::EditorNativeSpan* DeviceSignals::span(const std::uint64_t cardId) const
 {
     const auto found = spans_.find(cardId);
     return found != spans_.end() ? &found->second : nullptr;

@@ -1,8 +1,11 @@
-#include <cydaw/engine/EffectProcessors.h>
 #include <cydaw/engine/ContainerProcessors.h>
+#include <cydaw/engine/DspHistory.h>
+#include <cydaw/engine/EffectProcessors.h>
+#include <cydsp/math/DspMath.h>
 
 #include <cydaw/engine/AudioBuffer.h>
 #include <cydaw/engine/BiquadDesign.h>
+#include <cydsp/processors/Biquad.h>
 #include <cydaw/engine/ProEffects.h>
 
 #include <algorithm>
@@ -173,46 +176,45 @@ float syncedTime(const float milliseconds, const float sync, const ProcessContex
 // fractional distance behind it.
 class DelayLines {
 public:
-    void prepare(const std::uint32_t channels, const std::uint32_t length)
-    {
-        buffer_.prepare(std::max<std::uint32_t>(1, channels), std::max<std::uint32_t>(4, length));
-        clear();
-    }
-    void clear() noexcept
-    {
-        buffer_.clear(buffer_.maximumFrameCount());
-        write_ = 0;
-    }
-    [[nodiscard]] std::uint32_t length() const noexcept { return buffer_.maximumFrameCount(); }
-    [[nodiscard]] std::uint32_t channels() const noexcept { return buffer_.channelCount(); }
-    // Behind the write position by `distance` samples (at least 1).
-    [[nodiscard]] float read(const std::uint32_t channel, float distance) noexcept
-    {
-        const auto size = length();
-        distance = std::clamp(distance, 1.0f, static_cast<float>(size - 3));
-        auto position = static_cast<float>(write_) - distance;
-        if (position < 0.0f)
-            position += static_cast<float>(size);
-        const auto index = static_cast<std::uint32_t>(position);
-        const auto fraction = position - static_cast<float>(index);
-        const auto* data = buffer_.view(size).channel(channel);
-        const auto a = data[index % size];
-        const auto b = data[(index + 1) % size];
-        return a + (b - a) * fraction;
-    }
-    void write(const std::uint32_t channel, const float sample) noexcept
-    {
-        buffer_.view(length()).channel(channel)[write_] = sample;
-    }
-    void advance() noexcept
-    {
-        if (++write_ >= length())
-            write_ = 0;
-    }
+  void prepare(std::uint32_t channels, std::uint32_t length)
+  {
+      history_.prepare(std::max(1u, channels), std::max(4u, length));
+      pending_.assign(history_.channels(), 0);
+      clear();
+  }
+  void clear() noexcept
+  {
+      history_.reset();
+      std::fill(pending_.begin(), pending_.end(), 0);
+      write_ = 0;
+  }
+  [[nodiscard]] std::uint32_t length() const noexcept { return static_cast<std::uint32_t>(history_.capacity()); }
+  [[nodiscard]] std::uint32_t channels() const noexcept { return static_cast<std::uint32_t>(history_.channels()); }
+  [[nodiscard]] float read(std::uint32_t channel, float distance) noexcept
+  {
+      const auto size = length();
+      distance = std::clamp(distance, 1.f, float(size - 3));
+      // Preserve the old float-coordinate quantization, including ring wrap.
+      auto position = float(write_) - distance;
+      if (position < 0)
+          position += float(size);
+      const auto index = static_cast<std::uint32_t>(position);
+      const auto fraction = position - float(index);
+      const auto age = double((write_ + size - 1 - index) % size) - fraction;
+      return history_.read(channel, std::max(0., age));
+  }
+  void write(std::uint32_t channel, float sample) noexcept { pending_[channel] = sample; }
+  void advance() noexcept
+  {
+      history_.push(pending_);
+      if (++write_ >= length())
+          write_ = 0;
+  }
 
 private:
-    AudioBuffer buffer_;
-    std::uint32_t write_ {};
+  DspHistory<float> history_;
+  std::vector<float> pending_;
+  std::uint32_t write_{};
 };
 
 // The topology-preserving state-variable filter the built-in low-pass runs,
@@ -637,39 +639,16 @@ private:
     void design() noexcept
     {
         const auto shelf = [this](const float frequency, const float gainDb, const bool high) {
-            const auto a = std::pow(10.0, gainDb / 40.0);
-            const auto w0 = 2.0 * std::numbers::pi * std::min<double>(frequency, sampleRate_ * 0.45) / sampleRate_;
-            const auto cosine = std::cos(w0);
-            const auto alpha = std::sin(w0) / 2.0 * std::sqrt(2.0);
-            const auto root = 2.0 * std::sqrt(a) * alpha;
-            double b0, b1, b2, a0, a1, a2;
-            if (!high) {
-                b0 = a * ((a + 1.0) - (a - 1.0) * cosine + root);
-                b1 = 2.0 * a * ((a - 1.0) - (a + 1.0) * cosine);
-                b2 = a * ((a + 1.0) - (a - 1.0) * cosine - root);
-                a0 = (a + 1.0) + (a - 1.0) * cosine + root;
-                a1 = -2.0 * ((a - 1.0) + (a + 1.0) * cosine);
-                a2 = (a + 1.0) + (a - 1.0) * cosine - root;
-            } else {
-                b0 = a * ((a + 1.0) + (a - 1.0) * cosine + root);
-                b1 = -2.0 * a * ((a - 1.0) + (a + 1.0) * cosine);
-                b2 = a * ((a + 1.0) + (a - 1.0) * cosine - root);
-                a0 = (a + 1.0) - (a - 1.0) * cosine + root;
-                a1 = 2.0 * ((a - 1.0) - (a + 1.0) * cosine);
-                a2 = (a + 1.0) - (a - 1.0) * cosine - root;
-            }
-            return Biquad { static_cast<float>(b0 / a0), static_cast<float>(b1 / a0), static_cast<float>(b2 / a0),
-                            static_cast<float>(a1 / a0), static_cast<float>(a2 / a0) };
+            cydsp::BiquadCoefficients c;
+            (void) cydsp::designShelfBiquad(high, sampleRate_, std::min<double>(frequency, sampleRate_ * 0.45), 1.0, gainDb, c);
+            return Biquad {static_cast<float>(c.b0), static_cast<float>(c.b1), static_cast<float>(c.b2),
+                           static_cast<float>(c.a1), static_cast<float>(c.a2)};
         };
         const auto bell = [this](const float frequency, const float gainDb, const float q) {
-            const auto a = std::pow(10.0, gainDb / 40.0);
-            const auto w0 = 2.0 * std::numbers::pi * std::min<double>(frequency, sampleRate_ * 0.45) / sampleRate_;
-            const auto cosine = std::cos(w0);
-            const auto alpha = std::sin(w0) / (2.0 * q);
-            const auto a0 = 1.0 + alpha / a;
-            return Biquad { static_cast<float>((1.0 + alpha * a) / a0), static_cast<float>(-2.0 * cosine / a0),
-                            static_cast<float>((1.0 - alpha * a) / a0), static_cast<float>(-2.0 * cosine / a0),
-                            static_cast<float>((1.0 - alpha / a) / a0) };
+            cydsp::BiquadCoefficients c;
+            (void) cydsp::designPeakingBiquad(sampleRate_, std::min<double>(frequency, sampleRate_ * 0.45), q, gainDb, c);
+            return Biquad {static_cast<float>(c.b0), static_cast<float>(c.b1), static_cast<float>(c.b2),
+                           static_cast<float>(c.a1), static_cast<float>(c.a2)};
         };
         const auto low = designed_[3];
         const auto high = std::max(designed_[4], low * 1.5f);

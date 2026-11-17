@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
 #include "KickView.h"
 
 #include "InstrumentEffects.h"
@@ -24,10 +26,10 @@ constexpr double lowestHz = 20.0;
 constexpr double highestHz = 10'000.0;
 constexpr double pictureRate = 24'000.0;
 
-juce::String parameterName(const int index)
+cydaw::base::Text parameterName(const int index)
 {
     const auto& p = kick::parameter(index);
-    return juce::String::fromUTF8((ui::french() ? p.french : p.english).c_str());
+    return cydaw::base::Text::fromUTF8((ui::french() ? p.french : p.english).c_str());
 }
 
 bool logarithmic(const kick::Parameter& p)
@@ -53,12 +55,12 @@ float denormalise(const int index, const float normalised)
 }
 
 // "G#1": the note nearest a frequency (C4 the middle C).
-juce::String noteName(const double hz)
+cydaw::base::Text noteName(const double hz)
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     const auto midi = static_cast<int>(std::lround(69.0 + 12.0 * std::log2(std::max(1.0, hz) / 440.0)));
     const auto cents = static_cast<int>(std::lround((69.0 + 12.0 * std::log2(std::max(1.0, hz) / 440.0) - midi) * 100.0));
-    auto text = juce::String(names[((midi % 12) + 12) % 12]) + juce::String(midi / 12 - 1);
+    auto text = cydaw::base::Text(names[((midi % 12) + 12) % 12]) + cydaw::base::Text(midi / 12 - 1);
     if (cents != 0)
         text << (cents > 0 ? " +" : " ") << cents << " ct";
     return text;
@@ -79,7 +81,7 @@ float KickView::paneWidth()
     return dp(360.0f);
 }
 
-bool KickView::bind(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+bool KickView::bind(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     const auto values = graph.editorKickValues(nodeId);
     if (!values)
@@ -104,8 +106,8 @@ void KickView::set(const int index, const float newValue)
     if (clamped == value(index))
         return;
     card_.values[static_cast<std::size_t>(index)] = clamped;
-    const auto binding = "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".kick."
-                         + juce::String(kick::parameter(index).key);
+    const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".kick."
+                         + cydaw::base::Text(kick::parameter(index).key);
     (void) card_.graph->editorSetParameter(binding, clamped);
     state_.focused = Panel::devices;
 }
@@ -125,9 +127,9 @@ bool KickView::knob(const int index, const char* label, const float diameter)
     const auto origin = ImGui::GetCursorScreenPos();
     bool changed {};
     {
-        const ui::LearnParameterScope learn("node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".kick."
-                                                + juce::String(parameter.key),
-                                            juce::String::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
+        const ui::LearnParameterScope learn("node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".kick."
+                                                + cydaw::base::Text(parameter.key),
+                                            cydaw::base::Text::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
         changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
     }
     const auto hovered = ImGui::IsItemHovered();
@@ -139,7 +141,7 @@ bool KickView::knob(const int index, const char* label, const float diameter)
         ImGui::TextDisabled("%s", parameterName(index).toRawUTF8());
         if (ImGui::MenuItem(L("Valeur par défaut", "Default value")))
             set(index, parameter.defaultValue);
-        const auto binding = "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".kick." + juce::String(parameter.key);
+        const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".kick." + cydaw::base::Text(parameter.key);
         if (studio_.isValid(card_.track) && studio_.canAutomate(card_.track, binding)) {
             const auto automated = studio_.hasLane(card_.track, binding);
             if (ImGui::MenuItem(automated ? L("Afficher l'automation", "Show the automation")
@@ -161,8 +163,8 @@ bool KickView::knob(const int index, const char* label, const float diameter)
                             "Double click: default · right click: automate"));
     const auto width = dp(diameter + 14.0f);
     // Its name, its value while touched.
-    const auto text = hovered || active ? juce::String::fromUTF8(kick::displayValue(index, value(index), ui::french()).c_str())
-                                        : juce::String::fromUTF8(label != nullptr ? label : "");
+    const auto text = hovered || active ? cydaw::base::Text::fromUTF8(kick::displayValue(index, value(index), ui::french()).c_str())
+                                        : cydaw::base::Text::fromUTF8(label != nullptr ? label : "");
     auto* list = ImGui::GetWindowDrawList();
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
     const auto textHeight = ImGui::GetFontSize();
@@ -528,7 +530,7 @@ void KickView::drawGlobal()
 
 // ---- The card's pane, the window --------------------------------------------------------------
 
-void KickView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
+void KickView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 origin,
                         const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.
@@ -600,7 +602,7 @@ bool KickView::drawEditorWindow(const bool focus)
     if (focus)
         ImGui::SetNextWindowFocus();
     auto open = true;
-    const auto title = juce::String::fromUTF8("Kick \xe2\x80\x94 ") + studio_.trackName(target.track) + juce::String(windowId_);
+    const auto title = cydaw::base::Text::fromUTF8("Kick \xe2\x80\x94 ") + studio_.trackName(target.track) + cydaw::base::Text(windowId_);
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, theme::mix(kickRed, p.bg2 | 0xff000000u, 0.65f));
     const auto visible = ui::beginEditorWindow(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor();
@@ -620,7 +622,7 @@ bool KickView::drawEditorWindow(const bool focus)
             const auto track = target.track;
             const auto nodeId = target.nodeId;
             presets_.bar("kickPresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                         [this, track, nodeId](const juce::var& preset, juce::String& error) {
+                         [this, track, nodeId](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                              return studio_.applyDevicePreset(track, nodeId, preset, error);
                          },
                          dp(330.0f));

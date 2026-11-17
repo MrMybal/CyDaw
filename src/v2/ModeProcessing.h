@@ -1,3 +1,5 @@
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/File.h>
 #pragma once
 #include "ModeProcessor.h"
 #include "Studio.h"
@@ -32,7 +34,7 @@ class ModeProcessing final : public app::ModeProcessor
     void processFoundry(const engine::foundry::Session &, double at, double step, float *, float *, int frames) override;
     void syncFoundry(const engine::foundry::Session &session);
     bool copyMixTo(engine::foundry::Session &session);
-    void ensureInput(std::uint64_t id, const juce::String &name, bool midi = false, bool bus = false);
+    void ensureInput(std::uint64_t id, const cydaw::base::Text &name, bool midi = false, bool bus = false);
     struct Parameter
     {
         std::string binding, label;
@@ -40,7 +42,7 @@ class ModeProcessing final : public app::ModeProcessor
     };
     std::vector<Parameter> parameters(std::uint64_t id) const;
     // An input's effects as a graph that renders on any thread (createVst3RuntimeState); void when none.
-    [[nodiscard]] juce::var inputRuntimeState(std::uint64_t id) const;
+    [[nodiscard]] cydaw::base::Value inputRuntimeState(std::uint64_t id) const;
     void selectMaster();
     void showEditor()
     {
@@ -50,7 +52,7 @@ class ModeProcessing final : public app::ModeProcessor
         state_.bringToFront = Panel::none;
     }
     void chooseInstrument(std::uint64_t id);
-    juce::Result loadSample(std::uint64_t id, const juce::File &file);
+    cydaw::base::Result loadSample(std::uint64_t id, const cydaw::base::File &file);
     void selectInput(std::uint64_t id);
     bool routeInput(std::uint64_t id, std::uint64_t destinationId);
     void showPanel(int panel) { requestedEditorFrames_=0;panel_=std::clamp(panel,0,5);selectPanel_=true;state_.bringToFront=Panel::none; }
@@ -58,11 +60,11 @@ class ModeProcessing final : public app::ModeProcessor
               const std::function<void()> &subtracks = {});
     int selectedPanel() const noexcept { return panel_; }
     bool undo(bool redo = false);
-    [[nodiscard]] juce::var serialise() const;
-    void restore(const juce::var &state);
+    [[nodiscard]] cydaw::base::Value serialise() const;
+    void restore(const cydaw::base::Value &state);
     [[nodiscard]] std::uint64_t revision() const;
-    [[nodiscard]] juce::var command(const juce::var &request);
-    static engine::foundry::Sound render(const engine::foundry::Session &, const juce::var &processing, std::int64_t start,
+    [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value &request);
+    static engine::foundry::Sound render(const engine::foundry::Session &, const cydaw::base::Value &processing, std::int64_t start,
                                          std::int64_t end, double tail = 0.0);
 
   private:
@@ -75,7 +77,7 @@ class ModeProcessing final : public app::ModeProcessor
     struct GraphSnapshot {
         const GraphSlot* source{};
         std::uint64_t revision{};
-        juce::var state;
+        cydaw::base::Value state;
     };
     mutable std::map<std::uint64_t, GraphSnapshot> graphSnapshots_;
     std::vector<std::unique_ptr<Input>> inputs_;
@@ -93,7 +95,7 @@ class ModeProcessing final : public app::ModeProcessor
     std::unique_ptr<RoutingView> routing_;
     std::unique_ptr<DeviceEditorView> editors_;
     std::unique_ptr<PluginWindows> windows_;
-    juce::AudioBuffer<float> output_;
+    cydaw::audio::SampleBuffer<float> output_;
     double timeline_{};
     bool timelineActive_{};
     bool insideFoundry_{};

@@ -1,11 +1,17 @@
+#include <cydaw/realtime/SpscRing.h>
+#include <cydaw/audio/Sources.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/TextMap.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 #include "ModeProcessor.h"
 #include <cydaw/realtime/RtPublisher.h>
 
 #include <cydaw/engine/DjMix.h>
 
-#include <juce_audio_formats/juce_audio_formats.h>
-#include <juce_audio_utils/juce_audio_utils.h>
+
 
 #include <array>
 #include <atomic>
@@ -30,9 +36,9 @@ namespace cydaw::app {
 
 // The tags a reader found (title, artist), else "Artist - Title" from the
 // file's name.
-void djTrackTags(const juce::File& file, const juce::StringPairArray& tags, juce::String& title, juce::String& artist);
+void djTrackTags(const cydaw::base::File& file, const cydaw::base::TextMap& tags, cydaw::base::Text& title, cydaw::base::Text& artist);
 
-class DjEngine final : public juce::AudioSource {
+class DjEngine final : public cydaw::audio::AudioSource {
 public:
     static constexpr int deckCount = 4;
     static constexpr int hotCueCount = 8;
@@ -42,7 +48,7 @@ public:
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& output) override;
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output) override;
 
     // ---- Tracks ------------------------------------------------------------------------------
     // What is already known of a track (its grid and cues kept from before):
@@ -56,13 +62,13 @@ public:
         Known() { hotCues.fill(-1.0); }
     };
     enum class LoadState { empty, loading, ready, failed };
-    void load(int deck, const juce::File& file, const Known& known = {});
+    void load(int deck, const cydaw::base::File& file, const Known& known = {});
     // A track decoded whole (45 minutes at most; its first two channels),
     // its tags read (else "Artist - Title" from its name); null with `error`
     // set. `cancelled` is asked between chunks. Any thread.
-    [[nodiscard]] static std::shared_ptr<engine::dj::TrackAudio> decode(juce::AudioFormatManager& formats, const juce::File& file,
-                                                                        juce::String& error, juce::String& title,
-                                                                        juce::String& artist,
+    [[nodiscard]] static std::shared_ptr<engine::dj::TrackAudio> decode(cydaw::audio::AudioFormatManager& formats, const cydaw::base::File& file,
+                                                                        cydaw::base::Text& error, cydaw::base::Text& title,
+                                                                        cydaw::base::Text& artist,
                                                                         const std::function<bool()>& cancelled = {});
     // Some decoders (Windows Media) need COM on the thread that decodes:
     // one of these at the top of such a thread.
@@ -81,10 +87,10 @@ public:
     // ---- A deck as it is ---------------------------------------------------------------------
     struct DeckState {
         LoadState state { LoadState::empty };
-        juce::File file;
-        juce::String title;
-        juce::String artist;
-        juce::String error;
+        cydaw::base::File file;
+        cydaw::base::Text title;
+        cydaw::base::Text artist;
+        cydaw::base::Text error;
         // Null while it is analysed.
         std::shared_ptr<const engine::dj::TrackAnalysis> analysis;
         double seconds {};
@@ -187,11 +193,11 @@ public:
     [[nodiscard]] bool anyPlaying() const noexcept;
 
     // ---- The mix recorded --------------------------------------------------------------------
-    juce::Result startRecording(const juce::File& file);
+    cydaw::base::Result startRecording(const cydaw::base::File& file);
     void stopRecording();
     [[nodiscard]] bool recording() const noexcept { return recording_.load(std::memory_order_acquire); }
     [[nodiscard]] double recordedSeconds() const noexcept;
-    [[nodiscard]] juce::File recordingFile() const;
+    [[nodiscard]] cydaw::base::File recordingFile() const;
 
     void setProcessor(std::shared_ptr<ModeProcessor> processor) {
         processor_.store(std::make_shared<const std::shared_ptr<ModeProcessor>>(std::move(processor)));
@@ -199,7 +205,7 @@ public:
 
 private:
     realtime::RtPublisher<std::shared_ptr<ModeProcessor>> processor_;
-    std::array<juce::AudioBuffer<float>,4> modeInputs_;
+    std::array<cydaw::audio::SampleBuffer<float>,4> modeInputs_;
     struct Command {
         enum class Type : int { play, cueDown, cueUp, seek, hotCueJump, hotCueSet, hotCueRemove, loopBeats, loopMove,
                                 loopResize, beatJump, syncOn };
@@ -218,24 +224,23 @@ private:
     void alignPhase(Deck& deck, int master);
     [[nodiscard]] int chooseMaster() const noexcept;
     [[nodiscard]] double beatSecondsOf(const Deck& deck) const noexcept;
-    void publish(int deck, std::shared_ptr<const engine::dj::TrackAudio> audio, const juce::String& title,
-                 const juce::String& artist, std::uint64_t ticket);
+    void publish(int deck, std::shared_ptr<const engine::dj::TrackAudio> audio, const cydaw::base::Text& title,
+                 const cydaw::base::Text& artist, std::uint64_t ticket);
     void publishAnalysis(int deck, std::shared_ptr<const engine::dj::TrackAnalysis> analysis, std::uint64_t ticket);
-    void fail(int deck, const juce::String& error, std::uint64_t ticket);
+    void fail(int deck, const cydaw::base::Text& error, std::uint64_t ticket);
     void freeRetired();
 
     std::array<std::unique_ptr<Deck>, deckCount> decks_;
-    juce::AbstractFifo fifo_ { 256 };
-    std::array<Command, 256> commands_ {};
+    realtime::SpscRing<Command,256> commands_;
     std::mutex pushLock_;
     mutable std::mutex stateLock_;
     std::unique_ptr<Loader> loader_;
 
     double rate_ { 48'000.0 };
     int blockSize_ { 512 };
-    juce::AudioBuffer<float> work_;
-    juce::AudioBuffer<float> mix_;
-    juce::AudioBuffer<float> cueBus_;
+    cydaw::audio::SampleBuffer<float> work_;
+    cydaw::audio::SampleBuffer<float> mix_;
+    cydaw::audio::SampleBuffer<float> cueBus_;
     std::atomic<std::uint64_t> blocks_ {};
 
     std::atomic<float> crossfader_ { 0.5f };
@@ -254,12 +259,11 @@ private:
     float limiterGain_ { 1.0f };
 
     // Recording: written on a thread of its own.
-    juce::TimeSliceThread writerThread_ { "CyDAW DJ mix writer" };
-    std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer_;
-    juce::CriticalSection writerLock_;
+    std::unique_ptr<cydaw::audio::AudioFormatWriter::ThreadedWriter> writer_;
+    cydaw::base::CriticalSection writerLock_;
     std::atomic<bool> recording_ {};
     std::atomic<std::int64_t> recordedFrames_ {};
-    juce::File recordingFile_;
+    cydaw::base::File recordingFile_;
 };
 
 } // namespace cydaw::app

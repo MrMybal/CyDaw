@@ -1,3 +1,6 @@
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -5,7 +8,6 @@
 
 #include <imgui.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <functional>
 #include <memory>
@@ -47,8 +49,8 @@ private:
     void drawLibrary();
     void drawPalette();
     void drawSide();
-    void drawInfo(app::NodeGraphComponent& graph);
-    void drawParameters(app::NodeGraphComponent& graph);
+    void drawInfo(app::GraphDocument& graph);
+    void drawParameters(app::GraphDocument& graph);
     void drawExport(GraphSlot& slot);
     void drawDiscard();
     // The devices open, one tab each; + makes another.
@@ -62,9 +64,9 @@ private:
     bool askAboutNextAtRisk();
     void refreshLibrary(bool force);
     void save(bool asNewFile);
-    void report(const juce::String& message, bool error);
+    void report(const cydaw::base::Text& message, bool error);
     // A text field kept in step with the model while it is not being typed in.
-    bool textField(const char* id, std::vector<char>& buffer, const juce::String& current, float width, bool multiline = false,
+    bool textField(const char* id, std::vector<char>& buffer, const cydaw::base::Text& current, float width, bool multiline = false,
                    float height = 0.0f);
 
     Studio& studio_;
@@ -87,17 +89,17 @@ private:
     bool showSimulator_ { true };
     // The note the mouse holds down on the keyboard.
     int mouseNote_ { -1 };
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
     std::function<void()> quitWaiting_;
     bool askDiscard_ {};
-    juce::File removing_;
+    cydaw::base::File removing_;
     bool askRemove_ {};
 
     std::vector<Studio::LibraryDevice> library_;
     double libraryTime_ { -100.0 };
     std::vector<char> search_ = std::vector<char>(96, 0);
     std::vector<char> nodeSearch_ = std::vector<char>(96, 0);
-    std::vector<app::NodeGraphComponent::EditorNodeType> nodeTypes_;
+    std::vector<app::GraphDocument::EditorNodeType> nodeTypes_;
     const void* nodeTypesSlot_ {};
     int nodeTypesLanguage_ { -1 };
     bool showLibrary_ { true };
@@ -120,11 +122,11 @@ private:
     std::uint64_t planRevision_ {};
     double planTime_ {};
     bool planReady_ {};
-    juce::StringArray planIssues_;
-    juce::StringArray planDetails_;
+    cydaw::base::TextList planIssues_;
+    cydaw::base::TextList planDetails_;
     int planParameters_ {};
-    juce::String exported_;
-    juce::String deviceTransferMessage_;
+    cydaw::base::Text exported_;
+    cydaw::base::Text deviceTransferMessage_;
     bool deviceTransferWarning_ {};
     bool exportFormats_[3] {true, false, false};
     bool exportWindows_ {true}, exportLinux_ {};

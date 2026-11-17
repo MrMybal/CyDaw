@@ -1,3 +1,4 @@
+#include <cydaw/engine/Fft.h>
 #include <cydaw/engine/SynthMatch.h>
 
 #include <cydaw/engine/PrismSynth.h>
@@ -21,28 +22,10 @@ constexpr double twoPi = 2.0 * std::numbers::pi;
 // A radix-2 transform in place (size a power of two).
 void transform(std::vector<std::complex<float>>& data)
 {
-    const auto size = data.size();
-    for (std::size_t index = 1, reversed = 0; index < size; ++index) {
-        auto bit = size >> 1;
-        for (; reversed & bit; bit >>= 1)
-            reversed ^= bit;
-        reversed ^= bit;
-        if (index < reversed)
-            std::swap(data[index], data[reversed]);
-    }
-    for (std::size_t length = 2; length <= size; length <<= 1) {
-        const auto angle = -twoPi / static_cast<double>(length);
-        const std::complex<float> step(static_cast<float>(std::cos(angle)), static_cast<float>(std::sin(angle)));
-        for (std::size_t start = 0; start < size; start += length) {
-            std::complex<float> w(1.0f, 0.0f);
-            for (std::size_t k = 0; k < length / 2; ++k) {
-                const auto t = w * data[start + k + length / 2];
-                data[start + k + length / 2] = data[start + k] - t;
-                data[start + k] += t;
-                w *= step;
-            }
-        }
-    }
+    thread_local Fft plan;
+    if (plan.size() != data.size())
+        plan.prepare(data.size());
+    plan.forward(data.data());
 }
 
 // YIN (de Cheveigné and Kawahara) over one window: the period's frequency, 0

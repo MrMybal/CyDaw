@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <cydsp/processors/ComplexFft.h>
 
 // A stretch of a sound file read at a speed and a pitch of its own, as a
 // player asks for it: from any position, block after block.
@@ -125,8 +126,7 @@ private:
     bool havePrevious_ {};
     std::int64_t previousStart_ {};
     std::vector<float> window_;
-    std::vector<std::complex<float>> twiddles_;
-    std::vector<std::size_t> reversed_;
+    cydsp::ComplexFft<float> fft_;
     std::vector<std::vector<float>> read_;                 // a window of the file, per channel
     std::vector<std::vector<std::complex<float>>> spectra_; // per channel
     std::vector<std::complex<float>> reference_;

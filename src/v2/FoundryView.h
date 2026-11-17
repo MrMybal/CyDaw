@@ -1,3 +1,7 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "FoundryDocument.h"
@@ -8,7 +12,6 @@
 #include <imgui.h>
 #include <cyui/modules/Images.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <memory>
 #include <optional>
@@ -44,12 +47,12 @@ public:
     void draw();
     // The transport bar's middle in this mode: play, stop, loop, where.
     void drawTransport();
-    [[nodiscard]] juce::var command(const juce::var& request);
+    [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value& request);
     // A sound file or a session in a tab of its own.
-    bool open(const juce::File& file);
+    bool open(const cydaw::base::File& file, bool asTemplate = false);
     // Files into the session shown: on the track under (x, y), else new
     // tracks; with no session, the first opens and the others join it.
-    bool dropFiles(const juce::StringArray& files, float x = -1.0f, float y = -1.0f);
+    bool dropFiles(const cydaw::base::TextList& files, float x = -1.0f, float y = -1.0f);
     void chooseOpen();
     void chooseImport();
     void newDocument();
@@ -62,7 +65,7 @@ public:
     [[nodiscard]] TransportSync::State transportState() const;
     void applyTransport(const TransportSync::Update&);
     // A file not saved: its name (the quit asks first).
-    [[nodiscard]] juce::StringArray unsaved() const;
+    [[nodiscard]] cydaw::base::TextList unsaved() const;
     void tickCinemaVideo();
     void showToolsPanel(int panel);
 
@@ -72,7 +75,7 @@ private:
     using Clip = engine::foundry::Clip;
 
     struct Tab {
-        juce::Uuid cinemaIdentity;
+        cydaw::base::Uuid cinemaIdentity;
         std::unique_ptr<FoundryDocument> document;
         std::shared_ptr<ModeProcessing> processing;
         const Session* processingSession{};
@@ -101,7 +104,7 @@ private:
         std::unique_ptr<CinemaVideo> video;
         std::uint64_t videoRevision{};
         unsigned long long videoTexture{};
-        juce::String videoTextureKey;
+        cydaw::base::Text videoTextureKey;
         std::uint64_t activeGroup{};
         std::set<std::uint64_t> collapsedGroups;
         double cinemaVisibleSeconds{15.0};
@@ -109,9 +112,9 @@ private:
         int cinemaGridFrames{1};
         bool cinemaFilmstrip{true};
         std::unique_ptr<CinemaVideo> thumbnailDecoder;
-        struct Thumbnail { unsigned long long texture{}; juce::String key; std::uint64_t used{}; float aspect{16.f/9}; };
+        struct Thumbnail { unsigned long long texture{}; cydaw::base::Text key; std::uint64_t used{}; float aspect{16.f/9}; };
         std::map<std::int64_t,Thumbnail> thumbnails;
-        juce::String thumbnailSource;
+        cydaw::base::Text thumbnailSource;
         std::int64_t thumbnailPending{-1};
         std::uint64_t thumbnailClock{};
         bool cinemaContentsVisible{true};
@@ -183,8 +186,8 @@ private:
     [[nodiscard]] bool allTracks(const Tab& tab) const;
     void select(Tab& tab, std::int64_t start, std::int64_t end);
     void pickTrack(Tab& tab, int track, bool add);
-    void edit(Tab& tab, Session next, const juce::String& label);
-    void edit(Tab& tab, Session next, const juce::String& label, std::int64_t at, std::int64_t removed, std::int64_t inserted);
+    void edit(Tab& tab, Session next, const cydaw::base::Text& label);
+    void edit(Tab& tab, Session next, const cydaw::base::Text& label, std::int64_t at, std::int64_t removed, std::int64_t inserted);
     void cut(Tab& tab);
     void copy(Tab& tab);
     void paste(Tab& tab, bool mix);
@@ -194,16 +197,16 @@ private:
     void duplicateClip(Tab& tab);
     void addTrack(Tab& tab, bool midi = false);
     void addMarker(Tab& tab, bool region);
-    bool importFile(Tab& tab, const juce::File& file, int track, std::int64_t at);
+    bool importFile(Tab& tab, const cydaw::base::File& file, int track, std::int64_t at);
     void applyProcess(Tab& tab);
-    juce::Result applyTrackEffects(Tab& tab, const TrackRef& track, double tailSeconds);
+    cydaw::base::Result applyTrackEffects(Tab& tab, const TrackRef& track, double tailSeconds);
     void sendToStudio(Tab& tab, bool eachTrack);
     void playFrom(Tab& tab);
     void stop();
     void measure(Tab& tab, bool force);
     void closeTab(int index);
-    void report(const juce::String& message, bool error);
-    [[nodiscard]] juce::var tabJson(const Tab& tab) const;
+    void report(const cydaw::base::Text& message, bool error);
+    [[nodiscard]] cydaw::base::Value tabJson(const Tab& tab) const;
 
     app::FoundryPlayer& player() const;
     void ensureCinema(Tab& tab);
@@ -225,21 +228,21 @@ private:
     void createCinemaAudioClip(Tab&,int track,std::int64_t at);
     void importCinemaAudio(bool automatic = false);
     void pollCinemaAudio();
-    bool openCinemaVideo(const juce::File& file);
-    bool dropCinemaFiles(const juce::StringArray&,float x,float y);
-    std::uint64_t addCinemaGroup(Tab&,const juce::String& name);
-    std::uint64_t addCinemaTrack(Tab&,std::uint64_t group,bool midi,const juce::String& name = {});
+    bool openCinemaVideo(const cydaw::base::File& file);
+    bool dropCinemaFiles(const cydaw::base::TextList&,float x,float y);
+    std::uint64_t addCinemaGroup(Tab&,const cydaw::base::Text& name);
+    std::uint64_t addCinemaTrack(Tab&,std::uint64_t group,bool midi,const cydaw::base::Text& name = {});
     bool assignCinemaTrack(Tab&,std::uint64_t id,std::uint64_t group);
-    juce::var cinemaCommand(const juce::var&);
+    cydaw::base::Value cinemaCommand(const cydaw::base::Value&);
     struct CinemaAudioTask {
-        juce::File source,target;
-        juce::Uuid documentIdentity;
+        cydaw::base::File source,target;
+        cydaw::base::Uuid documentIdentity;
         std::uint64_t group{};
-        juce::String error;
+        cydaw::base::Text error;
         std::atomic<bool> done{};
         bool consumed{},hasAudio{},automatic{};
     };
-    juce::ThreadPool cinemaAudioWorker_{1};
+    cydaw::base::ThreadPool cinemaAudioWorker_{1};
     std::shared_ptr<CinemaAudioTask> cinemaAudioTask_;
     std::vector<std::shared_ptr<CinemaAudioTask>> cinemaAudioTasks_;
     bool cinema_{};
@@ -254,14 +257,14 @@ private:
     std::vector<CinemaBusTarget> cinemaBusTargets_;
     std::vector<CinemaBusTarget> cinemaListTargets_;
     std::vector<CinemaDropTarget> cinemaDropTargets_;
-    juce::var cinemaPending_;
+    cydaw::base::Value cinemaPending_;
     std::optional<Session> cinemaGestureBefore_;
     Clip cinemaGestureClip_;
     int cinemaGestureTrack_{-1};
     float cinemaGestureX_{};
     int cinemaGestureKind_{};
     struct CinemaContainerGesture {
-        Session before; engine::foundry::Track original; juce::Uuid document;
+        Session before; engine::foundry::Track original; cydaw::base::Uuid document;
         float x{}; int kind{}; std::uint64_t destination{};
     };
     std::optional<CinemaContainerGesture> cinemaContainerGesture_;
@@ -306,7 +309,7 @@ private:
     int effectsTrack_ { -1 };
     float tailSeconds_ { 2.0f };
     int saveBits_ { 24 };
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 };
 
 } // namespace cydaw::v2

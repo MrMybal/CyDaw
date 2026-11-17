@@ -1,3 +1,8 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SamplerView.h"
 
 #include "Icons.h"
@@ -7,7 +12,7 @@
 #include "Widgets.h"
 
 #include <imgui_internal.h>
-#include <juce_audio_formats/juce_audio_formats.h>
+
 
 #include <algorithm>
 #include <cmath>
@@ -20,50 +25,50 @@ using ui::L;
 
 namespace {
 
-juce::var copyOf(const juce::var& json)
+cydaw::base::Value copyOf(const cydaw::base::Value& json)
 {
-    return juce::JSON::parse(juce::JSON::toString(json, true));
+    return cydaw::base::JSON::parse(cydaw::base::JSON::toString(json, true));
 }
 
-juce::Array<juce::var>* zonesOf(juce::var& json)
-{
-    return json.getProperty("zones", {}).getArray();
-}
-
-const juce::Array<juce::var>* zonesOf(const juce::var& json)
+cydaw::base::Array<cydaw::base::Value>* zonesOf(cydaw::base::Value& json)
 {
     return json.getProperty("zones", {}).getArray();
 }
 
-juce::String noteName(const int note)
+const cydaw::base::Array<cydaw::base::Value>* zonesOf(const cydaw::base::Value& json)
+{
+    return json.getProperty("zones", {}).getArray();
+}
+
+cydaw::base::Text noteName(const int note)
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    return juce::String(names[((note % 12) + 12) % 12]) + juce::String(note / 12 - 1);
+    return cydaw::base::Text(names[((note % 12) + 12) % 12]) + cydaw::base::Text(note / 12 - 1);
 }
 
-std::pair<int, int> pairOf(const juce::var& zone, const char* key, const std::pair<int, int> fallback)
+std::pair<int, int> pairOf(const cydaw::base::Value& zone, const char* key, const std::pair<int, int> fallback)
 {
     if (const auto* list = zone.getProperty(key, {}).getArray(); list != nullptr && list->size() == 2)
         return { static_cast<int>((*list)[0]), static_cast<int>((*list)[1]) };
     return fallback;
 }
 
-void setPair(juce::var& zone, const char* key, const juce::int64 first, const juce::int64 second)
+void setPair(cydaw::base::Value& zone, const char* key, const std::int64_t first, const std::int64_t second)
 {
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     list.add(first);
     list.add(second);
     if (auto* object = zone.getDynamicObject())
         object->setProperty(key, list);
 }
 
-void setValue(juce::var& zone, const char* key, const juce::var& value)
+void setValue(cydaw::base::Value& zone, const char* key, const cydaw::base::Value& value)
 {
     if (auto* object = zone.getDynamicObject())
         object->setProperty(key, value);
 }
 
-bool isAudioFile(const juce::File& file)
+bool isAudioFile(const cydaw::base::File& file)
 {
     return file.hasFileExtension("wav;aif;aiff;flac;ogg;mp3;wv");
 }
@@ -73,23 +78,23 @@ bool isAudioFile(const juce::File& file)
 SamplerView::SamplerView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 SamplerView::~SamplerView() = default;
 
-juce::var SamplerView::currentMap(const Target& target) const
+cydaw::base::Value SamplerView::currentMap(const Target& target) const
 {
     if (const auto* slot = studio_.graphFor(target.track))
         return slot->graph().nodeSamplerJson(target.nodeId);
     return {};
 }
 
-void SamplerView::report(const juce::String& message, const bool error)
+void SamplerView::report(const cydaw::base::Text& message, const bool error)
 {
     state_.status = message;
     state_.statusIsError = error;
     state_.statusTime = ImGui::GetTime();
 }
 
-void SamplerView::commit(const Target& target, const juce::var& json, const bool applySettings)
+void SamplerView::commit(const Target& target, const cydaw::base::Value& json, const bool applySettings)
 {
-    juce::String error;
+    cydaw::base::Text error;
     if (!studio_.setSamplerMap(target.track, target.nodeId, json, applySettings, error))
         report(error, true);
 }
@@ -108,13 +113,13 @@ void SamplerView::openEditor(const TrackRef& track, const std::uint64_t nodeId, 
     kept.showControls = controls;
 }
 
-void SamplerView::addFiles(const TrackRef& track, const std::uint64_t nodeId, const juce::StringArray& paths)
+void SamplerView::addFiles(const TrackRef& track, const std::uint64_t nodeId, const cydaw::base::TextList& paths)
 {
-    juce::Array<juce::File> audio;
+    cydaw::base::Array<cydaw::base::File> audio;
     for (const auto& path : paths) {
-        const juce::File file(path);
+        const cydaw::base::File file(path);
         if (file.hasFileExtension("sfz;cysampler")) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!studio_.loadSamplerFile(file, track, error))
                 report(error, true);
             else
@@ -145,17 +150,17 @@ void SamplerView::addFiles(const TrackRef& track, const std::uint64_t nodeId, co
                           : app::samplerMapFromFiles(audio, audio.size() == 1 ? audio[0].getFileNameWithoutExtension()
                                                                                : audio[0].getParentDirectory().getFileName());
     commit(target, json, zones == nullptr || zones->isEmpty());
-    report(juce::String(audio.size()) + ui::Ls(" échantillon(s) ajouté(s)", " sample(s) added"));
+    report(cydaw::base::Text(audio.size()) + ui::Ls(" échantillon(s) ajouté(s)", " sample(s) added"));
 }
 
 void SamplerView::chooseFiles(const Target& target)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Des échantillons pour ce sampler", "Samples for this sampler"),
-                                                   juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [this, target](const juce::FileChooser& chooser) {
-                              juce::StringArray paths;
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Des échantillons pour ce sampler", "Samples for this sampler"),
+                                                   cydaw::base::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::canSelectMultipleItems,
+                          [this, target](const cydaw::base::FileDialog& chooser) {
+                              cydaw::base::TextList paths;
                               for (const auto& file : chooser.getResults())
                                   paths.add(file.getFullPathName());
                               if (!paths.isEmpty())
@@ -165,23 +170,23 @@ void SamplerView::chooseFiles(const Target& target)
 
 void SamplerView::chooseSfz(const Target& target)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Un instrument SFZ (ou une carte .cysampler)",
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un instrument SFZ (ou une carte .cysampler)",
                                                      "An SFZ instrument (or a .cysampler map)"),
-                                                   juce::File(), "*.sfz;*.cysampler");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this, target](const juce::FileChooser& chooser) {
-                              if (const auto file = chooser.getResult(); file != juce::File())
-                                  addFiles(target.track, target.nodeId, juce::StringArray { file.getFullPathName() });
+                                                   cydaw::base::File(), "*.sfz;*.cysampler");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this, target](const cydaw::base::FileDialog& chooser) {
+                              if (const auto file = chooser.getResult(); file != cydaw::base::File())
+                                  addFiles(target.track, target.nodeId, cydaw::base::TextList { file.getFullPathName() });
                           });
 }
 
 void SamplerView::exportSfz(const Target& target)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Enregistrer en SFZ", "Save as SFZ"), juce::File(), "*.sfz");
-    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this, target](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Enregistrer en SFZ", "Save as SFZ"), cydaw::base::File(), "*.sfz");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                          [this, target](const cydaw::base::FileDialog& chooser) {
                               auto file = chooser.getResult();
-                              if (file == juce::File())
+                              if (file == cydaw::base::File())
                                   return;
                               file = file.withFileExtension("sfz");
                               if (file.replaceWithText(app::samplerMapToSfz(currentMap(target), file)))
@@ -191,7 +196,7 @@ void SamplerView::exportSfz(const Target& target)
                           });
 }
 
-int SamplerView::drawMap(const juce::var& json, const ImVec2 at, const ImVec2 size, const int selected, const ImU32 colour,
+int SamplerView::drawMap(const cydaw::base::Value& json, const ImVec2 at, const ImVec2 size, const int selected, const ImU32 colour,
                          const bool interactive)
 {
     const auto& p = theme::palette();
@@ -263,7 +268,7 @@ int SamplerView::drawMap(const juce::var& json, const ImVec2 at, const ImVec2 si
         const auto keys = pairOf(zone, "keys", { root, root });
         const auto velocities = pairOf(zone, "velocities", { 1, 127 });
         ImGui::SetTooltip("%s\n%s %s  %s %s-%s  %s %d-%d",
-                          juce::File(app::resolveSamplePath(zone.getProperty("file", {}).toString())).getFileName().toRawUTF8(),
+                          cydaw::base::File(app::resolveSamplePath(zone.getProperty("file", {}).toString())).getFileName().toRawUTF8(),
                           L("racine", "root"), noteName(root).toRawUTF8(), L("touches", "keys"),
                           noteName(keys.first).toRawUTF8(), noteName(keys.second).toRawUTF8(), L("vélocités", "velocities"),
                           velocities.first, velocities.second);
@@ -271,7 +276,7 @@ int SamplerView::drawMap(const juce::var& json, const ImVec2 at, const ImVec2 si
     return ImGui::IsItemClicked() ? hovered : -2;
 }
 
-void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 at,
+void SamplerView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 at,
                            const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.
@@ -302,7 +307,7 @@ void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph
     // the map's own area, so that it takes the click).
     if (const auto has = sampler_controls::count(graph, nodeId); has.controls > 0 || has.articulations > 0) {
         ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
-        const auto label = juce::String::fromUTF8(L("Contrôles", "Controls")) + " (" + juce::String(has.controls + has.articulations) + ")";
+        const auto label = cydaw::base::Text::fromUTF8(L("Contrôles", "Controls")) + " (" + cydaw::base::Text(has.controls + has.articulations) + ")";
         const auto width = ImGui::CalcTextSize(label.toRawUTF8()).x + ImGui::GetStyle().FramePadding.x * 2.0f;
         ImGui::SetCursorScreenPos(ImVec2(mapAt.x + mapSize.x - width - dp(2.0f), mapAt.y + dp(2.0f)));
         if (ImGui::SmallButton(label.toRawUTF8()))
@@ -323,7 +328,7 @@ void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph
                   "(from the browser or the file explorer), or an SFZ."));
     if (ImGui::BeginDragDropTarget()) {
         if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload != nullptr && payload->DataSize > 1)
-            addFiles(track, nodeId, juce::StringArray { juce::String::fromUTF8(static_cast<const char*>(payload->Data)) });
+            addFiles(track, nodeId, cydaw::base::TextList { cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data)) });
         ImGui::EndDragDropTarget();
     }
     state_.samplerDrop = UiState::SamplerDrop { track, nodeId, at.x, at.y, end.x, end.y };
@@ -364,7 +369,7 @@ void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph
     ImGui::PopID();
 }
 
-void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 at,
+void SamplerView::drawSimplePane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 at,
                                  const ImVec2 size)
 {
     // Inside a module: English, whatever the language.
@@ -382,7 +387,7 @@ void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent&
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
     const auto row = ImGui::GetFrameHeight() + dp(3.0f);
     // Granular (Nuée): its grains' settings, a row of knobs under the sound.
-    std::vector<app::NodeGraphComponent::EditorParameter> grainSettings;
+    std::vector<app::GraphDocument::EditorParameter> grainSettings;
     auto granular = false;
     for (const auto& node : graph.editorNodes())
         if (node.id == nodeId)
@@ -453,7 +458,7 @@ void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent&
         auto root = static_cast<int>(zone.getProperty("root", 60));
         ImGui::SetCursorScreenPos(ImVec2(waveAt.x, ImGui::GetCursorScreenPos().y));
         ImGui::SetNextItemWidth(dp(96.0f));
-        const auto format = juce::String::fromUTF8(L("Racine ", "Root ")) + noteName(root);
+        const auto format = cydaw::base::Text::fromUTF8(L("Racine ", "Root ")) + noteName(root);
         if (ImGui::DragInt("##root", &root, 0.15f, 0, 127, format.toRawUTF8())) {
             setValue(zone, "root", root);
             pane_.editing = true;
@@ -463,7 +468,7 @@ void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent&
         ui::tooltip(L("La note où l'échantillon joue à sa hauteur enregistrée (glisser, ou Ctrl+clic pour la taper).",
                       "The key that plays the sample at its recorded pitch (drag, or Ctrl+click to type it)."));
         ImGui::SameLine();
-        const auto file = juce::File(app::resolveSamplePath(zone.getProperty("file", {}).toString())).getFileNameWithoutExtension();
+        const auto file = cydaw::base::File(app::resolveSamplePath(zone.getProperty("file", {}).toString())).getFileNameWithoutExtension();
         ImGui::PushClipRect(ImGui::GetCursorScreenPos(), ImVec2(end.x - dp(4.0f), end.y), true);
         ImGui::TextColored(theme::vec(p.textDim), "%s", file.toRawUTF8());
         ImGui::PopClipRect();
@@ -508,7 +513,7 @@ void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent&
     // (the drop handler asks where this pane was).
     if (ImGui::BeginDragDropTargetCustom(ImRect(at, end), ImGui::GetID("##simpleDrop"))) {
         if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload != nullptr && payload->DataSize > 1)
-            addFiles(track, nodeId, juce::StringArray { juce::String::fromUTF8(static_cast<const char*>(payload->Data)) });
+            addFiles(track, nodeId, cydaw::base::TextList { cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data)) });
         ImGui::EndDragDropTarget();
     }
     state_.samplerDrop = UiState::SamplerDrop { track, nodeId, at.x, at.y, end.x, end.y };
@@ -519,11 +524,11 @@ void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent&
         && !ImGui::IsAnyItemActive()) {
         pane_.editing = false;
         commit(target, pane_.working);
-        pane_.working = juce::var();
+        pane_.working = cydaw::base::Value();
     }
 }
 
-void SamplerView::drawZoneFields(const Target& target, juce::var& json, const int zone)
+void SamplerView::drawZoneFields(const Target& target, cydaw::base::Value& json, const int zone)
 {
     auto* zones = zonesOf(json);
     if (zones == nullptr || zone < 0 || zone >= zones->size())
@@ -599,7 +604,7 @@ void SamplerView::drawZoneFields(const Target& target, juce::var& json, const in
                     setValue(edit, "tune", std::round((note - heard) * 1'000.0) / 10.0);
                     commit(target, edited);
                     report(ui::Ls("Hauteur entendue : ", "Pitch heard: ") + noteName(note)
-                           + juce::String::formatted(" %+.1f c", (heard - note) * 100.0));
+                           + cydaw::base::Text::formatted(" %+.1f c", (heard - note) * 100.0));
                 } else {
                     report(ui::Ls("Aucune hauteur nette dans ce son", "No clear pitch in this sound"), true);
                 }
@@ -609,8 +614,8 @@ void SamplerView::drawZoneFields(const Target& target, juce::var& json, const in
                   "The root and tuning from the pitch heard in the sample."));
 }
 
-void SamplerView::drawWaveform(const Target& target, juce::var& json, const int zone, const ImVec2 size, Peaks& peaks,
-                               juce::var& working, bool& editing, const bool compact)
+void SamplerView::drawWaveform(const Target& target, cydaw::base::Value& json, const int zone, const ImVec2 size, Peaks& peaks,
+                               cydaw::base::Value& working, bool& editing, const bool compact)
 {
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
@@ -642,16 +647,16 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
         peaks.high.assign(static_cast<std::size_t>(columns), 0.0f);
         // A long recording has only its head in memory: its peaks read from
         // the file, once.
-        std::unique_ptr<juce::AudioFormatReader> reader;
+        std::unique_ptr<cydaw::audio::AudioFormatReader> reader;
         if (data->streamed) {
-            juce::AudioFormatManager formats;
-            formats.registerBasicFormats();
-            reader.reset(formats.createReaderFor(juce::File(juce::String::fromUTF8(data->path.c_str()))));
+            cydaw::audio::AudioFormatManager formats;
+            cydaw::integration::registerCyAudioCoreReaders(formats);
+            reader.reset(formats.createReaderFor(cydaw::base::File(cydaw::base::Text::fromUTF8(data->path.c_str()))));
         }
         for (int column = 0; column < columns && reader != nullptr; ++column) {
             const auto from = data->frames * column / columns;
             const auto to = std::max(from + 1, data->frames * (column + 1) / columns);
-            juce::Range<float> levels[2];
+            cydaw::base::Range<float> levels[2];
             reader->readMaxLevels(from, to - from, levels, 1);
             peaks.low[static_cast<std::size_t>(column)] = levels[0].getStart();
             peaks.high[static_cast<std::size_t>(column)] = levels[0].getEnd();
@@ -682,14 +687,14 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
     auto& item = zones->getReference(zone);
     const auto frames = static_cast<double>(data->frames);
     const auto xOf = [&](const double frame) { return at.x + static_cast<float>(frame / frames) * size.x; };
-    const auto start = static_cast<double>(static_cast<juce::int64>(item.getProperty("start", 0)));
-    auto finish = static_cast<double>(static_cast<juce::int64>(item.getProperty("end", -1)));
+    const auto start = static_cast<double>(static_cast<std::int64_t>(item.getProperty("start", 0)));
+    auto finish = static_cast<double>(static_cast<std::int64_t>(item.getProperty("end", -1)));
     if (finish < 0.0)
         finish = frames;
     const auto* loop = item.getProperty("loop", {}).getArray();
-    const auto hasLoop = loop != nullptr && loop->size() == 2 && static_cast<juce::int64>((*loop)[0]) >= 0;
-    const auto loopStart = hasLoop ? static_cast<double>(static_cast<juce::int64>((*loop)[0])) : -1.0;
-    const auto loopEnd = hasLoop ? static_cast<double>(static_cast<juce::int64>((*loop)[1])) : -1.0;
+    const auto hasLoop = loop != nullptr && loop->size() == 2 && static_cast<std::int64_t>((*loop)[0]) >= 0;
+    const auto loopStart = hasLoop ? static_cast<double>(static_cast<std::int64_t>((*loop)[0])) : -1.0;
+    const auto loopEnd = hasLoop ? static_cast<double>(static_cast<std::int64_t>((*loop)[1])) : -1.0;
     if (hasLoop)
         list->AddRectFilled(ImVec2(xOf(loopStart), at.y), ImVec2(xOf(loopEnd), end.y), (p.accent & 0x00ffffffu) | 0x30000000u);
     const std::array<double, 4> markers { start, finish, loopStart, loopEnd };
@@ -709,12 +714,12 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
             }
     }
     if (ImGui::IsItemActive() && draggedMarker_ >= 0) {
-        const auto frame = static_cast<juce::int64>(std::clamp((ImGui::GetIO().MousePos.x - at.x) / size.x, 0.0f, 1.0f) * frames);
+        const auto frame = static_cast<std::int64_t>(std::clamp((ImGui::GetIO().MousePos.x - at.x) / size.x, 0.0f, 1.0f) * frames);
         switch (draggedMarker_) {
-        case 0: setValue(item, "start", std::min<juce::int64>(frame, static_cast<juce::int64>(finish) - 1)); break;
-        case 1: setValue(item, "end", std::max<juce::int64>(frame, static_cast<juce::int64>(start) + 1)); break;
-        case 2: setPair(item, "loop", std::min<juce::int64>(frame, static_cast<juce::int64>(loopEnd) - 2), static_cast<juce::int64>(loopEnd)); break;
-        case 3: setPair(item, "loop", static_cast<juce::int64>(loopStart), std::max<juce::int64>(frame, static_cast<juce::int64>(loopStart) + 2)); break;
+        case 0: setValue(item, "start", std::min<std::int64_t>(frame, static_cast<std::int64_t>(finish) - 1)); break;
+        case 1: setValue(item, "end", std::max<std::int64_t>(frame, static_cast<std::int64_t>(start) + 1)); break;
+        case 2: setPair(item, "loop", std::min<std::int64_t>(frame, static_cast<std::int64_t>(loopEnd) - 2), static_cast<std::int64_t>(loopEnd)); break;
+        case 3: setPair(item, "loop", static_cast<std::int64_t>(loopStart), std::max<std::int64_t>(frame, static_cast<std::int64_t>(loopStart) + 2)); break;
         default: break;
         }
         editing = true;
@@ -729,7 +734,7 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
         auto& edit = zonesOf(edited)->getReference(zone);
         if (looped) {
             // The middle third to begin with, a crossfade of 50 ms.
-            setPair(edit, "loop", static_cast<juce::int64>(frames * 0.4), static_cast<juce::int64>(frames * 0.8));
+            setPair(edit, "loop", static_cast<std::int64_t>(frames * 0.4), static_cast<std::int64_t>(frames * 0.8));
             setValue(edit, "loopCrossfade", static_cast<int>(data->sampleRate * 0.05));
         } else if (auto* object = edit.getDynamicObject()) {
             object->removeProperty("loop");
@@ -800,7 +805,7 @@ bool SamplerView::drawEditorWindow(const bool focus)
     if (focus)
         ImGui::SetNextWindowFocus();
     auto open = true;
-    const auto title = ui::Ls("Sampler — ", "Sampler — ") + studio_.trackName(target.track) + juce::String(windowId_);
+    const auto title = ui::Ls("Sampler — ", "Sampler — ") + studio_.trackName(target.track) + cydaw::base::Text(windowId_);
     if (ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse)) {
         // Out of the studio's window, as a plug-in's (another screen), and back.
         {
@@ -876,7 +881,7 @@ bool SamplerView::drawEditorWindow(const bool focus)
                         ImGui::TableNextRow();
                         ImGui::TableNextColumn();
                         ImGui::PushID(index);
-                        const auto name = juce::File(app::resolveSamplePath(zone.getProperty("file", {}).toString())).getFileName();
+                        const auto name = cydaw::base::File(app::resolveSamplePath(zone.getProperty("file", {}).toString())).getFileName();
                         if (ImGui::Selectable(name.toRawUTF8(), index == selected_, ImGuiSelectableFlags_SpanAllColumns)) {
                             selected_ = index;
                             peaks_ = {};
@@ -934,7 +939,7 @@ bool SamplerView::drawEditorWindow(const bool focus)
     if (editing_ && !ImGui::IsAnyItemActive()) {
         editing_ = false;
         commit(target, working_);
-        working_ = juce::var();
+        working_ = cydaw::base::Value();
     }
     return open;
 }

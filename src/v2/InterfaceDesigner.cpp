@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
 #include "InterfaceEditor.h"
 #include "CustomInterface.h"
 #include "DeviceVisuals.h"
@@ -15,13 +17,13 @@ using ui::dp;
 using ui::L;
 namespace
 {
-juce::var designValue(const app::ModuleInterfaceControl &c, const char *key, const juce::var &fallback = {})
+cydaw::base::Value designValue(const app::ModuleInterfaceControl &c, const char *key, const cydaw::base::Value &fallback = {})
 {
     return c.design.getProperty(key, fallback);
 }
-void setDesign(app::ModuleInterfaceControl &c, const char *key, const juce::var &value)
+void setDesign(app::ModuleInterfaceControl &c, const char *key, const cydaw::base::Value &value)
 {
-    auto next = c.design.isObject() ? c.design.clone() : juce::var(new juce::DynamicObject);
+    auto next = c.design.isObject() ? c.design.clone() : cydaw::base::Value(new cydaw::base::Object);
     next.getDynamicObject()->setProperty(key, value);
     c.design = std::move(next);
 }
@@ -48,7 +50,7 @@ bool InterfaceEditor::visible(const Control &c) const
 }
 void InterfaceEditor::drawPageBar()
 {
-    std::set<juce::String> pages;
+    std::set<cydaw::base::Text> pages;
     for (const auto &c : interface_.controls)
         if (auto page = designValue(c, "page").toString(); page.isNotEmpty())
             pages.insert(page);
@@ -85,7 +87,7 @@ void InterfaceEditor::drawLayers(GraphSlot &slot)
         }
         ImGui::SameLine();
         const auto name =
-            it->label.isNotEmpty() ? it->label : juce::String("#") + juce::String(static_cast<juce::int64>(it->id));
+            it->label.isNotEmpty() ? it->label : cydaw::base::Text("#") + cydaw::base::Text(static_cast<std::int64_t>(it->id));
         if (ImGui::Selectable(name.toRawUTF8(), selection_.contains(it->id) || selected_ == it->id))
         {
             selected_ = it->id;
@@ -165,7 +167,7 @@ void InterfaceEditor::drawLayers(GraphSlot &slot)
         }
         if (ImGui::SmallButton(L("Grouper", "Group")))
         {
-            const auto group = "group-" + juce::String(static_cast<juce::int64>(interface_.nextControlId++));
+            const auto group = "group-" + cydaw::base::Text(static_cast<std::int64_t>(interface_.nextControlId++));
             for (auto &c : interface_.controls)
                 if (selection_.contains(c.id))
                     setDesign(c, "group", group);
@@ -173,7 +175,7 @@ void InterfaceEditor::drawLayers(GraphSlot &slot)
         }
     }
 }
-bool InterfaceEditor::addInstrumentInterface(GraphSlot& slot,std::uint64_t nodeId,bool whole,const juce::String& panelId)
+bool InterfaceEditor::addInstrumentInterface(GraphSlot& slot,std::uint64_t nodeId,bool whole,const cydaw::base::Text& panelId)
 {
     pull(slot);
     const auto nodes=slot.graph().editorNodes();const auto node=std::find_if(nodes.begin(),nodes.end(),[&](const auto& n){return n.id==nodeId;});
@@ -181,8 +183,8 @@ bool InterfaceEditor::addInstrumentInterface(GraphSlot& slot,std::uint64_t nodeI
     const auto type=node->typeKey.toStdString();const auto& panels=instrument_ui::panels(type,deviceLayout_);
     if(panels.empty())return false;
     const auto model=engine::synth::modelForType(type);
-    const auto prefix=model==engine::synth::Model::none?juce::String(type=="kick-synth"?"kick":"prism"):juce::String(engine::synth::info(model).prefix);
-    std::vector<juce::String> bindings;juce::Array<juce::var> keys;
+    const auto prefix=model==engine::synth::Model::none?cydaw::base::Text(type=="kick-synth"?"kick":"prism"):cydaw::base::Text(engine::synth::info(model).prefix);
+    std::vector<cydaw::base::Text> bindings;cydaw::base::Array<cydaw::base::Value> keys;
     for(const auto& p:node->parameters)if(p.binding.contains("."+prefix+".")) {
         bindings.push_back(p.binding);keys.add(p.binding.fromFirstOccurrenceOf("."+prefix+".",false,false));
     }
@@ -194,15 +196,15 @@ bool InterfaceEditor::addInstrumentInterface(GraphSlot& slot,std::uint64_t nodeI
     selection_.clear();
     for(const auto& p:panels) {
         if(!whole && p.id!=panelId.toStdString())continue;
-        Control c;c.id=interface_.nextControlId++;c.kind=Kind::nativePanel;c.label=juce::String(p.title);c.extraParameterBindings=bindings;
-        c.design=new juce::DynamicObject;auto* d=c.design.getDynamicObject();
-        d->setProperty("instrumentType",node->typeKey);d->setProperty("instrumentPanel",juce::String(p.id));d->setProperty("instrumentCompact",deviceLayout_);d->setProperty("instrumentKeys",keys);
-        const auto color=ImGui::ColorConvertU32ToFloat4(p.colour);d->setProperty("accent",juce::Colour::fromFloatRGBA(color.x,color.y,color.z,color.w).toString());
+        Control c;c.id=interface_.nextControlId++;c.kind=Kind::nativePanel;c.label=cydaw::base::Text(p.title);c.extraParameterBindings=bindings;
+        c.design=new cydaw::base::Object;auto* d=c.design.getDynamicObject();
+        d->setProperty("instrumentType",node->typeKey);d->setProperty("instrumentPanel",cydaw::base::Text(p.id));d->setProperty("instrumentCompact",deviceLayout_);d->setProperty("instrumentKeys",keys);
+        const auto color=ImGui::ColorConvertU32ToFloat4(p.colour);d->setProperty("accent",cydaw::base::Colour::fromFloatRGBA(color.x,color.y,color.z,color.w).toString());
         if(whole) {
             float total=0,before=0;for(const auto& sibling:panels)if(sibling.page==p.page && sibling.row==p.row){if(sibling.id==p.id)before=total;total+=sibling.weight;}
             c.x=.02f+.96f*before/std::max(.1f,total);c.width=.96f*p.weight/std::max(.1f,total)-.008f;
             c.y=.02f+.96f*p.row/std::max(1,rows[p.page]);c.height=.96f/std::max(1,rows[p.page])-.012f;
-            if(!p.page.empty())d->setProperty("page",node->title+" / "+juce::String(p.page));
+            if(!p.page.empty())d->setProperty("page",node->title+" / "+cydaw::base::Text(p.page));
         } else {c.x=.04f;c.y=.08f;c.width=.6f;c.height=.75f;if(page_.isNotEmpty())d->setProperty("page",page_);}
         interface_.controls.push_back(c);selection_.insert(c.id);selected_=c.id;
     }
@@ -217,16 +219,16 @@ bool InterfaceEditor::addInstrumentInterface(GraphSlot& slot,std::uint64_t nodeI
     return push(slot,true);
 }
 
-bool InterfaceEditor::addInstrumentSection(GraphSlot& slot,const juce::String& type,const juce::String& panelId)
+bool InterfaceEditor::addInstrumentSection(GraphSlot& slot,const cydaw::base::Text& type,const cydaw::base::Text& panelId)
 {
     pull(slot);
     const auto* spec=instrument_ui::panel(type.toStdString(),panelId.toStdString(),deviceLayout_);
     if(!spec)return false;
-    Control c;c.id=interface_.nextControlId++;c.kind=Kind::nativePanel;c.label=juce::String(spec->title);
-    c.x=.05f;c.y=.08f;c.width=.65f;c.height=.75f;c.design=new juce::DynamicObject;
+    Control c;c.id=interface_.nextControlId++;c.kind=Kind::nativePanel;c.label=cydaw::base::Text(spec->title);
+    c.x=.05f;c.y=.08f;c.width=.65f;c.height=.75f;c.design=new cydaw::base::Object;
     auto* d=c.design.getDynamicObject();d->setProperty("instrumentType",type);d->setProperty("instrumentPanel",panelId);
-    d->setProperty("instrumentCompact",deviceLayout_);d->setProperty("instrumentKeys",juce::Array<juce::var>{});
-    const auto color=ImGui::ColorConvertU32ToFloat4(spec->colour);d->setProperty("accent",juce::Colour::fromFloatRGBA(color.x,color.y,color.z,color.w).toString());
+    d->setProperty("instrumentCompact",deviceLayout_);d->setProperty("instrumentKeys",cydaw::base::Array<cydaw::base::Value>{});
+    const auto color=ImGui::ColorConvertU32ToFloat4(spec->colour);d->setProperty("accent",cydaw::base::Colour::fromFloatRGBA(color.x,color.y,color.z,color.w).toString());
     if(page_.isNotEmpty())d->setProperty("page",page_);
     interface_.controls.push_back(c);selected_=c.id;selection_={c.id};
     return push(slot,true);
@@ -238,8 +240,8 @@ void InterfaceEditor::drawNativePalette(GraphSlot &slot)
         return;
     if(ImGui::TreeNode(L("Bibliothèque de sections","Section library"))) {
         const auto model=libraryInstrument_<15?static_cast<engine::synth::Model>(libraryInstrument_+1):engine::synth::Model::none;
-        const auto type=model==engine::synth::Model::none?juce::String(libraryInstrument_==16?"kick-synth":"prism-synth"):juce::String(engine::synth::info(model).typeKey);
-        const auto title=model==engine::synth::Model::none?juce::String(libraryInstrument_==16?"Kick":"Prisme"):juce::String(engine::synth::info(model).english);
+        const auto type=model==engine::synth::Model::none?cydaw::base::Text(libraryInstrument_==16?"kick-synth":"prism-synth"):cydaw::base::Text(engine::synth::info(model).typeKey);
+        const auto title=model==engine::synth::Model::none?cydaw::base::Text(libraryInstrument_==16?"Kick":"Prisme"):cydaw::base::Text(engine::synth::info(model).english);
         ImGui::SetNextItemWidth(-1);
         if(ImGui::BeginCombo("##sectionModel",title.toRawUTF8())) {
             for(int i=0;i<17;++i) {
@@ -252,7 +254,7 @@ void InterfaceEditor::drawNativePalette(GraphSlot &slot)
         for(const auto& panel:instrument_ui::panels(type.toStdString(),deviceLayout_)) {
             ImGui::PushID(panel.id.c_str());
             const auto text=panel.page.empty()?panel.title:panel.page+" / "+panel.title;
-            if(ImGui::Selectable(text.c_str()))addInstrumentSection(slot,type,juce::String(panel.id));
+            if(ImGui::Selectable(text.c_str()))addInstrumentSection(slot,type,cydaw::base::Text(panel.id));
             ImGui::PopID();
         }
         ImGui::TreePop();
@@ -266,7 +268,7 @@ void InterfaceEditor::drawNativePalette(GraphSlot &slot)
                 if(ImGui::Button(L("Ajouter l'interface complète","Add full interface"),ImVec2(-1,0)))addInstrumentInterface(slot,node.id,true);
                 for(const auto& panel:instrument) {
                     const auto text=panel.page.empty()?panel.title:panel.page+" / "+panel.title;
-                    if(ImGui::Selectable(text.c_str()))addInstrumentInterface(slot,node.id,false,juce::String(panel.id));
+                    if(ImGui::Selectable(text.c_str()))addInstrumentInterface(slot,node.id,false,cydaw::base::Text(panel.id));
                 }
                 ImGui::TreePop();
             }
@@ -292,13 +294,13 @@ void InterfaceEditor::drawNativePalette(GraphSlot &slot)
                 c.y = .08f;
                 c.width = .7f;
                 c.height = .65f;
-                c.design = new juce::DynamicObject;
+                c.design = new cydaw::base::Object;
                 c.design.getDynamicObject()->setProperty("pane", static_cast<int>(pane.kind));
                 c.design.getDynamicObject()->setProperty("variant", pane.variant);
                 c.design.getDynamicObject()->setProperty("large",!deviceLayout_);
                 if (page_.isNotEmpty())
                     c.design.getDynamicObject()->setProperty("page", page_);
-                juce::Array<juce::var> indices;
+                cydaw::base::Array<cydaw::base::Value> indices;
                 for (const auto index : pane.parameters)
                 {
                     if (index < 0 || index >= static_cast<int>(parameters.size()))
@@ -328,7 +330,7 @@ ImU32 InterfaceEditor::surfaceColour(const char* key, ImU32 fallback) const
 {
     const auto value=interface_.windowDesign.getProperty(key,{}).toString();
     if(value.isEmpty())return fallback;
-    const auto c=juce::Colour::fromString(value);
+    const auto c=cydaw::base::Colour::fromString(value);
     return ImGui::ColorConvertFloat4ToU32({c.getFloatRed(),c.getFloatGreen(),c.getFloatBlue(),c.getFloatAlpha()});
 }
 
@@ -346,7 +348,7 @@ void InterfaceEditor::drawWindowProperties(GraphSlot& slot)
     if(ImGui::BeginCombo(L("Format","Format"),L("Choisir un format…","Choose a size…"))) {
         const int presets[][2]={{720,420},{1000,700},{1280,800},{1600,900},{480,240},{720,280}};
         for(const auto& preset:presets) {
-            const auto label=juce::String(preset[0])+" x "+juce::String(preset[1]);
+            const auto label=cydaw::base::Text(preset[0])+" x "+cydaw::base::Text(preset[1]);
             if(ImGui::Selectable(label.toRawUTF8(),w==preset[0]&&h==preset[1]))saveSize(preset[0],preset[1]);
         }
         ImGui::EndCombo();
@@ -358,12 +360,12 @@ void InterfaceEditor::drawWindowProperties(GraphSlot& slot)
     if(ImGui::InputInt("##surfaceHeight",&h,10,100,ImGuiInputTextFlags_EnterReturnsTrue))saveSize(w,h);
     if(ImGui::IsItemDeactivatedAfterEdit())saveSize(w,h);
     for(const auto* key:{"background","accent","text"}) {
-        const auto fallback=juce::String(key)=="background"?theme::palette().bg1:juce::String(key)=="accent"?theme::palette().accent:theme::palette().text;
+        const auto fallback=cydaw::base::Text(key)=="background"?theme::palette().bg1:cydaw::base::Text(key)=="accent"?theme::palette().accent:theme::palette().text;
         const auto c=ImGui::ColorConvertU32ToFloat4(surfaceColour(key,fallback));float rgba[]{c.x,c.y,c.z,c.w};
-        const char* label=juce::String(key)=="background"?L("Fond","Background"):juce::String(key)=="accent"?L("Accent","Accent"):L("Texte","Text");
+        const char* label=cydaw::base::Text(key)=="background"?L("Fond","Background"):cydaw::base::Text(key)=="accent"?L("Accent","Accent"):L("Texte","Text");
         if(ImGui::ColorEdit4(label,rgba,ImGuiColorEditFlags_NoInputs)) {
-            auto design=interface_.windowDesign.isObject()?interface_.windowDesign.clone():juce::var(new juce::DynamicObject);
-            design.getDynamicObject()->setProperty(key,juce::Colour::fromFloatRGBA(rgba[0],rgba[1],rgba[2],rgba[3]).toString());
+            auto design=interface_.windowDesign.isObject()?interface_.windowDesign.clone():cydaw::base::Value(new cydaw::base::Object);
+            design.getDynamicObject()->setProperty(key,cydaw::base::Colour::fromFloatRGBA(rgba[0],rgba[1],rgba[2],rgba[3]).toString());
             interface_.windowDesign=design;push(slot,false);
         }
         if(ImGui::IsItemDeactivatedAfterEdit())push(slot,true);
@@ -376,7 +378,7 @@ void InterfaceEditor::drawWindowProperties(GraphSlot& slot)
     }
     if(ImGui::IsItemDeactivatedAfterEdit())push(slot,true);
     if(ImGui::Checkbox(L("Aimanter","Snap"),&interface_.snapToGrid))push(slot,true);
-    if(ImGui::SmallButton(L("Réinitialiser les couleurs","Reset colors"))) {interface_.windowDesign=juce::var();push(slot,true);}
+    if(ImGui::SmallButton(L("Réinitialiser les couleurs","Reset colors"))) {interface_.windowDesign=cydaw::base::Value();push(slot,true);}
     ImGui::Spacing();
 }
 
@@ -384,7 +386,7 @@ void InterfaceEditor::drawCode(GraphSlot &slot)
 {
     if (!code_[0])
     {
-        const auto text = juce::JSON::toString(app::serialiseModuleInterface(interface_), false);
+        const auto text = cydaw::base::JSON::toString(app::serialiseModuleInterface(interface_), false);
         std::snprintf(code_.data(), code_.size(), "%s", text.toRawUTF8());
     }
     ImGui::TextWrapped("%s", L("JSON de la disposition active. Les paramètres appartiennent au graphe ; les contrôles "
@@ -393,8 +395,8 @@ void InterfaceEditor::drawCode(GraphSlot &slot)
                                "object are editable. Apply validates before replacing."));
     if (ImGui::Button(L("Appliquer le code", "Apply code")))
     {
-        juce::var parsed;
-        auto result = juce::JSON::parse(juce::String::fromUTF8(code_.data()), parsed);
+        cydaw::base::Value parsed;
+        auto result = cydaw::base::JSON::parse(cydaw::base::Text::fromUTF8(code_.data()), parsed);
         if (result.wasOk())
             result = app::validateModuleInterfaceDocument(parsed, interface_);
         if (result.wasOk())
@@ -407,16 +409,16 @@ void InterfaceEditor::drawCode(GraphSlot &slot)
             if (const auto *source = parsed.getProperty("controls", {}).getArray())
             {
                 if (static_cast<std::size_t>(source->size()) != candidate.controls.size())
-                    result = juce::Result::fail("Contrôles ignorés : vérifiez les identifiants et les types.");
+                    result = cydaw::base::Result::fail("Contrôles ignorés : vérifiez les identifiants et les types.");
                 for (const auto &c : *source)
                 {
                     const auto binding = c.getProperty("binding", {}).toString();
                     if (binding.isNotEmpty() && !parameter(binding))
-                        result = juce::Result::fail("Paramètre inconnu : " + binding);
+                        result = cydaw::base::Result::fail("Paramètre inconnu : " + binding);
                 }
             }
             else
-                result = juce::Result::fail("La liste controls est requise.");
+                result = cydaw::base::Result::fail("La liste controls est requise.");
             if (result.wasOk())
             {
                 interface_ = std::move(candidate);
@@ -457,12 +459,12 @@ void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
         auto rgba = ImGui::ColorConvertU32ToFloat4(fallback);
         if (text.isNotEmpty())
         {
-            const auto c = juce::Colour::fromString(text);
+            const auto c = cydaw::base::Colour::fromString(text);
             rgba = {c.getFloatRed(), c.getFloatGreen(), c.getFloatBlue(), c.getFloatAlpha()};
         }
         if (ImGui::ColorEdit4(id, &rgba.x, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_NoInputs))
         {
-            setDesign(control, key, juce::Colour::fromFloatRGBA(rgba.x, rgba.y, rgba.z, rgba.w).toString());
+            setDesign(control, key, cydaw::base::Colour::fromFloatRGBA(rgba.x, rgba.y, rgba.z, rgba.w).toString());
             push(slot, false);
         }
         if (ImGui::IsItemDeactivatedAfterEdit())
@@ -494,7 +496,7 @@ void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
         if (storage.empty())
             storage.resize(128);
         auto *value = storage.data();
-        const auto id = juce::String("##design-") + key;
+        const auto id = cydaw::base::Text("##design-") + key;
         if (ImGui::GetActiveID() != ImGui::GetID(id.toRawUTF8()))
             std::snprintf(value, storage.size(), "%s", designValue(control, key).toString().toRawUTF8());
         ImGui::TextUnformatted(key);
@@ -502,7 +504,7 @@ void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
         ImGui::InputText(id.toRawUTF8(), value, storage.size());
         if (ImGui::IsItemDeactivatedAfterEdit())
         {
-            setDesign(control, key, juce::String::fromUTF8(value));
+            setDesign(control, key, cydaw::base::Text::fromUTF8(value));
             push(slot, true);
         }
     }
@@ -526,8 +528,8 @@ void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
             if(ImGui::CollapsingHeader(L("Liaisons du panneau natif","Native panel bindings"),ImGuiTreeNodeFlags_DefaultOpen)) {
                 const auto keys=designValue(control,"instrumentKeys");
                 if(const auto* list=keys.getArray())for(const auto& setting:spec->settings) {
-                    int index=-1;for(int i=0;i<list->size();++i)if((*list)[i].toString()==juce::String(setting.key)){index=i;break;}
-                    const auto binding=index>=0 && index<static_cast<int>(control.extraParameterBindings.size())?control.extraParameterBindings[static_cast<std::size_t>(index)]:juce::String();
+                    int index=-1;for(int i=0;i<list->size();++i)if((*list)[i].toString()==cydaw::base::Text(setting.key)){index=i;break;}
+                    const auto binding=index>=0 && index<static_cast<int>(control.extraParameterBindings.size())?control.extraParameterBindings[static_cast<std::size_t>(index)]:cydaw::base::Text();
                     const auto* bound=parameter(binding);ImGui::PushID(setting.key.c_str());
                     ImGui::TextUnformatted(setting.label.c_str());ImGui::SetNextItemWidth(-1);
                     if(ImGui::BeginCombo("##nativeBinding",bound?bound->label.toRawUTF8():L("Sans liaison","Unbound"))) {
@@ -537,7 +539,7 @@ void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
                         }
                         for(const auto& candidate:interface_.parameters)if(ImGui::Selectable(candidate.label.toRawUTF8(),candidate.key==binding)) {
                             if(index>=0)control.extraParameterBindings[static_cast<std::size_t>(index)]=candidate.key;
-                            else {auto next=keys.clone();if(!next.isArray())next=juce::Array<juce::var>{};next.getArray()->add(juce::String(setting.key));setDesign(control,"instrumentKeys",next);control.extraParameterBindings.push_back(candidate.key);}
+                            else {auto next=keys.clone();if(!next.isArray())next=cydaw::base::Array<cydaw::base::Value>{};next.getArray()->add(cydaw::base::Text(setting.key));setDesign(control,"instrumentKeys",next);control.extraParameterBindings.push_back(candidate.key);}
                             push(slot,true);
                         }
                         ImGui::EndCombo();
@@ -574,15 +576,15 @@ void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
         if (!cppEditor_.focused())
             std::snprintf(cpp_.data(), cpp_.size(), "%s", source.toRawUTF8());
         if (cppEditor_.draw("##cppSource", cpp_, ImVec2(-1, dp(260)), cyui::CodeLanguage::cpp)) {
-            setDesign(control, "customSource", juce::String::fromUTF8(cpp_.data()));
+            setDesign(control, "customSource", cydaw::base::Text::fromUTF8(cpp_.data()));
             push(slot, false);
         }
         if (cppEditor_.committed()) push(slot, true);
         if (ImGui::Button(L("Compiler le composant", "Compile component")))
         {
-            setDesign(control, "customSource", juce::String::fromUTF8(cpp_.data()));
+            setDesign(control, "customSource", cydaw::base::Text::fromUTF8(cpp_.data()));
             push(slot, true);
-            CustomInterface::build(juce::String::fromUTF8(cpp_.data()));
+            CustomInterface::build(cydaw::base::Text::fromUTF8(cpp_.data()));
         }
         ImGui::SameLine();
         if (ImGui::Button(L("Exemple", "Example")))

@@ -7,6 +7,9 @@
 #include <cyui/modules/Nodes.h>
 #include <cstdio>
 #include <cmath>
+#include <numeric>
+#include <algorithm>
+#include <limits>
 
 using namespace cydaw::v2;
 namespace {
@@ -44,6 +47,50 @@ void frame(SourceEditor& editor, std::vector<char>& source) {
     ImGui::Dummy({0,0}); ImGui::End(); cyui::renderNotifications(); ImGui::Render();
     check(ImGui::GetDrawData()->TotalVtxCount > 0, "migrated views generate drawing commands");
 }
+
+void audioViews() {
+    cyui::SpectrogramHistory history;
+    check(history.reset(2, 2, .1, {20,20000}, true), "spectrogram history accepts bounded log-frequency data");
+    const float first[] {-80,-60}, second[] {-40,-20}, third[] {-10,0};
+    history.append({first,2}); history.append({second,2}); history.append({third,2});
+    const auto data = history.view();
+    check(data.frames==2 && data.bins==2 && data.values[0]==-40 && data.values[3]==0,
+          "spectrogram ring exposes chronological frames after wrapping");
+    ImGui::NewFrame();
+    ImGui::SetNextWindowPos({0,0}); ImGui::SetNextWindowSize({1000,740});
+    ImGui::Begin("Audio analysis views", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    cyui::PlotState spectrumView{{{20,20000},true},{{-90,6},false}};
+    const cyui::Point spectrum[] {{20,-80},{1000,-10},{20000,-60}};
+    cyui::PlotSeries series{1,"prepared spectrum", {spectrum,3}};
+    series.style=cyui::PlotStyle::area; series.baseline=-90; series.gradient=true; series.fillAlpha=.3f;
+    cyui::PlotOptions plotOptions; plotOptions.navigation=false;
+    cyui::spectrum("filled spectrum", spectrumView, {&series,1}, {400,100}, plotOptions);
+    cyui::PlotState timeView{{data.time,false},{data.frequency,true}};
+    cyui::SpectrogramOptions waterfall; waterfall.orientation=cyui::SpectrogramOrientation::timeVertical;
+    waterfall.navigation=false; waterfall.legend=true; waterfall.maxCells=32;
+    check(cyui::spectrogram("waterfall",timeView,data,{400,150},waterfall).valid,
+          "vertical spectrogram renders the host's chronological history");
+    cyui::StereoDensityState density;
+    cyui::StereoDensityOptions options; options.persistence.resolution=64;
+    options.persistence.navigation=false; options.persistence.diffusion=0;
+    const cyui::Point samples[] {{.2,.4},{-.3,-.5},{std::numeric_limits<double>::quiet_NaN(),0}};
+    cyui::stereoDensity("density first",density,{samples,3},1,{160,160},options);
+    const auto energy=std::accumulate(density.density.energy.begin(),density.density.energy.end(),0.0);
+    cyui::stereoDensity("density repeat",density,{samples,3},1,{160,160},options);
+    check(energy>0 && energy==std::accumulate(density.density.energy.begin(),density.density.energy.end(),0.0),
+          "same audio revision is not injected twice into persistent density");
+    check(std::all_of(density.density.energy.begin(),density.density.energy.end(),
+                      [](float v){return std::isfinite(v);}), "nonfinite input cannot poison stereo persistence");
+    cyui::stereoDensity("density fresh",density,{samples,3},2,{160,160},options);
+    check(std::accumulate(density.density.energy.begin(),density.density.energy.end(),0.0)>energy,
+          "a fresh revision adds energy even when the audio samples are identical");
+    check(density.density.energy.size()==64*64, "stereo persistence storage respects the host's resolution budget");
+    cyui::StereoDensityState independent;
+    check(independent.density.energy.empty(), "each panel owns independent persistence");
+    ImGui::End(); ImGui::Render();
+    check(ImGui::GetDrawData()->TotalVtxCount>0,"new audio views generate drawing commands");
+}
+
 }
 int main() {
     auto* first = ImGui::CreateContext(); initialize(first);
@@ -93,6 +140,7 @@ int main() {
         auto zoomed=canvas; const auto before=canvas.world({100,50}); zoomed.zoomAt({100,50},17);
         check(std::abs(before.x-zoomed.world({100,50}).x)<1.e-6, "double-precision navigation retains pointer anchor");
     }
+    audioViews();
     ImGui::DestroyContext(first);
     std::printf("CyDAW/CyUI checks: %d failures\n", failures);
     return failures ? 1 : 0;

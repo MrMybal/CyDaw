@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "SoundCardView.h"
 
 #include "RoutingUi.h"
@@ -20,7 +21,7 @@ using ui::L;
 
 SoundCardView::SoundCardView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 
-void SoundCardView::report(const juce::String& error)
+void SoundCardView::report(const cydaw::base::Text& error)
 {
     if (error.isEmpty())
         return;
@@ -99,7 +100,7 @@ void SoundCardView::drawBuses(const bool inputs)
     const auto device = engine.deviceChannels();
     const auto& names = inputs ? device.inputNames : device.outputNames;
     const auto direction = inputs ? app::VirtualBusDirection::input : app::VirtualBusDirection::output;
-    juce::String error;
+    cydaw::base::Text error;
     std::optional<std::uint64_t> removed;
     constexpr auto flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp;
     ImGui::PushID(inputs ? "inputs" : "outputs");
@@ -128,12 +129,12 @@ void SoundCardView::drawBuses(const bool inputs)
             if (typed == names_.end())
                 typed = names_.emplace(bus.id, bus.name.toStdString()).first;
             std::array<char, 64> buffer {};
-            juce::String::fromUTF8(typed->second.c_str()).copyToUTF8(buffer.data(), buffer.size());
+            cydaw::base::Text::fromUTF8(typed->second.c_str()).copyToUTF8(buffer.data(), buffer.size());
             ImGui::SetNextItemWidth(-1.0f);
             if (ImGui::InputText("##name", buffer.data(), buffer.size()))
                 typed->second = buffer.data();
             if (ImGui::IsItemDeactivatedAfterEdit()) {
-                const auto name = juce::String::fromUTF8(typed->second.c_str()).trim();
+                const auto name = cydaw::base::Text::fromUTF8(typed->second.c_str()).trim();
                 if (name.isNotEmpty() && name != bus.name) {
                     bus.name = name;
                     changed = true;
@@ -174,7 +175,7 @@ void SoundCardView::drawBuses(const bool inputs)
                     ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(p.warn));
                 if (ImGui::BeginCombo("##channel", preview.c_str(), ImGuiComboFlags_HeightLarge)) {
                     for (auto choice = 0; choice < std::max(names.size(), at + 1); ++choice) {
-                        const auto label = juce::String(choice + 1) + "  "
+                        const auto label = cydaw::base::Text(choice + 1) + "  "
                                            + (choice < names.size() ? names[choice] : ui::Ls("(fermée)", "(closed)"));
                         if (ImGui::Selectable(label.toRawUTF8(), choice == at) && choice != at) {
                             bus.setDeviceChannel(channel, choice);
@@ -222,8 +223,8 @@ void SoundCardView::drawBuses(const bool inputs)
                         if (!node.boundary)
                             ++devices;
                 const auto label = (devices == 0 ? ui::Ls("+ Effets", "+ Effects")
-                                                 : juce::String(devices) + ui::Ls(" effet", " effect") + (devices > 1 ? "s" : ""))
-                                   + juce::String::fromUTF8("  \xe2\x80\xba");
+                                                 : cydaw::base::Text(devices) + ui::Ls(" effet", " effect") + (devices > 1 ? "s" : ""))
+                                   + cydaw::base::Text::fromUTF8("  \xe2\x80\xba");
                 if (ImGui::Button(label.toRawUTF8(), ImVec2(-1.0f, 0.0f))) {
                     state_.selectTrack(TrackRef::ofBus(bus.id));
                     state_.bringToFront = Panel::devices;

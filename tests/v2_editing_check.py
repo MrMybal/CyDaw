@@ -243,7 +243,7 @@ def main() -> int:
         check(jump < 0.05, f"the passages meet without a click (largest step {jump:.3f})")
         check(rms(samples, rate, 2.8, 3.8) < 1e-4, "past the last passage, silence, as when it plays")
         history = need({"cmd": "audio_clip_history", "track": track, "clipId": clip_id}, "history")
-        check(history["versions"][-1]["label"] == "Mise à plat des prises",
+        check(history["versions"][-1]["label"] in ("Mise à plat des prises", "Takes flattened"),
               f"the flattening is in the history ({history['versions'][-1]['label']})")
         need({"cmd": "undo", "scope": "arrangement"}, "undo the flattening")
         again = need({"cmd": "audio_takes", "track": track, "clipId": clip_id}, "takes")
@@ -399,7 +399,10 @@ def main() -> int:
             process.wait(timeout=30)
         except Exception:  # noqa: BLE001
             process.kill()
-        shutil.rmtree(scratch, ignore_errors=True)
+        if failures:
+            print(f"Failure evidence preserved at {scratch}", flush=True)
+        else:
+            shutil.rmtree(scratch, ignore_errors=True)
     print("FAILED: " + "; ".join(failures) if failures else "All editing checks passed")
     return 1 if failures else 0
 

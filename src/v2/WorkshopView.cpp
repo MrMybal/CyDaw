@@ -1,3 +1,8 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "WorkshopView.h"
 
 #include "GraphEditor.h"
@@ -25,7 +30,7 @@ using ui::L;
 
 namespace {
 
-void copyInto(std::vector<char>& buffer, const juce::String& text)
+void copyInto(std::vector<char>& buffer, const cydaw::base::Text& text)
 {
     if (buffer.empty())
         return;
@@ -38,9 +43,9 @@ void copyInto(std::vector<char>& buffer, const juce::String& text)
     buffer[length] = 0;
 }
 
-juce::String textOf(const std::vector<char>& buffer)
+cydaw::base::Text textOf(const std::vector<char>& buffer)
 {
-    return juce::String::fromUTF8(buffer.data());
+    return cydaw::base::Text::fromUTF8(buffer.data());
 }
 
 const char* issueText(const cydaw::graph::PluginExportIssueCode code)
@@ -69,9 +74,9 @@ const char* issueText(const cydaw::graph::PluginExportIssueCode code)
     return "";
 }
 
-juce::File exportFolderFor(const juce::String& productName)
+cydaw::base::File exportFolderFor(const cydaw::base::Text& productName)
 {
-    auto name = juce::File::createLegalFileName(productName).trim();
+    auto name = cydaw::base::File::createLegalFileName(productName).trim();
     if (name.isEmpty())
         name = "Plugin";
     return locations::folder(Location::pluginExports).getChildFile(name);
@@ -116,7 +121,7 @@ bool WorkshopView::askAboutNextAtRisk()
     return false;
 }
 
-void WorkshopView::report(const juce::String& message, const bool error)
+void WorkshopView::report(const cydaw::base::Text& message, const bool error)
 {
     state_.status = message;
     state_.statusIsError = error;
@@ -131,7 +136,7 @@ void WorkshopView::refreshLibrary(const bool force)
     libraryTime_ = ImGui::GetTime();
 }
 
-bool WorkshopView::textField(const char* id, std::vector<char>& buffer, const juce::String& current, const float width,
+bool WorkshopView::textField(const char* id, std::vector<char>& buffer, const cydaw::base::Text& current, const float width,
                              const bool multiline, const float height)
 {
     // Refreshed from the model unless the person is typing in it.
@@ -150,7 +155,7 @@ bool WorkshopView::textField(const char* id, std::vector<char>& buffer, const ju
 
 void WorkshopView::perform(const WorkshopRequest& request)
 {
-    auto result = juce::Result::ok();
+    auto result = cydaw::base::Result::ok();
     switch (request.kind) {
     case WorkshopRequest::Kind::trackDevice: result = studio_.openWorkshopFromTrack(request.track, request.nodeId); break;
     case WorkshopRequest::Kind::file: result = studio_.openWorkshopFile(request.file); break;
@@ -166,7 +171,7 @@ void WorkshopView::perform(const WorkshopRequest& request)
 
 void WorkshopView::save(const bool asNewFile)
 {
-    juce::File written;
+    cydaw::base::File written;
     if (const auto saved = studio_.saveWorkshop(written, asNewFile); saved.failed()) {
         report(saved.getErrorMessage(), true);
         return;
@@ -180,17 +185,17 @@ void WorkshopView::save(const bool asNewFile)
 void WorkshopView::chooseDevice(const bool exporting)
 {
     const auto tab = studio_.activeWorkshopTab();
-    auto name = juce::File::createLegalFileName(studio_.workshop().name).trim();
+    auto name = cydaw::base::File::createLegalFileName(studio_.workshop().name).trim();
     if (name.isEmpty()) name = "Device";
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         exporting ? ui::Ls("Exporter le périphérique CyDAW", "Export CyDAW device") : ui::Ls("Ouvrir un périphérique CyDAW", "Open CyDAW device"),
         exporting ? locations::folder(Location::pluginExports).getChildFile(name + ".cydawdevice") : Studio::deviceLibraryFolder(),
         "*.cydawdevice");
-    chooser_->launchAsync((exporting ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
-                                   : juce::FileBrowserComponent::openMode) | juce::FileBrowserComponent::canSelectFiles,
-        [this, exporting, tab](const juce::FileChooser& chooser) {
+    chooser_->launchAsync((exporting ? cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting
+                                   : cydaw::base::FileDialogFlags::openMode) | cydaw::base::FileDialogFlags::canSelectFiles,
+        [this, exporting, tab](const cydaw::base::FileDialog& chooser) {
             auto file = chooser.getResult();
-            if (file == juce::File()) return;
+            if (file == cydaw::base::File()) return;
             if (!exporting) {
                 perform({ WorkshopRequest::Kind::file, {}, 0, file });
                 return;
@@ -200,7 +205,7 @@ void WorkshopView::chooseDevice(const bool exporting)
                 return;
             }
             file = file.withFileExtension("cydawdevice");
-            juce::StringArray dependencies;
+            cydaw::base::TextList dependencies;
             if (const auto saved = studio_.exportWorkshop(file, dependencies); saved.failed()) {
                 report(saved.getErrorMessage(), true);
                 return;
@@ -381,7 +386,7 @@ void WorkshopView::drawTopBar()
     const auto& p = theme::palette();
     const auto current = studio_.workshop();
 
-    if (ImGui::Button((juce::String::fromUTF8(icon::back) + " Studio").toRawUTF8()))
+    if (ImGui::Button((cydaw::base::Text::fromUTF8(icon::back) + " Studio").toRawUTF8()))
         state_.mode = AppMode::studio;
     ui::tooltip(L("Revenir au studio : pistes, arrangement, mixage (F7)", "Back to the studio: tracks, arrangement, mixing (F7)"));
     ImGui::SameLine(0.0f, dp(6.0f));
@@ -409,7 +414,7 @@ void WorkshopView::drawTopBar()
             effect(2, 1);
         if (ImGui::BeginMenu(L("Multicanal", "Multichannel"))) {
             for (const auto channels : { 3, 4, 5, 6, 8 })
-                if (ImGui::MenuItem((juce::String(channels) + ui::Ls(" canaux", " channels")).toRawUTF8()))
+                if (ImGui::MenuItem((cydaw::base::Text(channels) + ui::Ls(" canaux", " channels")).toRawUTF8()))
                     effect(channels, channels);
             ImGui::EndMenu();
         }
@@ -439,7 +444,7 @@ void WorkshopView::drawTopBar()
         return;
     }
     ImGui::SameLine(0.0f, dp(2.0f));
-    if (ui::iconButton(icon::save, current.file != juce::File() && !current.file.isAChildOf(Studio::deviceLibraryFolder())
+    if (ui::iconButton(icon::save, current.file != cydaw::base::File() && !current.file.isAChildOf(Studio::deviceLibraryFolder())
                            ? L("Enregistrer le périphérique ouvert", "Save the open device")
                            : L("Enregistrer dans Mes périphériques", "Save into My devices"), current.unsaved, p.accent))
         save(false);
@@ -471,7 +476,7 @@ void WorkshopView::drawTopBar()
         ImGui::TextColored(theme::vec(p.warn), "%s", L("● non enregistré", "● not saved"));
     else
         ImGui::TextDisabled("%s", L("enregistré", "saved"));
-    if (ImGui::IsItemHovered() && current.file != juce::File())
+    if (ImGui::IsItemHovered() && current.file != cydaw::base::File())
         ImGui::SetTooltip("%s", current.file.getFullPathName().toRawUTF8());
     ui::toolbarSeparator();
 
@@ -578,7 +583,7 @@ void WorkshopView::drawTabs()
         for (const auto& tab : tabs) {
             auto open = true;
             // Not saved: ImGui's dot in place of the cross.
-            const auto label = tab.name + "###tab" + juce::String(static_cast<juce::int64>(tab.id));
+            const auto label = tab.name + "###tab" + cydaw::base::Text(static_cast<std::int64_t>(tab.id));
             ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(tab.instrument ? p.midi : p.text));
             const auto flags = (forced && tab.id == active ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)
                                | (tab.unsaved ? ImGuiTabItemFlags_UnsavedDocument : ImGuiTabItemFlags_None);
@@ -616,12 +621,12 @@ void WorkshopView::drawTabs()
 
 void WorkshopView::chooseSample()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour le simulateur", "A sound for the simulator"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un son pour le simulateur", "A sound for the simulator"),
                                                    studio_.simulatorSettings().sample, "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
-                              if (file == juce::File())
+                              if (file == cydaw::base::File())
                                   return;
                               auto settings = studio_.simulatorSettings();
                               settings.sample = file;
@@ -666,12 +671,12 @@ void WorkshopView::drawSimulator()
         static const char* sourcesEn[] = { "None", "Sine", "Chords", "White noise", "Pink noise", "Drums", "Clicks", "Audio file" };
         const auto names = ui::french() ? sourcesFr : sourcesEn;
         ImGui::SetNextItemWidth(dp(128.0f));
-        if (ImGui::BeginCombo("##simSource", juce::String::fromUTF8(names[std::clamp(settings.source, 0, 7)]).toRawUTF8())) {
+        if (ImGui::BeginCombo("##simSource", cydaw::base::Text::fromUTF8(names[std::clamp(settings.source, 0, 7)]).toRawUTF8())) {
             for (auto index = 0; index < 8; ++index)
-                if (ImGui::Selectable(juce::String::fromUTF8(names[index]).toRawUTF8(), settings.source == index)) {
+                if (ImGui::Selectable(cydaw::base::Text::fromUTF8(names[index]).toRawUTF8(), settings.source == index)) {
                     settings.source = index;
                     changed = true;
-                    if (index == 7 && settings.sample == juce::File())
+                    if (index == 7 && settings.sample == cydaw::base::File())
                         chooseSample();
                 }
             ImGui::EndCombo();
@@ -682,7 +687,7 @@ void WorkshopView::drawSimulator()
                       "from the Explorer."));
         if (ImGui::BeginDragDropTarget()) {
             if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload != nullptr && payload->DataSize > 1) {
-                settings.sample = juce::File(juce::String::fromUTF8(static_cast<const char*>(payload->Data)));
+                settings.sample = cydaw::base::File(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data)));
                 settings.source = 7;
                 changed = true;
             }
@@ -700,9 +705,9 @@ void WorkshopView::drawSimulator()
         }
         if (settings.source == 7) {
             ImGui::SameLine();
-            const auto name = settings.sample != juce::File() ? settings.sample.getFileName()
+            const auto name = settings.sample != cydaw::base::File() ? settings.sample.getFileName()
                                                               : ui::Ls("Choisir un fichier…", "Pick a file…");
-            if (ImGui::Button((juce::String::fromUTF8(icon::folder) + " " + name).toRawUTF8()))
+            if (ImGui::Button((cydaw::base::Text::fromUTF8(icon::folder) + " " + name).toRawUTF8()))
                 chooseSample();
             ui::tooltip(L("Le fichier lu en boucle", "The file played in a loop"));
         }
@@ -715,9 +720,9 @@ void WorkshopView::drawSimulator()
         static const char* patternsEn[] = { "Keyboard only", "Held note", "Chords", "Arpeggio", "Bass line", "Scale" };
         const auto names = ui::french() ? patternsFr : patternsEn;
         ImGui::SetNextItemWidth(dp(140.0f));
-        if (ImGui::BeginCombo("##simPattern", juce::String::fromUTF8(names[std::clamp(settings.pattern, 0, 5)]).toRawUTF8())) {
+        if (ImGui::BeginCombo("##simPattern", cydaw::base::Text::fromUTF8(names[std::clamp(settings.pattern, 0, 5)]).toRawUTF8())) {
             for (auto index = 0; index < 6; ++index)
-                if (ImGui::Selectable(juce::String::fromUTF8(names[index]).toRawUTF8(), settings.pattern == index)) {
+                if (ImGui::Selectable(cydaw::base::Text::fromUTF8(names[index]).toRawUTF8(), settings.pattern == index)) {
                     settings.pattern = index;
                     changed = true;
                 }
@@ -728,7 +733,7 @@ void WorkshopView::drawSimulator()
         ImGui::SameLine();
         static const char* noteNames[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
         const auto noteLabel = [](const int note) {
-            return juce::String(noteNames[note % 12]) + juce::String(note / 12 - 1);
+            return cydaw::base::Text(noteNames[note % 12]) + cydaw::base::Text(note / 12 - 1);
         };
         ImGui::SetNextItemWidth(dp(64.0f));
         if (ImGui::BeginCombo("##simRoot", noteLabel(settings.rootNote).toRawUTF8())) {
@@ -764,9 +769,9 @@ void WorkshopView::drawSimulator()
             static const char* sidesEn[] = { "Same source", "Silence", "Kick (sidechain)" };
             const auto sides = ui::french() ? sidesFr : sidesEn;
             ImGui::SetNextItemWidth(dp(120.0f));
-            if (ImGui::BeginCombo("##simSide", juce::String::fromUTF8(sides[std::clamp(settings.sideSource, 0, 2)]).toRawUTF8())) {
+            if (ImGui::BeginCombo("##simSide", cydaw::base::Text::fromUTF8(sides[std::clamp(settings.sideSource, 0, 2)]).toRawUTF8())) {
                 for (auto index = 0; index < 3; ++index)
-                    if (ImGui::Selectable(juce::String::fromUTF8(sides[index]).toRawUTF8(), settings.sideSource == index)) {
+                    if (ImGui::Selectable(cydaw::base::Text::fromUTF8(sides[index]).toRawUTF8(), settings.sideSource == index)) {
                         settings.sideSource = index;
                         changed = true;
                     }
@@ -788,7 +793,7 @@ void WorkshopView::drawSimulator()
     ui::tooltip(L("Volume de la simulation (le master s'applique aussi)", "The simulation's volume (the master applies too)"));
     ImGui::SameLine();
     const auto level = studio_.simulatorLevelDb();
-    const auto gain = juce::Decibels::decibelsToGain(level, -120.0f);
+    const auto gain = cydaw::audio::Decibels::decibelsToGain(level, -120.0f);
     const auto meterAt = ImGui::GetCursorScreenPos();
     ImGui::SetCursorScreenPos(ImVec2(meterAt.x, meterAt.y + ImGui::GetFrameHeight() * 0.2f));
     ui::meter("##simMeter", ImVec2(dp(96.0f), ImGui::GetFrameHeight() * 0.6f), gain, gain, gain * 0.7f, gain * 0.7f, false);
@@ -873,7 +878,7 @@ void WorkshopView::drawKeyboard(const ImVec2 size)
         if (!black)
             list->AddRect(key.min, key.max, IM_COL32(0, 0, 0, 90), dp(2.0f), 1.0f, ImDrawFlags_RoundCornersBottom);
         if (!black && key.note % 12 == 0) {
-            const auto label = "C" + juce::String(key.note / 12 - 1);
+            const auto label = "C" + cydaw::base::Text(key.note / 12 - 1);
             list->AddText(ImVec2(key.min.x + dp(3.0f), key.max.y - ImGui::GetFontSize() - dp(2.0f)), IM_COL32(70, 74, 82, 255),
                           label.toRawUTF8());
         }
@@ -1072,7 +1077,7 @@ void WorkshopView::drawSide()
     }
 }
 
-void WorkshopView::drawInfo(app::NodeGraphComponent& graph)
+void WorkshopView::drawInfo(app::GraphDocument& graph)
 {
     const auto current = studio_.workshop();
     const auto info = graph.editorGraphInfo();
@@ -1102,7 +1107,7 @@ void WorkshopView::drawInfo(app::NodeGraphComponent& graph)
         const auto widthName = [](const int channels) {
             return channels == 1   ? ui::Ls("Mono", "Mono")
                    : channels == 2 ? ui::Ls("Stéréo", "Stereo")
-                                   : juce::String(channels) + ui::Ls(" canaux", " channels");
+                                   : cydaw::base::Text(channels) + ui::Ls(" canaux", " channels");
         };
         const auto chooser = [&](const char* id, const int now, const bool isInput) {
             ImGui::SetNextItemWidth((width - ImGui::GetStyle().ItemSpacing.x) * 0.5f);
@@ -1150,7 +1155,7 @@ void WorkshopView::drawInfo(app::NodeGraphComponent& graph)
                                 "Cards that are devices themselves open with a double click; Ctrl+G makes one device of the "
                                 "cards picked."));
     ImGui::PopTextWrapPos();
-    if (current.file != juce::File()) {
+    if (current.file != cydaw::base::File()) {
         ImGui::Spacing();
         ImGui::TextDisabled("%s", L("Fichier", "File"));
         ImGui::PushTextWrapPos(0.0f);
@@ -1159,7 +1164,7 @@ void WorkshopView::drawInfo(app::NodeGraphComponent& graph)
     }
 }
 
-void WorkshopView::drawParameters(app::NodeGraphComponent& graph)
+void WorkshopView::drawParameters(app::GraphDocument& graph)
 {
     const auto& p = theme::palette();
     const auto parameters = graph.editorGraphParameters();
@@ -1247,7 +1252,7 @@ void WorkshopView::drawParameters(app::NodeGraphComponent& graph)
             ImGui::TableNextColumn();
             auto value = static_cast<float>(parameter.value);
             ImGui::SetNextItemWidth(-1.0f);
-            const auto format = parameter.unit.isNotEmpty() ? "%.2f " + parameter.unit.replace("%", "%%") : juce::String("%.2f");
+            const auto format = parameter.unit.isNotEmpty() ? "%.2f " + parameter.unit.replace("%", "%%") : cydaw::base::Text("%.2f");
             const auto logarithmic = parameter.minimum > 0.0
                                      && (parameter.unit == "Hz" || parameter.unit == "ms" || parameter.unit == "s");
             if (ImGui::SliderFloat("##value", &value, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
@@ -1285,29 +1290,29 @@ void WorkshopView::drawExport(GraphSlot& slot)
         graph.setPluginExportIdentity(edited);
     };
     ImGui::TextDisabled("%s", L("Nom du plugin", "Plugin name"));
-    if (textField("##product", product_, juce::String(identity.productName), width))
+    if (textField("##product", product_, cydaw::base::Text(identity.productName), width))
         commit([this](auto& edited) { edited.productName = textOf(product_).toStdString(); });
     ImGui::TextDisabled("%s", L("Éditeur", "Maker"));
-    if (textField("##company", company_, juce::String(identity.companyName), width))
+    if (textField("##company", company_, cydaw::base::Text(identity.companyName), width))
         commit([this](auto& edited) { edited.companyName = textOf(company_).toStdString(); });
     if (ImGui::BeginTable("##codes", 2, ImGuiTableFlags_SizingStretchSame)) {
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
         ImGui::TextDisabled("%s", L("Code éditeur", "Maker code"));
-        if (textField("##manufacturer", manufacturer_, juce::String(identity.manufacturerCode), -1.0f))
+        if (textField("##manufacturer", manufacturer_, cydaw::base::Text(identity.manufacturerCode), -1.0f))
             commit([this](auto& edited) { edited.manufacturerCode = textOf(manufacturer_).toStdString(); });
         ImGui::TableNextColumn();
         ImGui::TextDisabled("%s", L("Code plugin", "Plugin code"));
-        if (textField("##pluginCode", pluginCode_, juce::String(identity.pluginCode), -1.0f))
+        if (textField("##pluginCode", pluginCode_, cydaw::base::Text(identity.pluginCode), -1.0f))
             commit([this](auto& edited) { edited.pluginCode = textOf(pluginCode_).toStdString(); });
         ImGui::EndTable();
     }
     ui::tooltip(L("4 lettres ou chiffres chacun : ils identifient le plugin dans les hôtes.",
                   "4 letters or digits each: hosts know the plugin by them."));
     ImGui::TextDisabled("%s", "Version");
-    if (textField("##version", version_, juce::String(identity.version.toString()), width))
+    if (textField("##version", version_, cydaw::base::Text(identity.version.toString()), width))
         commit([this](auto& edited) {
-            const auto parts = juce::StringArray::fromTokens(textOf(version_), ".", "");
+            const auto parts = cydaw::base::TextList::fromTokens(textOf(version_), ".", "");
             edited.version.major = static_cast<std::uint16_t>(std::clamp(parts[0].getIntValue(), 0, 999));
             edited.version.minor = static_cast<std::uint16_t>(std::clamp(parts[1].getIntValue(), 0, 999));
             edited.version.patch = static_cast<std::uint16_t>(std::clamp(parts[2].getIntValue(), 0, 999));
@@ -1322,7 +1327,7 @@ void WorkshopView::drawExport(GraphSlot& slot)
         planDetails_.clear();
         const auto result = graph.planVst3Export();
         for (const auto& issue : result.issues)
-            planIssues_.add(juce::String::fromUTF8(issueText(issue.code)) + (issue.message.empty() ? juce::String() : " (" + juce::String(issue.message) + ")"));
+            planIssues_.add(cydaw::base::Text::fromUTF8(issueText(issue.code)) + (issue.message.empty() ? cydaw::base::Text() : " (" + cydaw::base::Text(issue.message) + ")"));
         planParameters_ = 0;
         if (result.plan) {
             const auto& plan = *result.plan;
@@ -1332,11 +1337,11 @@ void WorkshopView::drawExport(GraphSlot& slot)
             for (const auto& bus : plan.buses)
                 if (bus.mediaType == cydaw::graph::PluginBusMediaType::audio)
                     (bus.direction == cydaw::graph::PortDirection::input ? inputs : outputs) += 1;
-            planDetails_.add(ui::Ls("Catégorie : ", "Category: ") + juce::String(plan.vst3Category));
-            planDetails_.add(ui::Ls("Audio : ", "Audio: ") + juce::String(inputs) + ui::Ls(" entrée(s), ", " input(s), ")
-                             + juce::String(outputs) + ui::Ls(" sortie(s)", " output(s)")
-                             + (plan.acceptsMidi ? ui::Ls(", reçoit le MIDI", ", takes MIDI") : juce::String()));
-            planDetails_.add(ui::Ls("Paramètres : ", "Parameters: ") + juce::String(planParameters_));
+            planDetails_.add(ui::Ls("Catégorie : ", "Category: ") + cydaw::base::Text(plan.vst3Category));
+            planDetails_.add(ui::Ls("Audio : ", "Audio: ") + cydaw::base::Text(inputs) + ui::Ls(" entrée(s), ", " input(s), ")
+                             + cydaw::base::Text(outputs) + ui::Ls(" sortie(s)", " output(s)")
+                             + (plan.acceptsMidi ? ui::Ls(", reçoit le MIDI", ", takes MIDI") : cydaw::base::Text()));
+            planDetails_.add(ui::Ls("Paramètres : ", "Parameters: ") + cydaw::base::Text(planParameters_));
             if (outputs != 1 || inputs > 4)
                 planIssues_.add(ui::Ls("Un plugin exporté a une sortie audio, et quatre entrées au plus.",
                                        "An exported plugin has one audio output, and four inputs at most."));
@@ -1365,7 +1370,7 @@ void WorkshopView::drawExport(GraphSlot& slot)
     ImGui::Checkbox("Windows x64",&exportWindows_);ImGui::SameLine();
     ImGui::Checkbox("Linux x64",&exportLinux_);
     ImGui::TextDisabled("%s",L("macOS : reporté", "macOS: deferred"));
-    const auto folder=exportFolderFor(juce::String(identity.productName));
+    const auto folder=exportFolderFor(cydaw::base::Text(identity.productName));
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled(L("Dans %s", "Into %s"),folder.getFullPathName().toRawUTF8());
     if(exportLinux_)ImGui::TextDisabled("%s",L("Première compilation Linux : téléchargement local de Zig et du SDK X11/OpenGL. Python 3 et Ninja requis.",
@@ -1375,14 +1380,14 @@ void WorkshopView::drawExport(GraphSlot& slot)
     const auto generate=[&]() {
         jobs.clear();
         for(const auto* platform:{"Windows","Linux"}) {
-            if((juce::String(platform)=="Windows"&&!exportWindows_)||(juce::String(platform)=="Linux"&&!exportLinux_))continue;
+            if((cydaw::base::Text(platform)=="Windows"&&!exportWindows_)||(cydaw::base::Text(platform)=="Linux"&&!exportLinux_))continue;
             for(int i=0;i<3;++i)if(exportFormats_[i]) {
                 const auto destination=folder.getChildFile(platform).getChildFile(formats[i]);
                 const auto project=destination.getChildFile("projet");
                 if(const auto made=graph.generateVst3Project(project,formats[i]);made.failed()) {
                     report(made.getErrorMessage(),true);return false;
                 }
-                jobs.push_back({project,destination,juce::String(identity.productName),formats[i],platform});
+                jobs.push_back({project,destination,cydaw::base::Text(identity.productName),formats[i],platform});
             }
         }
         return !jobs.empty();
@@ -1392,7 +1397,7 @@ void WorkshopView::drawExport(GraphSlot& slot)
     ImGui::TextDisabled("%s", L("Sources de CyDAW", "CyDAW's sources"));
     ImGui::SetNextItemWidth(width);
     ImGui::InputText("##sourceRoot", sourceRoot_.data(), sourceRoot_.size());
-    const auto tools = Vst3Build::findTools(juce::File(textOf(sourceRoot_).trim()));
+    const auto tools = Vst3Build::findTools(cydaw::base::File(textOf(sourceRoot_).trim()));
     ImGui::PushTextWrapPos(0.0f);
     if (!tools.cmake.existsAsFile())
         ImGui::TextColored(theme::vec(p.warn), "%s", L("CMake introuvable : installez Visual Studio 2022 avec « Développement Desktop en C++ ».",

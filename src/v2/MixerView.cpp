@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "MixerView.h"
 #include "AddTrackMenu.h"
 #include "ControlTargets.h"
@@ -203,7 +204,7 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     const auto learnable = !track.master && track.bus == 0 && track.pad < 0;
     const auto learnKey = learnable ? studio_.routingKey(track) : 0;
     const auto learnTarget = [&](const char* what) { return learnable ? control_targets::forTrack(learnKey, what) : std::string(); };
-    const auto learnLabel = [&](const juce::String& what) { return (studio_.trackName(track) + juce::String::fromUTF8(" \xc2\xb7 ") + what).toStdString(); };
+    const auto learnLabel = [&](const cydaw::base::Text& what) { return (studio_.trackName(track) + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + what).toStdString(); };
     // Pan: its own row under the name, a knob big enough to take, its value
     // beside it ("C", "L 30"), which a click types in; the track's kind on
     // the right.
@@ -344,7 +345,7 @@ void mixer_strip::master(Studio& studio_, UiState& state_, const float width, co
             for (const auto& node : slot->graph().editorNodes())
                 devices += node.boundary ? 0 : 1;
         ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.75f);
-        const auto text = juce::String(devices) + ui::Ls(devices > 1 ? " effets" : " effet", devices > 1 ? " effects" : " effect");
+        const auto text = cydaw::base::Text(devices) + ui::Ls(devices > 1 ? " effets" : " effet", devices > 1 ? " effects" : " effect");
         list->AddText(ImVec2(origin.x + dp(6.0f), origin.y + dp(8.0f) + ImGui::GetFontSize() * 1.35f), p.textDim,
                       text.toRawUTF8());
         ImGui::PopFont();

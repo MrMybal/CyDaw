@@ -1,4 +1,4 @@
-"""Publish a verified CyDAW V2 Alpha built by GitHub Actions. Never publishes stable releases."""
+"""Publish a verified CyDaw Alpha built by GitHub Actions. Never publishes stable releases."""
 import argparse
 import hashlib
 import json
@@ -65,7 +65,7 @@ def main():
     args = parser.parse_args()
     if args.check_tag:
         check_tag(args.check_tag)
-        print('Valid CyDAW V2 Alpha tag: ' + args.check_tag)
+        print('Valid CyDaw Alpha tag: ' + args.check_tag)
         return
     if not args.tag or not args.assets:
         parser.error('--tag and --assets are required')
@@ -114,17 +114,20 @@ def main():
             obj = request('GET', obj['url'])['object']
         if obj['sha'] != sha:
             raise ValueError('Release tag already points to another commit; use a new Alpha number')
-    title = 'CyDAW V2 ' + version + ' — Alpha ' + args.tag.rsplit('.', 1)[1]
-    body = ('## Alpha preview — CyDAW V2\n\n'
-            'Built and tested on GitHub Actions for Windows x64. This is the Dear ImGui **CyDAW V2** application.\n\n'
+    title = 'CyDaw ' + version + ' — Alpha ' + args.tag.rsplit('.', 1)[1]
+    body = ('## Alpha preview — CyDaw\n\n'
+            'Built and tested on GitHub Actions for Windows x64. This is the Dear ImGui **CyDaw** application.\n\n'
             'Download the ZIP below, extract it completely, and launch **CyDAW 2.exe**. Keep the DLLs and folders beside it.\n\n'
-            '- Windows Audio / WASAPI; this package does not enable ASIO or VST2.\n'
+            '- CyAudioCore audio engine with native CyDSP processing; JUCE removed. Windows Audio / WASAPI and ASIO (PortAudio/GPL SDK). VST2 is not supported.\n'
+            '- Direct controller/MIDI bridge, configurable UI frame rate and integrated window controls.\n'
+            '- Fixed ASIO CUE returns, exact-length WAV recording and silent paused DJ decks across modes.\n'
             '- Studio, Mix DJ, Foundry, Cinema, Processings and Plugin workshop.\n'
             '- Native instruments/effects, isolated VST3/CLAP/LV2/JSFX hosting and video codecs.\n'
-            '- Factory sample banks are downloaded separately in Options > Sound banks. Local example projects and unfinished sound models may be absent.\n'
+            '- Factory sample banks are downloaded separately in Options > Sound banks. Personal example projects and unfinished sound models are not included.\n'
             '- Building exported plugins requires the C++ tools and CyDAW sources.\n\n'
             '- Modular CyUI interface: shared audio controls, themes, native source editors, Cinema preview and master property drafts.\n'
-            '- CyUI: [source](https://github.com/MrMybal/CyUI) and [MIT licence](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE); full notices are included in Licenses/CyUI.\n\n'
+            '- CyUI: [source](https://github.com/MrMybal/CyUI) and [MIT licence](https://github.com/MrMybal/CyUI/blob/7a793e9281e78572818d85e9cf856d779a7792a1/LICENSE); full notices are included in Licenses/CyUI.\n\n'
+            'Known comparison limits: project 08 still differs from the historical engine by about 0.49 dB, and a first-block reload difference remains. See docs/CyAudioCoreComparison.fr.md and docs/CinemaDcFix.fr.md in the sources.\n\n'
             '**Experimental Alpha / préversion expérimentale.** Windows x64 only. SHA-256 checksums are supplied.\n\n'
             'Source: [' + sha[:7] + '](https://github.com/' + repository + '/commit/' + sha + ').\n')
     release = find_release(request, api, args.tag)

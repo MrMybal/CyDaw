@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "CurveEditor.h"
@@ -29,7 +30,7 @@ private:
     UiState& state_;
     // The lane shown (a binding, or Studio::masterGainLane), for the clip
     // of `shownScene_`.
-    juce::String lane_;
+    cydaw::base::Text lane_;
     int shownScene_ { -1 };
     double gridBeats_ { 1.0 };
     // The lane's curve editor (its picked points).

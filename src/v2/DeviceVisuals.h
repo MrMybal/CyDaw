@@ -1,9 +1,10 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "SignalAnalysis.h"
 
 #include <imgui.h>
-#include <juce_core/juce_core.h>
+
 
 #include <functional>
 #include <map>
@@ -22,9 +23,9 @@ namespace cydaw::v2::visual {
 
 // A parameter as a display reads and edits it.
 struct Param {
-    juce::String binding;
-    juce::String label;
-    juce::String unit;
+    cydaw::base::Text binding;
+    cydaw::base::Text label;
+    cydaw::base::Text unit;
     double minimum {};
     double maximum { 1.0 };
     double value {};
@@ -53,7 +54,7 @@ struct Live {
     bool hasControl {};
     float control {};
     // What cables put on the device's parameters now, by binding.
-    const std::map<juce::String, float>* modulated {};
+    const std::map<cydaw::base::Text, float>* modulated {};
     // What the device's processor shows of its work now (an equaliser's
     // dynamic bands: engine::eqProReadingCount values); meaningful while
     // `running`.
@@ -185,7 +186,7 @@ struct Surface {
 // device's sound can be tapped; `instrument`: only what leaves it can;
 // `typeKey`: what it is (an analyser shows what it is for).
 [[nodiscard]] Surface inferSurface(const std::vector<Param>& parameters, bool hasSignal, bool instrument,
-                                   const juce::String& typeKey = {});
+                                   const cydaw::base::Text& typeKey = {});
 
 // The width a pane takes at a height.
 [[nodiscard]] float paneWidth(const Pane& pane, float height);
@@ -227,7 +228,7 @@ bool typedValue(const char* id, Param& parameter, ImVec2 min, ImVec2 size, const
 bool valueField(const char* id, Param& parameter, float width, ImU32 colour, const Setter& set);
 
 // "1.20 kHz", "-6.0 dB", "35 %", "4.0:1".
-[[nodiscard]] juce::String formatValue(const Param& parameter, double value);
+[[nodiscard]] cydaw::base::Text formatValue(const Param& parameter, double value);
 // Whether its knob turns on a logarithmic scale (a frequency, a time).
 [[nodiscard]] bool logarithmic(const Param& parameter);
 

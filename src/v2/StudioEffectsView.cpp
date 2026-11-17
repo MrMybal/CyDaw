@@ -1,4 +1,7 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Text.h>
 #include "StudioEffectsView.h"
+#include <cyui/modules/AudioViews.h>
 
 #include "Theme.h"
 #include "Widgets.h"
@@ -175,6 +178,7 @@ bool knobCell(const ImVec2 origin, const float width, Param* parameter, const ch
     ui::KnobStyle style;
     style.diameter = diameter;
     style.label = label;
+    style.flags = ui::knobNoLabel; // Name is drawn persistently across the cell below.
     style.labelWidth = width;
     style.colour = colour;
     style.format = parameter->maximum - parameter->minimum >= 100.0 ? "%.0f" : parameter->maximum - parameter->minimum >= 10.0 ? "%.1f" : "%.2f";
@@ -199,6 +203,10 @@ bool knobCell(const ImVec2 origin, const float width, Param* parameter, const ch
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
         openParameterMenu(*parameter);
     ImGui::PopID();
+    const auto nameSize = textSize(label, 0.72f);
+    const auto labelScale = std::min(0.72f, 0.72f * (width - dp(4.0f)) / std::max(1.0f, nameSize.x));
+    const auto fitted = textSize(label, labelScale);
+    text(list, ImVec2(origin.x + (width - fitted.x) * 0.5f, origin.y + dp(diameter)), p.textDim, label, labelScale);
     const auto shown = formatValue(*parameter, parameter->value);
     const auto size = textSize(shown.toRawUTF8(), 0.7f);
     const auto valueTop = origin.y + dp(diameter) + ImGui::GetFontSize() * 0.88f;
@@ -264,7 +272,7 @@ bool switchCell(const char* label, Param* parameter, const ImVec2 origin, const 
 }
 
 // A drop-down list for a parameter of whole steps.
-bool comboCell(const char* id, Param* parameter, const std::vector<juce::String>& names, const ImVec2 origin, const float width,
+bool comboCell(const char* id, Param* parameter, const std::vector<cydaw::base::Text>& names, const ImVec2 origin, const float width,
                const Setter& set)
 {
     if (parameter == nullptr || names.empty())
@@ -368,14 +376,14 @@ struct DragState {
 };
 DragState& dragState(std::vector<Param>& parameters, const Pane& pane)
 {
-    static std::map<juce::String, DragState> states;
+    static std::map<cydaw::base::Text, DragState> states;
     const auto* first = at(parameters, pane, 0);
-    return states[first != nullptr ? first->binding : juce::String("?")];
+    return states[first != nullptr ? first->binding : cydaw::base::Text("?")];
 }
 
-juce::String percent(const double value)
+cydaw::base::Text percent(const double value)
 {
-    return juce::String(juce::roundToInt(value * 100.0)) + " %";
+    return cydaw::base::Text(cydaw::base::roundToInt(value * 100.0)) + " %";
 }
 
 // ---- Réverbe Pro ------------------------------------------------------------------------------
@@ -540,7 +548,7 @@ bool reverbDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& 
             const auto* frequency = at(parameters, pane, nodes[index].frequency);
             const auto* multiplier = at(parameters, pane, nodes[index].multiplier);
             if (frequency != nullptr && multiplier != nullptr) {
-                const auto label = formatValue(*frequency, frequency->value) + "  " + juce::String(view.decay * multiplier->value, 2)
+                const auto label = formatValue(*frequency, frequency->value) + "  " + cydaw::base::Text(view.decay * multiplier->value, 2)
                                    + " s";
                 text(list, ImVec2(centre.x + dp(10.0f), centre.y - dp(18.0f)), p.text, label.toRawUTF8(), 0.68f);
             }
@@ -874,9 +882,9 @@ private:
 
 Loudness& loudnessOf(std::vector<Param>& parameters, const Pane& pane)
 {
-    static std::map<juce::String, Loudness> meters;
+    static std::map<cydaw::base::Text, Loudness> meters;
     const auto* first = at(parameters, pane, 0);
-    return meters[first != nullptr ? first->binding : juce::String("?")];
+    return meters[first != nullptr ? first->binding : cydaw::base::Text("?")];
 }
 
 // The levels scrolling by: what goes in (with the gain, grey), what comes
@@ -1387,10 +1395,10 @@ bool filterDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& 
         std::snprintf(label, sizeof(label), "%d", unit + 1);
         handleDot(list, centre, isHot ? theme::brighter(unitColour, 0.2f) : unitColour, isHot, label);
         if (state.active == unit || (state.active < 0 && hot == unit)) {
-            const auto hz = view.cutoff < 1'000.0 ? juce::String(juce::roundToInt(view.cutoff)) + " Hz"
-                                                  : juce::String(view.cutoff / 1'000.0, 2) + " kHz";
-            const auto info = juce::String::fromUTF8(typeName(view.type, false)) + "  " + hz + "  Q "
-                              + juce::String(pro::filterQ(view.resonance), 2);
+            const auto hz = view.cutoff < 1'000.0 ? cydaw::base::Text(cydaw::base::roundToInt(view.cutoff)) + " Hz"
+                                                  : cydaw::base::Text(view.cutoff / 1'000.0, 2) + " kHz";
+            const auto info = cydaw::base::Text::fromUTF8(typeName(view.type, false)) + "  " + hz + "  Q "
+                              + cydaw::base::Text(pro::filterQ(view.resonance), 2);
             text(list, ImVec2(std::min(centre.x + dp(10.0f), box.max.x - dp(200.0f)), centre.y - dp(20.0f)), p.text, info.toRawUTF8(), 0.68f);
         }
     }
@@ -1583,8 +1591,8 @@ bool filterLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 
     // The matrix.
     section(list, ImVec2(left, y), L("MODULATIONS  ·  source, cible, quantité", "MODULATIONS  ·  source, target, amount"));
     y += dp(13.0f);
-    std::vector<juce::String> sources { ui::Ls("—", "—"), "LFO 1", "LFO 2", ui::Ls("Suiveur", "Follower") };
-    std::vector<juce::String> destinations;
+    std::vector<cydaw::base::Text> sources { ui::Ls("—", "—"), "LFO 1", "LFO 2", ui::Ls("Suiveur", "Follower") };
+    std::vector<cydaw::base::Text> destinations;
     for (int destination = 0; destination < pro::modulationDestinationCount; ++destination)
         destinations.push_back(studioFormat(Param { "filtpro.m1Destination", {}, {}, 0.0, 13.0, static_cast<double>(destination), 0.0 },
                                             destination));
@@ -1660,47 +1668,47 @@ int whole(const float value, const int count)
     return std::clamp(static_cast<int>(std::lround(value)), 0, count - 1);
 }
 
-juce::String ampName(const int index)
+cydaw::base::Text ampName(const int index)
 {
     const auto& model = ampd::ampModel(index);
-    return juce::String::fromUTF8(ui::french() ? model.french : model.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? model.french : model.english);
 }
-juce::String ampHint(const int index)
+cydaw::base::Text ampHint(const int index)
 {
     const auto& model = ampd::ampModel(index);
-    return juce::String::fromUTF8(ui::french() ? model.frenchHint : model.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? model.frenchHint : model.englishHint);
 }
-juce::String cabName(const int index)
+cydaw::base::Text cabName(const int index)
 {
     const auto& model = ampd::cabModel(index);
-    return juce::String::fromUTF8(ui::french() ? model.french : model.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? model.french : model.english);
 }
-juce::String cabHint(const int index)
+cydaw::base::Text cabHint(const int index)
 {
     const auto& model = ampd::cabModel(index);
-    return juce::String::fromUTF8(ui::french() ? model.frenchHint : model.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? model.frenchHint : model.englishHint);
 }
-juce::String micName(const int index)
+cydaw::base::Text micName(const int index)
 {
     const auto& model = ampd::micModel(index);
-    return juce::String::fromUTF8(ui::french() ? model.french : model.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? model.french : model.english);
 }
-juce::String micHint(const int index)
+cydaw::base::Text micHint(const int index)
 {
     const auto& model = ampd::micModel(index);
-    return juce::String::fromUTF8(ui::french() ? model.frenchHint : model.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? model.frenchHint : model.englishHint);
 }
 
-std::vector<juce::String> names(const int count, juce::String (*name)(int))
+std::vector<cydaw::base::Text> names(const int count, cydaw::base::Text (*name)(int))
 {
-    std::vector<juce::String> list;
+    std::vector<cydaw::base::Text> list;
     for (int index = 0; index < count; ++index)
         list.push_back(name(index));
     return list;
 }
 
 // A name to click (a model's): a list to choose from, each with its hint.
-bool chooser(const char* id, Param* parameter, const int count, juce::String (*name)(int), juce::String (*hint)(int), const ImVec2 at,
+bool chooser(const char* id, Param* parameter, const int count, cydaw::base::Text (*name)(int), cydaw::base::Text (*hint)(int), const ImVec2 at,
              const ImU32 colour, const Setter& set, const float scale = 0.74f)
 {
     if (parameter == nullptr)
@@ -2077,7 +2085,7 @@ void cardFileRow(const ImVec2 at, const bool large, const ImU32 colour)
                       "Load an impulse response (.wav): a cabinet recorded with its microphone, played instead of the models"));
     } else {
         ImGui::PushStyleColor(ImGuiCol_Button, theme::alpha(colour, 0.35f));
-        if (ImGui::Button((juce::String("IR : ") + cardFile->name + "##changeIr").toRawUTF8()) && cardFile->load)
+        if (ImGui::Button((cydaw::base::Text("IR : ") + cardFile->name + "##changeIr").toRawUTF8()) && cardFile->load)
             cardFile->load();
         ImGui::PopStyleColor();
         ui::tooltip(L("Réponse impulsionnelle chargée : un clic en charge une autre", "Impulse response loaded: a click loads another"));
@@ -2413,7 +2421,7 @@ bool addedLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 p
     auto* list = ImGui::GetWindowDrawList();
     std::vector<ControlGroup> groups;
     for (const auto& item : sections) {
-        ControlGroup group { juce::String::fromUTF8(item.title), {} };
+        ControlGroup group { cydaw::base::Text::fromUTF8(item.title), {} };
         for (const auto index : item.indices)
             if (index >= 0 && static_cast<std::size_t>(index) < pane.parameters.size() && pane.parameters[static_cast<std::size_t>(index)] >= 0)
                 group.indices.push_back(pane.parameters[static_cast<std::size_t>(index)]);
@@ -2515,7 +2523,7 @@ std::vector<int> addedCardFields(const PaneKind kind, std::vector<Param>& parame
     return {};
 }
 
-juce::String addedFormat(const juce::String& binding, const double value)
+cydaw::base::Text addedFormat(const cydaw::base::Text& binding, const double value)
 {
     if (auto shown = voiceFormat(binding, value); shown.isNotEmpty())
         return shown;
@@ -2536,7 +2544,7 @@ juce::String addedFormat(const juce::String& binding, const double value)
     return {};
 }
 
-bool addedStepped(const juce::String& binding)
+bool addedStepped(const cydaw::base::Text& binding)
 {
     return midifxStepped(binding) || voiceStepped(binding) || pitchStepped(binding) || spacefxStepped(binding) || rhythmStepped(binding) || motionStepped(binding) || resonanceStepped(binding) || utilityStepped(binding);
 }
@@ -2545,7 +2553,7 @@ bool addedStepped(const juce::String& binding)
 
 enum class ControlKind { knob, toggle, buttons, list };
 
-bool endsWithAny(const juce::String& binding, std::initializer_list<const char*> suffixes)
+bool endsWithAny(const cydaw::base::Text& binding, std::initializer_list<const char*> suffixes)
 {
     for (const auto* suffix : suffixes)
         if (binding.endsWith(suffix))
@@ -2568,9 +2576,9 @@ ControlKind controlKindOf(const Param& parameter)
 }
 
 // A choice's names: what each of its values reads as.
-std::vector<juce::String> choiceNames(const Param& parameter)
+std::vector<cydaw::base::Text> choiceNames(const Param& parameter)
 {
-    std::vector<juce::String> list;
+    std::vector<cydaw::base::Text> list;
     for (auto value = parameter.minimum; value <= parameter.maximum + 1.0e-6; value += 1.0)
         list.push_back(formatValue(parameter, value));
     return list;
@@ -2678,7 +2686,8 @@ bool nativeSection(std::vector<Param>& parameters, const ControlSection& part, c
         const auto column = static_cast<int>(at) % perRow;
         auto& parameter = parameters[static_cast<std::size_t>(knobs[at])];
         // The label without the device's name before it ("Chorus · Rate").
-        const auto label = parameter.label.fromLastOccurrenceOf(juce::String::fromUTF8("\xc2\xb7 "), false, false).toStdString();
+        const auto tail = parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false);
+        const auto label = (tail.isNotEmpty() ? tail : parameter.label).toStdString();
         changed |= knobCell(ImVec2(origin.x + cell * static_cast<float>(column), y + static_cast<float>(row) * (knobHeight(diameter) + dp(8.0f))),
                             cell, &parameter, label.c_str(), colour, live, set, diameter);
     }
@@ -2756,9 +2765,10 @@ namespace {
 
 // A setting's name on its own: after its group's ("Sortie · niveau"), its
 // first letter up.
-juce::String ownLabel(const Param& parameter)
+cydaw::base::Text ownLabel(const Param& parameter)
 {
-    const auto label = parameter.label.fromLastOccurrenceOf(juce::String::fromUTF8("\xc2\xb7 "), false, false);
+    const auto tail = parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false);
+    const auto label = tail.isNotEmpty() ? tail : parameter.label;
     return label.substring(0, 1).toUpperCase() + label.substring(1);
 }
 
@@ -3069,28 +3079,28 @@ bool is(const Param& parameter, const char* suffix)
     return parameter.binding.endsWith(suffix);
 }
 
-juce::String pick(const double value, const std::vector<const char*>& names)
+cydaw::base::Text pick(const double value, const std::vector<const char*>& names)
 {
     const auto index = std::clamp(static_cast<int>(std::lround(value)), 0, static_cast<int>(names.size()) - 1);
-    return juce::String::fromUTF8(names[static_cast<std::size_t>(index)]);
+    return cydaw::base::Text::fromUTF8(names[static_cast<std::size_t>(index)]);
 }
 
-juce::String onOff(const double value)
+cydaw::base::Text onOff(const double value)
 {
     return value >= 0.5 ? ui::Ls("Actif", "On") : ui::Ls("Coupé", "Off");
 }
 
 } // namespace
 
-juce::String studioFormat(const Param& parameter, const double value)
+cydaw::base::Text studioFormat(const Param& parameter, const double value)
 {
     const auto& binding = parameter.binding;
     if (auto shown = addedFormat(binding, value); shown.isNotEmpty())
         return shown;
-    const auto knob = [](const double v) { return juce::String(v, 1); };
+    const auto knob = [](const double v) { return cydaw::base::Text(v, 1); };
     const auto off = [](const char* french, const char* english) { return ui::Ls(french, english); };
-    const auto degrees = [](const double v) { return juce::String(juce::roundToInt(v)) + juce::String::fromUTF8("\xc2\xb0"); };
-    const auto centimetres = [](const double v) { return juce::String(v, v < 10.0 ? 1 : 0) + " cm"; };
+    const auto degrees = [](const double v) { return cydaw::base::Text(cydaw::base::roundToInt(v)) + cydaw::base::Text::fromUTF8("\xc2\xb0"); };
+    const auto centimetres = [](const double v) { return cydaw::base::Text(v, v < 10.0 ? 1 : 0) + " cm"; };
     if (binding.contains(".amp.") || binding.startsWith("amp.")) {
         const auto suffix = binding.fromLastOccurrenceOf("amp.", false, false);
         if (suffix == "model" || suffix == "modelB")
@@ -3105,14 +3115,14 @@ juce::String studioFormat(const Param& parameter, const double value)
             return onOff(value);
         // Channel A's knobs and channel B's ("gainB").
         const auto knobOf = suffix.endsWith("B") ? suffix.dropLastCharacters(1) : suffix;
-        if (juce::StringArray { "gain", "bass", "middle", "treble", "presence", "master", "depth" }.contains(knobOf))
+        if (cydaw::base::TextList { "gain", "bass", "middle", "treble", "presence", "master", "depth" }.contains(knobOf))
             return knob(value);
         if (suffix == "sag" || suffix == "mix" || suffix == "pedalDrive" || suffix == "pedalTone")
             return percent(value);
         if (suffix == "tight")
-            return value <= 20.5 ? off("Désactivé", "Off") : juce::String(juce::roundToInt(value)) + " Hz";
+            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "gate")
-            return value <= -89.5 ? off("Désactivé", "Off") : juce::String(value, 0) + " dB";
+            return value <= -89.5 ? off("Désactivé", "Off") : cydaw::base::Text(value, 0) + " dB";
         return {};
     }
     if (binding.contains(".cab.") || binding.startsWith("cab.")) {
@@ -3130,13 +3140,13 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "angleA" || suffix == "angleB")
             return degrees(value);
         if (suffix == "blend")
-            return "A " + juce::String(juce::roundToInt((1.0 - value) * 100.0)) + " / B " + juce::String(juce::roundToInt(value * 100.0));
+            return "A " + cydaw::base::Text(cydaw::base::roundToInt((1.0 - value) * 100.0)) + " / B " + cydaw::base::Text(cydaw::base::roundToInt(value * 100.0));
         if (suffix == "room" || suffix == "resonance" || suffix == "mix")
             return percent(value);
         if (suffix == "lowCut")
-            return value <= 20.5 ? off("Désactivé", "Off") : juce::String(juce::roundToInt(value)) + " Hz";
+            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
-            return value >= 19'900.0 ? off("Désactivé", "Off") : juce::String(value / 1'000.0, 1) + " kHz";
+            return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
     }
     if (binding.contains("micsim.")) {
@@ -3155,13 +3165,13 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "room" || suffix == "mix" || suffix == "roomSize")
             return percent(value);
         if (suffix == "roomTone")
-            return juce::String(value / 1'000.0, 1) + " kHz";
+            return cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         if (suffix == "noise")
-            return value <= -89.5 ? off("Du micro", "Its own") : juce::String(value, 0) + " dB";
+            return value <= -89.5 ? off("Du micro", "Its own") : cydaw::base::Text(value, 0) + " dB";
         if (suffix == "lowCut")
-            return value <= 20.5 ? off("Désactivé", "Off") : juce::String(juce::roundToInt(value)) + " Hz";
+            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
-            return value >= 19'900.0 ? off("Désactivé", "Off") : juce::String(value / 1'000.0, 1) + " kHz";
+            return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
     }
     if (binding.contains("pression.")) {
@@ -3171,11 +3181,11 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "solo")
             return pick(value, { L("Tout", "All"), L("Graves", "Low"), L("Médiums", "Mid"), L("Aigus", "High") });
         if (suffix.endsWith("Ratio"))
-            return value >= 99.5 ? juce::String::fromUTF8("\xe2\x88\x9e:1") : juce::String(value, value < 10.0 ? 2 : 1) + ":1";
+            return value >= 99.5 ? cydaw::base::Text::fromUTF8("\xe2\x88\x9e:1") : cydaw::base::Text(value, value < 10.0 ? 2 : 1) + ":1";
         if (suffix.endsWith("Threshold"))
-            return juce::String(value, 1) + " dB";
+            return cydaw::base::Text(value, 1) + " dB";
         if (suffix.startsWith("cross"))
-            return value >= 1'000.0 ? juce::String(value / 1'000.0, 2) + " kHz" : juce::String(juce::roundToInt(value)) + " Hz";
+            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 2) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         return {};
     }
     if (binding.contains("fournaise.")) {
@@ -3194,9 +3204,9 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "mix")
             return percent(value);
         if (suffix == "lowCut")
-            return value <= 20.5 ? off("Désactivé", "Off") : juce::String(juce::roundToInt(value)) + " Hz";
+            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
-            return value >= 19'900.0 ? off("Désactivé", "Off") : juce::String(value / 1'000.0, 1) + " kHz";
+            return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
     }
     if (binding.contains("echoband.")) {
@@ -3205,13 +3215,13 @@ juce::String studioFormat(const Param& parameter, const double value)
             return echoModeName(whole(static_cast<float>(value), engine::mix::echoModeCount));
         if (suffix == "sync") {
             const auto* division = engine::noteDivisionFor(static_cast<float>(value));
-            return division == nullptr ? ui::Ls("Temps libre", "Free time") : juce::String(std::string(division->name));
+            return division == nullptr ? ui::Ls("Temps libre", "Free time") : cydaw::base::Text(std::string(division->name));
         }
         if (suffix == "intensity" || suffix == "echo" || suffix == "reverb" || suffix == "wow" || suffix == "mix" || suffix == "age"
             || suffix == "width")
             return percent(value);
         if (suffix == "time")
-            return juce::String(juce::roundToInt(value)) + " ms";
+            return cydaw::base::Text(cydaw::base::roundToInt(value)) + " ms";
         return {};
     }
     if (binding.contains("multiband.")) {
@@ -3219,11 +3229,11 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "amount" || suffix == "link")
             return percent(value);
         if (suffix.startsWith("cross"))
-            return value >= 1'000.0 ? juce::String(value / 1'000.0, 2) + " kHz" : juce::String(juce::roundToInt(value)) + " Hz";
+            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 2) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix.endsWith("Mode"))
-            return juce::String::fromUTF8(multibandModeName(whole(static_cast<float>(value), engine::mix::multibandModeCount), false));
+            return cydaw::base::Text::fromUTF8(multibandModeName(whole(static_cast<float>(value), engine::mix::multibandModeCount), false));
         if (suffix.endsWith("Ratio"))
-            return juce::String(value, value < 10.0 ? 2 : 1) + ":1";
+            return cydaw::base::Text(value, value < 10.0 ? 2 : 1) + ":1";
         if (suffix.endsWith("On") || suffix.endsWith("Solo"))
             return onOff(value);
         return {};
@@ -3237,7 +3247,7 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "delta")
             return onOff(value);
         if (suffix.startsWith("focus"))
-            return value >= 1'000.0 ? juce::String(value / 1'000.0, 1) + " kHz" : juce::String(juce::roundToInt(value)) + " Hz";
+            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 1) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         return {};
     }
     if (binding.contains("patine.")) {
@@ -3263,19 +3273,19 @@ juce::String studioFormat(const Param& parameter, const double value)
             return pick(value, { L("Années 70", "1970s"), L("Années 80", "1980s"), L("Maintenant", "Now") });
         if (suffix == "sync") {
             const auto* division = engine::noteDivisionFor(static_cast<float>(value));
-            return division == nullptr ? ui::Ls("Libre", "Free") : juce::String(std::string(division->name));
+            return division == nullptr ? ui::Ls("Libre", "Free") : cydaw::base::Text(std::string(division->name));
         }
         if (suffix == "mix" || suffix == "size" || suffix == "attack" || suffix == "earlyDiffusion" || suffix == "lateDiffusion"
             || suffix == "modDepth" || suffix == "width")
             return percent(value);
         if (suffix == "bassMultiplier")
-            return juce::String::fromUTF8("\xc3\x97") + juce::String(value, 2);
+            return cydaw::base::Text::fromUTF8("\xc3\x97") + cydaw::base::Text(value, 2);
         if (suffix == "decay")
-            return juce::String(value, value < 10.0 ? 2 : 1) + " s";
+            return cydaw::base::Text(value, value < 10.0 ? 2 : 1) + " s";
         if (suffix == "lowCut")
-            return value <= 10.5 ? off("Désactivé", "Off") : juce::String(juce::roundToInt(value)) + " Hz";
+            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut" || suffix == "damping")
-            return value >= 19'900.0 ? off("Désactivé", "Off") : juce::String(value / 1'000.0, 1) + " kHz";
+            return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
     }
     if (binding.contains("tranche.")) {
@@ -3285,15 +3295,15 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "exciterStyle")
             return pick(value, { L("Lampe", "Valve"), L("Bande", "Tape"), "Transistor" });
         if (suffix == "attack" || suffix == "sustain")
-            return (value > 0.0 ? "+" : "") + juce::String(juce::roundToInt(value * 100.0)) + " %";
+            return (value > 0.0 ? "+" : "") + cydaw::base::Text(cydaw::base::roundToInt(value * 100.0)) + " %";
         if (suffix == "excite" || suffix == "width" || suffix == "mix")
             return percent(value);
         if (suffix == "compRatio")
-            return juce::String(value, value < 10.0 ? 1 : 0) + ":1";
+            return cydaw::base::Text(value, value < 10.0 ? 1 : 0) + ":1";
         if (suffix == "lowCut")
-            return value <= 10.5 ? off("Désactivé", "Off") : juce::String(juce::roundToInt(value)) + " Hz";
+            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
-            return value >= 19'900.0 ? off("Désactivé", "Off") : juce::String(value / 1'000.0, 1) + " kHz";
+            return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
     }
     if (binding.contains("finition.")) {
@@ -3305,9 +3315,9 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "dynamics" || suffix == "excite" || suffix.endsWith("Drive") || suffix.endsWith("Width") || suffix == "width")
             return percent(value);
         if (suffix == "ratio")
-            return juce::String(value, 1) + ":1";
+            return cydaw::base::Text(value, 1) + ":1";
         if (suffix == "lowCut")
-            return value <= 10.5 ? off("Désactivé", "Off") : juce::String(juce::roundToInt(value)) + " Hz";
+            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         return {};
     }
     if (binding.contains("sonometre.")) {
@@ -3315,7 +3325,7 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix == "target")
             return targetName(whole(static_cast<float>(value), engine::mix::loudnessTargetCount));
         if (suffix == "history")
-            return value >= 60.0 ? juce::String(value / 60.0, 1) + " min" : juce::String(juce::roundToInt(value)) + " s";
+            return value >= 60.0 ? cydaw::base::Text(value / 60.0, 1) + " min" : cydaw::base::Text(cydaw::base::roundToInt(value)) + " s";
         return {};
     }
     if (binding.contains("comppro.")) {
@@ -3326,11 +3336,11 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (is(parameter, "comppro.autoRelease") || is(parameter, "comppro.autoGain") || is(parameter, "comppro.audition"))
             return onOff(value);
         if (is(parameter, "comppro.range"))
-            return value >= 59.95 ? ui::Ls("Illimitée", "Unlimited") : juce::String(value, 1) + " dB";
+            return value >= 59.95 ? ui::Ls("Illimitée", "Unlimited") : cydaw::base::Text(value, 1) + " dB";
         if (is(parameter, "comppro.link"))
-            return juce::String(juce::roundToInt(value * 100.0)) + " %";
+            return cydaw::base::Text(cydaw::base::roundToInt(value * 100.0)) + " %";
         if (is(parameter, "comppro.sidechainLow"))
-            return value >= 19'500.0 ? ui::Ls("Désactivé", "Off") : juce::String(value / 1'000.0, 1) + " kHz";
+            return value >= 19'500.0 ? ui::Ls("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
     }
     if (binding.contains("revpro.")) {
@@ -3340,17 +3350,17 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (is(parameter, "revpro.brightness"))
             return (value >= 0.0 ? "+" : "") + percent(value);
         if (is(parameter, "revpro.lowDecay") || is(parameter, "revpro.midDecay") || is(parameter, "revpro.highDecay"))
-            return "x" + juce::String(value, 2);
+            return "x" + cydaw::base::Text(value, 2);
         if (is(parameter, "revpro.decay"))
-            return juce::String(value, value < 10.0 ? 2 : 1) + " s";
+            return cydaw::base::Text(value, value < 10.0 ? 2 : 1) + " s";
         if (is(parameter, "revpro.freeze"))
             return onOff(value);
         if (is(parameter, "revpro.lowCut"))
-            return value <= 10.5 ? ui::Ls("Désactivé", "Off") : juce::String(juce::roundToInt(value)) + " Hz";
+            return value <= 10.5 ? ui::Ls("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (is(parameter, "revpro.highCut"))
-            return value >= 19'900.0 ? ui::Ls("Désactivé", "Off") : juce::String(value / 1'000.0, 1) + " kHz";
+            return value >= 19'900.0 ? ui::Ls("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         if (is(parameter, "revpro.ducking"))
-            return value <= 0.05 ? ui::Ls("Désactivé", "Off") : juce::String(value, 1) + " dB";
+            return value <= 0.05 ? ui::Ls("Désactivé", "Off") : cydaw::base::Text(value, 1) + " dB";
         return {};
     }
     if (binding.contains("limpro.")) {
@@ -3368,7 +3378,7 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (is(parameter, "limpro.linkTransients") || is(parameter, "limpro.linkRelease"))
             return percent(value);
         if (is(parameter, "limpro.target"))
-            return juce::String(value, 1) + " LUFS";
+            return cydaw::base::Text(value, 1) + " LUFS";
         return {};
     }
     if (binding.contains("filtpro.")) {
@@ -3376,13 +3386,13 @@ juce::String studioFormat(const Param& parameter, const double value)
         if (suffix.endsWith("On"))
             return onOff(value);
         if (suffix.endsWith("Type"))
-            return juce::String::fromUTF8(typeName(static_cast<int>(std::lround(value)), false));
+            return cydaw::base::Text::fromUTF8(typeName(static_cast<int>(std::lround(value)), false));
         if (suffix.endsWith("Slope"))
             return pick(value, { "12 dB/oct", "24 dB/oct", "48 dB/oct" });
         if (suffix.endsWith("Resonance") || suffix == "mix")
             return percent(value);
         if (suffix.endsWith("Spread"))
-            return (value >= 0.0 ? "+" : "") + juce::String(value, 2) + " oct";
+            return (value >= 0.0 ? "+" : "") + cydaw::base::Text(value, 2) + " oct";
         if (suffix == "routing")
             return pick(value, { L("Série", "Serial"), L("Parallèle", "Parallel"), L("Paires", "Pairs") });
         if (suffix.endsWith("Shape"))
@@ -3390,11 +3400,11 @@ juce::String studioFormat(const Param& parameter, const double value)
                                  L("Carré", "Square"), L("Aléatoire tenu", "Sample & hold"), L("Aléatoire lissé", "Smooth random") });
         if (suffix.endsWith("Sync")) {
             if (const auto* division = engine::noteDivisionFor(static_cast<float>(value)))
-                return juce::String(std::string(division->name));
+                return cydaw::base::Text(std::string(division->name));
             return ui::Ls("Libre", "Free");
         }
         if (suffix.endsWith("Stereo"))
-            return juce::String(juce::roundToInt(value * 360.0)) + juce::String::fromUTF8("\xc2\xb0");
+            return cydaw::base::Text(cydaw::base::roundToInt(value * 360.0)) + cydaw::base::Text::fromUTF8("\xc2\xb0");
         if (suffix.endsWith("Source"))
             return pick(value, { "\xe2\x80\x94", "LFO 1", "LFO 2", L("Suiveur", "Follower") });
         if (suffix.endsWith("Destination"))

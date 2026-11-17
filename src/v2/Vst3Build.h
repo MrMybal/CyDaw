@@ -1,6 +1,8 @@
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
 
 #include <atomic>
 #include <mutex>
@@ -13,21 +15,21 @@
 
 namespace cydaw::v2 {
 
-class Vst3Build final : private juce::Thread {
+class Vst3Build final : private cydaw::base::Thread {
 public:
     // What a build needs: CMake (Visual Studio's own will do), CyDAW's
     // sources, and the MIT VST3 SDK (fetched when absent).
     struct Tools {
-        juce::File cmake;
-        juce::File sourceRoot;
-        juce::File vst3Sdk;
-        juce::File ninja, python, linuxToolchain;
+        cydaw::base::File cmake;
+        cydaw::base::File sourceRoot;
+        cydaw::base::File vst3Sdk;
+        cydaw::base::File ninja, python, linuxToolchain;
         [[nodiscard]] bool ready() const { return cmake.existsAsFile() && sourceRoot.isDirectory(); }
     };
-    [[nodiscard]] static Tools findTools(const juce::File& sourceRootHint = {});
-    [[nodiscard]] static bool isSourceRoot(const juce::File& folder);
+    [[nodiscard]] static Tools findTools(const cydaw::base::File& sourceRootHint = {});
+    [[nodiscard]] static bool isSourceRoot(const cydaw::base::File& folder);
     // Where builds happen, short enough for Visual Studio's paths.
-    [[nodiscard]] static juce::File workFolder();
+    [[nodiscard]] static cydaw::base::File workFolder();
 
     enum class Phase { idle, configuring, building, done, failed, cancelled };
 
@@ -36,15 +38,15 @@ public:
 
     // `project` is the generated folder; the bundle is copied into
     // `destination`. False while a build runs.
-    bool start(const juce::File& project, const juce::File& destination, const juce::String& productName, const Tools& tools, const juce::String& format = "VST3");
+    bool start(const cydaw::base::File& project, const cydaw::base::File& destination, const cydaw::base::Text& productName, const Tools& tools, const cydaw::base::Text& format = "VST3");
     struct Job {
-        juce::File project, destination;
-        juce::String productName, format, platform {"Windows"};
+        cydaw::base::File project, destination;
+        cydaw::base::Text productName, format, platform {"Windows"};
     };
     struct JobResult {
-        juce::String format, platform;
-        juce::File file;
-        juce::String error;
+        cydaw::base::Text format, platform;
+        cydaw::base::File file;
+        cydaw::base::Text error;
     };
     bool startBatch(const std::vector<Job>& jobs, const Tools& tools);
     [[nodiscard]] std::vector<JobResult> results() const;
@@ -56,26 +58,26 @@ public:
         return phase_.load() == Phase::configuring || phase_.load() == Phase::building;
     }
     // The last lines CMake and the compiler wrote.
-    [[nodiscard]] juce::StringArray log() const;
-    [[nodiscard]] juce::File bundle() const;
-    [[nodiscard]] juce::String failure() const;
+    [[nodiscard]] cydaw::base::TextList log() const;
+    [[nodiscard]] cydaw::base::File bundle() const;
+    [[nodiscard]] cydaw::base::Text failure() const;
     [[nodiscard]] double elapsedSeconds() const;
 
 private:
     void run() override;
     bool runJob(const Job& job);
-    bool runStep(const juce::StringArray& command);
-    void addLine(const juce::String& line);
-    void finish(Phase phase, const juce::String& failure = {});
+    bool runStep(const cydaw::base::TextList& command);
+    void addLine(const cydaw::base::Text& line);
+    void finish(Phase phase, const cydaw::base::Text& failure = {});
 
     std::atomic<Phase> phase_ { Phase::idle };
     mutable std::mutex mutex_;
-    juce::StringArray log_;
+    cydaw::base::TextList log_;
     Tools tools_;
     std::vector<Job> jobs_;
     std::vector<JobResult> results_;
-    juce::File bundle_;
-    juce::String failure_;
+    cydaw::base::File bundle_;
+    cydaw::base::Text failure_;
     double started_ {};
     double finished_ {};
 };

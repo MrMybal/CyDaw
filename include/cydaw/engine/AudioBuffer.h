@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
+#include <cydsp/core/AudioBuffer.h>
 
 namespace cydaw::engine {
 
@@ -19,6 +19,10 @@ class AudioBuffer final {
 public:
     AudioBuffer() = default;
     AudioBuffer(std::uint32_t channels, std::uint32_t maximumFrames);
+    AudioBuffer(const AudioBuffer&);
+    AudioBuffer& operator=(const AudioBuffer&);
+    AudioBuffer(AudioBuffer&&) noexcept;
+    AudioBuffer& operator=(AudioBuffer&&) noexcept;
 
     // Control-thread only. All storage used by process() is allocated here.
     void prepare(std::uint32_t channels, std::uint32_t maximumFrames);
@@ -29,7 +33,8 @@ public:
     [[nodiscard]] std::uint32_t maximumFrameCount() const noexcept;
 
 private:
-    std::vector<float> storage_;
+    cydsp::AudioBuffer<float> storage_;
+    std::uint32_t channelStride_ {};
     std::uint32_t channelCount_ {};
     std::uint32_t maximumFrameCount_ {};
 };

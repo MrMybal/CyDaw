@@ -1,17 +1,17 @@
-#include "NativeDspGraphState.h"
+#include <cydaw/document/NativeGraphState.h>
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <unordered_set>
 
-namespace cydaw::app {
+namespace cydaw::document {
 namespace {
 
-juce::var serialiseParameters(
+base::Value serialiseParameters(
     const cydaw::engine::NativeDspNodeParameters& parameters)
 {
-    auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto value = base::Object::Ptr(new base::Object());
 #define CYDAW_WRITE_PARAMETER(name) value->setProperty(#name, parameters.name)
     CYDAW_WRITE_PARAMETER(driveDb);
     CYDAW_WRITE_PARAMETER(gainDb);
@@ -77,11 +77,11 @@ juce::var serialiseParameters(
     CYDAW_WRITE_PARAMETER(effect8);
 #undef CYDAW_WRITE_PARAMETER
     writeEqBands(*value, parameters);
-    return juce::var(value.get());
+    return base::Value(value.get());
 }
 
 cydaw::engine::NativeDspNodeParameters restoreParameters(
-    const juce::var& state)
+    const base::Value& state)
 {
     cydaw::engine::NativeDspNodeParameters parameters;
     const auto* value = state.getDynamicObject();
@@ -162,17 +162,17 @@ cydaw::engine::NativeDspNodeParameters restoreParameters(
 
 } // namespace
 
-void writeEqBands(juce::DynamicObject& object, const cydaw::engine::NativeDspNodeParameters& parameters)
+void writeEqBands(base::Object& object, const cydaw::engine::NativeDspNodeParameters& parameters)
 {
     if (std::all_of(parameters.eqBands.begin(), parameters.eqBands.end(), [](const float value) { return value == 0.0f; }))
         return;
-    juce::Array<juce::var> bands;
+    base::Array<base::Value> bands;
     for (const auto value : parameters.eqBands)
         bands.add(value);
     object.setProperty("eqBands", bands);
 }
 
-void readEqBands(const juce::DynamicObject& object, cydaw::engine::NativeDspNodeParameters& parameters)
+void readEqBands(const base::Object& object, cydaw::engine::NativeDspNodeParameters& parameters)
 {
     const auto* bands = object.getProperty("eqBands").getArray();
     if (bands == nullptr)
@@ -184,68 +184,68 @@ void readEqBands(const juce::DynamicObject& object, cydaw::engine::NativeDspNode
     }
 }
 
-juce::var serialiseNativeDspGraphState(
+base::Value serialiseNativeDspGraphState(
     const cydaw::engine::NativeDspGraph& graph)
 {
-    auto root = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto root = base::Object::Ptr(new base::Object());
     root->setProperty("schema", 3);
     root->setProperty("outputNodeId",
-                      static_cast<juce::int64>(graph.outputNodeId));
-    juce::Array<juce::var> nodes;
+                      static_cast<base::int64>(graph.outputNodeId));
+    base::Array<base::Value> nodes;
     for (const auto& node : graph.nodes) {
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
-        value->setProperty("id", static_cast<juce::int64>(node.id));
+        auto value = base::Object::Ptr(new base::Object());
+        value->setProperty("id", static_cast<base::int64>(node.id));
         value->setProperty("kind", static_cast<int>(node.kind));
         value->setProperty("parameters", serialiseParameters(node.parameters));
         if (node.inputBus != 0)
             value->setProperty("inputBus", static_cast<int>(node.inputBus));
-        nodes.add(juce::var(value.get()));
+        nodes.add(base::Value(value.get()));
     }
     root->setProperty("nodes", std::move(nodes));
-    juce::Array<juce::var> connections;
+    base::Array<base::Value> connections;
     for (const auto& connection : graph.connections) {
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto value = base::Object::Ptr(new base::Object());
         value->setProperty("source",
-                           static_cast<juce::int64>(connection.source));
+                           static_cast<base::int64>(connection.source));
         value->setProperty("destination",
-                           static_cast<juce::int64>(connection.destination));
+                           static_cast<base::int64>(connection.destination));
         value->setProperty("sourcePort",
-                           static_cast<juce::int64>(connection.sourcePort));
+                           static_cast<base::int64>(connection.sourcePort));
         value->setProperty("destinationPort",
-                           static_cast<juce::int64>(connection.destinationPort));
-        connections.add(juce::var(value.get()));
+                           static_cast<base::int64>(connection.destinationPort));
+        connections.add(base::Value(value.get()));
     }
     root->setProperty("connections", std::move(connections));
-    juce::Array<juce::var> modulations;
+    base::Array<base::Value> modulations;
     for (const auto& connection : graph.modulations) {
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto value = base::Object::Ptr(new base::Object());
         value->setProperty("source",
-                           static_cast<juce::int64>(connection.source));
+                           static_cast<base::int64>(connection.source));
         value->setProperty("destination",
-                           static_cast<juce::int64>(connection.destination));
+                           static_cast<base::int64>(connection.destination));
         value->setProperty("sourcePort",
-                           static_cast<juce::int64>(connection.sourcePort));
+                           static_cast<base::int64>(connection.sourcePort));
         value->setProperty("destinationPort",
-                           static_cast<juce::int64>(connection.destinationPort));
+                           static_cast<base::int64>(connection.destinationPort));
         value->setProperty("destinationParameterKey",
-                           juce::String(connection.destinationParameterKey));
+                           base::Text(connection.destinationParameterKey));
         if (connection.mode != 0) {
             value->setProperty("mode", static_cast<int>(connection.mode));
             value->setProperty("amount", static_cast<double>(connection.amount));
             value->setProperty("minimum", static_cast<double>(connection.minimum));
             value->setProperty("maximum", static_cast<double>(connection.maximum));
         }
-        modulations.add(juce::var(value.get()));
+        modulations.add(base::Value(value.get()));
     }
     root->setProperty("modulations", std::move(modulations));
-    juce::Array<juce::var> bypasses;
-    for(const auto& b:graph.bypasses){auto* v=new juce::DynamicObject();v->setProperty("node",static_cast<juce::int64>(b.node));v->setProperty("from",static_cast<juce::int64>(b.from));bypasses.add(juce::var(v));}
+    base::Array<base::Value> bypasses;
+    for(const auto& b:graph.bypasses){auto* v=new base::Object();v->setProperty("node",static_cast<base::int64>(b.node));v->setProperty("from",static_cast<base::int64>(b.from));bypasses.add(base::Value(v));}
     root->setProperty("bypasses",bypasses);
-    return juce::var(root.get());
+    return base::Value(root.get());
 }
 
 std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
-    const juce::var& state, juce::String& error)
+    const base::Value& state, base::Text& error)
 {
     const auto* root = state.getDynamicObject();
     const auto* nodeValues = root != nullptr
@@ -273,12 +273,12 @@ std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
 
     cydaw::engine::NativeDspGraph graph;
     graph.outputNodeId = static_cast<std::uint64_t>(
-        static_cast<juce::int64>(root->getProperty("outputNodeId")));
+        static_cast<base::int64>(root->getProperty("outputNodeId")));
     std::unordered_set<std::uint64_t> nodeIds;
     for (const auto& item : *nodeValues) {
         const auto* value = item.getDynamicObject();
         const auto id = value != nullptr
-                            ? static_cast<std::uint64_t>(static_cast<juce::int64>(
+                            ? static_cast<std::uint64_t>(static_cast<base::int64>(
                                   value->getProperty("id")))
                             : 0;
         const auto kind = value != nullptr
@@ -293,25 +293,25 @@ std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
             id, static_cast<cydaw::engine::NativeDspNodeKind>(kind),
             restoreParameters(value->getProperty("parameters")) });
         graph.nodes.back().inputBus = static_cast<std::uint32_t>(
-            juce::jlimit(0, 16, static_cast<int>(value->getProperty("inputBus"))));
+            base::jlimit(0, 16, static_cast<int>(value->getProperty("inputBus"))));
     }
     for (const auto& item : *connectionValues) {
         const auto* value = item.getDynamicObject();
         const auto source = value != nullptr
                                 ? static_cast<std::uint64_t>(
-                                      static_cast<juce::int64>(
+                                      static_cast<base::int64>(
                                           value->getProperty("source")))
                                 : 0;
         const auto destination = value != nullptr
                                      ? static_cast<std::uint64_t>(
-                                           static_cast<juce::int64>(
+                                           static_cast<base::int64>(
                                                value->getProperty("destination")))
                                      : 0;
         const auto sourcePort = value != nullptr && schema >= 2
-            ? static_cast<std::uint64_t>(static_cast<juce::int64>(
+            ? static_cast<std::uint64_t>(static_cast<base::int64>(
                   value->getProperty("sourcePort"))) : 0;
         const auto destinationPort = value != nullptr && schema >= 2
-            ? static_cast<std::uint64_t>(static_cast<juce::int64>(
+            ? static_cast<std::uint64_t>(static_cast<base::int64>(
                   value->getProperty("destinationPort"))) : 0;
         if (!nodeIds.contains(source) || !nodeIds.contains(destination)) {
             error = "Native Graph state contains an invalid connection";
@@ -324,10 +324,10 @@ std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
         for (const auto& item : *modulationValues) {
             const auto* value = item.getDynamicObject();
             const auto source = value != nullptr
-                ? static_cast<std::uint64_t>(static_cast<juce::int64>(
+                ? static_cast<std::uint64_t>(static_cast<base::int64>(
                       value->getProperty("source"))) : 0;
             const auto destination = value != nullptr
-                ? static_cast<std::uint64_t>(static_cast<juce::int64>(
+                ? static_cast<std::uint64_t>(static_cast<base::int64>(
                       value->getProperty("destination"))) : 0;
             if (!nodeIds.contains(source) || !nodeIds.contains(destination)) {
                 error = "Native Graph state contains an invalid modulation";
@@ -335,16 +335,16 @@ std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
             }
             graph.modulations.push_back({
                 source, destination,
-                static_cast<std::uint64_t>(static_cast<juce::int64>(
+                static_cast<std::uint64_t>(static_cast<base::int64>(
                     value->getProperty("sourcePort"))),
-                static_cast<std::uint64_t>(static_cast<juce::int64>(
+                static_cast<std::uint64_t>(static_cast<base::int64>(
                     value->getProperty("destinationPort"))),
                 value->getProperty("destinationParameterKey").toString()
                     .toStdString()
             });
             if (value->hasProperty("mode")) {
                 auto& restored = graph.modulations.back();
-                restored.mode = static_cast<std::uint8_t>(juce::jlimit(0, 1, static_cast<int>(value->getProperty("mode"))));
+                restored.mode = static_cast<std::uint8_t>(base::jlimit(0, 1, static_cast<int>(value->getProperty("mode"))));
                 const auto finite = [value](const char* key, const float otherwise) {
                     const auto read = static_cast<double>(value->getProperty(key));
                     return std::isfinite(read) ? static_cast<float>(read) : otherwise;
@@ -355,8 +355,8 @@ std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
             }
         }
     if(const auto* bypasses=root->getProperty("bypasses").getArray())for(const auto& b:*bypasses){
-        const auto node=static_cast<std::uint64_t>(static_cast<juce::int64>(b.getProperty("node",0)));
-        const auto from=static_cast<std::uint64_t>(static_cast<juce::int64>(b.getProperty("from",0)));
+        const auto node=static_cast<std::uint64_t>(static_cast<base::int64>(b.getProperty("node",0)));
+        const auto from=static_cast<std::uint64_t>(static_cast<base::int64>(b.getProperty("from",0)));
         if(!nodeIds.contains(node)||(from&&!nodeIds.contains(from))){error="Invalid bypass route";return {};}
         graph.bypasses.push_back({node,from});
     }
@@ -368,4 +368,4 @@ std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
     return graph;
 }
 
-} // namespace cydaw::app
+} // namespace cydaw::document

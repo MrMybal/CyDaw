@@ -1,3 +1,5 @@
+#include <cassert>
+#include <cydsp/math/Window.h>
 // Quartz: a four-operator FM synthesiser of the synth family, compact and
 // immediate. Four sine operators, each at a ratio to the note (or at a
 // frequency of its own) with its fine tuning, its own envelope, its share in
@@ -205,23 +207,19 @@ constexpr std::size_t halfBandTaps = 12;
 
 std::array<double, halfBandTaps> halfBand() noexcept
 {
-    const auto bessel = [](const double x) {
-        auto sum = 1.0;
-        auto term = 1.0;
-        for (int k = 1; k < 32; ++k) {
-            const auto ratio = x / (2.0 * static_cast<double>(k));
-            term *= ratio * ratio;
-            sum += term;
-        }
-        return sum;
-    };
     constexpr double beta = 7.8;
+    std::array<double, halfBandLength> windowValues{};
+    cydsp::WindowParameters options;
+    options.type = cydsp::WindowType::kaiser;
+    options.beta = beta;
+    const auto status = cydsp::makeWindow(options, windowValues);
+    assert(status == cydsp::Status::ok);
+    (void)status;
     std::array<double, halfBandTaps> taps {};
     auto total = 0.0;
     for (std::size_t m = 0; m < halfBandTaps; ++m) {
         const auto distance = static_cast<double>(2 * m + 1);
-        const auto along = distance / static_cast<double>(halfBandCentre);
-        const auto window = bessel(beta * std::sqrt(std::max(0.0, 1.0 - along * along))) / bessel(beta);
+        const auto window = windowValues[halfBandCentre + 2 * m + 1];
         taps[m] = std::sin(kPi * distance * 0.5) / (kPi * distance) * window;
         total += 2.0 * taps[m];
     }

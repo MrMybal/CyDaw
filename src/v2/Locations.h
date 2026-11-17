@@ -1,6 +1,9 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
 
 #include <array>
 #include <atomic>
@@ -44,73 +47,73 @@ namespace locations {
 // A path read from a list (a bank's files, a model's): relative and staying
 // in the folder it names a file of. On Windows "/x", "\\host\x" and "C:x"
 // are not taken as relative, though JUCE would.
-[[nodiscard]] inline bool staysInside(const juce::String& path)
+[[nodiscard]] inline bool staysInside(const cydaw::base::Text& path)
 {
-    return path.isNotEmpty() && !path.contains("..") && !juce::File::isAbsolutePath(path) && !path.startsWithChar('/')
+    return path.isNotEmpty() && !path.contains("..") && !cydaw::base::File::isAbsolutePath(path) && !path.startsWithChar('/')
            && !path.startsWithChar('\\') && !path.containsChar(':');
 }
 // One folder's name (a model's id, its version): no path in it.
-[[nodiscard]] inline bool isPlainName(const juce::String& name)
+[[nodiscard]] inline bool isPlainName(const cydaw::base::Text& name)
 {
     return staysInside(name) && !name.containsAnyOf("/\\") && name != ".";
 }
 
-[[nodiscard]] juce::File folder(Location location);
-[[nodiscard]] juce::File defaultFolder(Location location);
+[[nodiscard]] cydaw::base::File folder(Location location);
+[[nodiscard]] cydaw::base::File defaultFolder(Location location);
 [[nodiscard]] bool isDefault(Location location);
 [[nodiscard]] const char* key(Location location);
-[[nodiscard]] std::optional<Location> fromKey(const juce::String& key);
-[[nodiscard]] juce::File settingsFile();
+[[nodiscard]] std::optional<Location> fromKey(const cydaw::base::Text& key);
+[[nodiscard]] cydaw::base::File settingsFile();
 // Read once, at the start.
 void load();
 // Off for an automated session without a file of its own: it reads the
 // person's choices and never changes them.
 void setSaving(bool saving);
 // Chosen ({}: back to the default), nothing moved; saved at once.
-void set(Location location, const juce::File& folder);
+void set(Location location, const cydaw::base::File& folder);
 
 // What CyDAW put in a folder of this kind: what a move takes along, never
 // anything else the folder may hold. Empty for the kinds nothing is moved
 // from (files on their way, exports).
-[[nodiscard]] juce::Array<juce::File> contentOf(Location location, const juce::File& folder);
+[[nodiscard]] cydaw::base::Array<cydaw::base::File> contentOf(Location location, const cydaw::base::File& folder);
 [[nodiscard]] bool movable(Location location);
 // What CyDAW downloads, builds and installs (banks, files on their way, cache,
 // companion, AI models), as opposed to what the person makes with it.
 [[nodiscard]] bool downloaded(Location location);
 // Its folder inside a folder that holds them all ("Banks", "Cache"...).
-[[nodiscard]] juce::File inside(Location location, const juce::File& root);
+[[nodiscard]] cydaw::base::File inside(Location location, const cydaw::base::File& root);
 
 // A location's content taken to another folder on a thread of its own:
 // renamed on the same drive, else copied, then the originals deleted once
 // every copy is there (cancelled: the copies go, the originals stay).
-class Move final : private juce::Thread {
+class Move final : private cydaw::base::Thread {
 public:
-    Move(Location location, juce::File from, juce::File to);
+    Move(Location location, cydaw::base::File from, cydaw::base::File to);
     ~Move() override;
 
     struct Progress {
-        juce::int64 done {};
-        juce::int64 total {};
-        juce::String current;
+        std::int64_t done {};
+        std::int64_t total {};
+        cydaw::base::Text current;
         bool finished {};
         bool cancelled {};
-        juce::String error;
+        cydaw::base::Text error;
         // Files left in the old folder: the new one already held a different
         // file of that name, and neither was overwritten.
         int kept {};
     };
     [[nodiscard]] Progress progress() const;
     [[nodiscard]] Location location() const noexcept { return location_; }
-    [[nodiscard]] const juce::File& destination() const noexcept { return to_; }
+    [[nodiscard]] const cydaw::base::File& destination() const noexcept { return to_; }
     void cancel();
 
 private:
     void run() override;
-    void fail(const juce::String& error);
+    void fail(const cydaw::base::Text& error);
 
     const Location location_;
-    const juce::File from_;
-    const juce::File to_;
+    const cydaw::base::File from_;
+    const cydaw::base::File to_;
     mutable std::mutex mutex_;
     Progress progress_;
 };

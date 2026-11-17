@@ -1,3 +1,7 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/EventLoop.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "SampleCatalog.h"
 
 #include "Widgets.h"
@@ -13,20 +17,20 @@ namespace {
 
 double nowMs()
 {
-    return juce::Time::getMillisecondCounterHiRes();
+    return cydaw::base::Time::getMillisecondCounterHiRes();
 }
 
-juce::String categoryLabel(const juce::String& key, const bool french)
+cydaw::base::Text categoryLabel(const cydaw::base::Text& key, const bool french)
 {
     if (key.isEmpty())
-        return french ? juce::String::fromUTF8("Sans catégorie") : juce::String("Uncategorised");
+        return french ? cydaw::base::Text::fromUTF8("Sans catégorie") : cydaw::base::Text("Uncategorised");
     if (const auto* info = app::SampleLibrary::categoryInfo(key))
-        return juce::String::fromUTF8(french ? info->french : info->english);
+        return cydaw::base::Text::fromUTF8(french ? info->french : info->english);
     return key;
 }
 
 // "Grosses caisses (kicks)": Grosses caisses.
-juce::String categoryShort(const juce::String& key, const bool french)
+cydaw::base::Text categoryShort(const cydaw::base::Text& key, const bool french)
 {
     if (key.isEmpty())
         return {};
@@ -36,9 +40,9 @@ juce::String categoryShort(const juce::String& key, const bool french)
     return label;
 }
 
-int familyIndex(const juce::String& category)
+int familyIndex(const cydaw::base::Text& category)
 {
-    const auto family = category.isEmpty() ? juce::String("other") : app::SampleLibrary::familyOf(category);
+    const auto family = category.isEmpty() ? cydaw::base::Text("other") : app::SampleLibrary::familyOf(category);
     const auto& families = app::SampleLibrary::categoryFamilies();
     for (std::size_t index = 0; index < families.size(); ++index)
         if (family == families[index].key)
@@ -46,7 +50,7 @@ int familyIndex(const juce::String& category)
     return static_cast<int>(families.size()) - 1;
 }
 
-int categoryOrder(const juce::String& category)
+int categoryOrder(const cydaw::base::Text& category)
 {
     if (category.isEmpty())
         return 10'000;
@@ -58,7 +62,7 @@ int categoryOrder(const juce::String& category)
 }
 
 // A key's place: its pitch, major before minor; none last.
-int keyOrder(const juce::String& key)
+int keyOrder(const cydaw::base::Text& key)
 {
     if (key.isEmpty())
         return 1'000;
@@ -100,7 +104,7 @@ int lengthBucket(const float seconds)
     return 4;
 }
 
-juce::String durationText(const double seconds)
+cydaw::base::Text durationText(const double seconds)
 {
     char text[32];
     if (seconds < 10.0)
@@ -152,7 +156,7 @@ bool naturalLess(const std::string& a, const std::string& b)
 
 // ---- Folding -----------------------------------------------------------------------------------
 
-std::string SampleCatalog::fold(const juce::String& text)
+std::string SampleCatalog::fold(const cydaw::base::Text& text)
 {
     std::string out;
     out.reserve(static_cast<std::size_t>(text.getNumBytesAsUTF8()));
@@ -162,7 +166,7 @@ std::string SampleCatalog::fold(const juce::String& text)
             out.push_back(static_cast<char>(c >= 'A' && c <= 'Z' ? c + 32 : c));
             continue;
         }
-        c = juce::CharacterFunctions::toLowerCase(c);
+        c = cydaw::base::CharacterFunctions::toLowerCase(c);
         switch (c) {
         case 0xe0: case 0xe1: case 0xe2: case 0xe3: case 0xe4: case 0xe5: out.push_back('a'); continue;
         case 0xe7: out.push_back('c'); continue;
@@ -176,11 +180,7 @@ std::string SampleCatalog::fold(const juce::String& text)
         default: break;
         }
         // Anything else as its UTF-8 bytes.
-        char bytes[8] {};
-        juce::CharPointer_UTF8 writer(bytes);
-        writer.write(c);
-        writer.writeNull();
-        out += bytes;
+        out += cydaw::base::Text::charToString(c).toStdString();
     }
     return out;
 }
@@ -188,18 +188,18 @@ std::string SampleCatalog::fold(const juce::String& text)
 // ---- What is copied from the library -------------------------------------------------------------
 
 struct SampleCatalog::Raw {
-    juce::String path;
-    juce::String name;
-    juce::String category;
-    juce::String instrument;
-    juce::String source;
-    juce::String root;
-    juce::String type;
-    juce::String key;
-    juce::String classifier;
+    cydaw::base::Text path;
+    cydaw::base::Text name;
+    cydaw::base::Text category;
+    cydaw::base::Text instrument;
+    cydaw::base::Text source;
+    cydaw::base::Text root;
+    cydaw::base::Text type;
+    cydaw::base::Text key;
+    cydaw::base::Text classifier;
     // Made by build(), off the message thread.
-    juce::String sourceKey;
-    juce::String sourceTitle;
+    cydaw::base::Text sourceKey;
+    cydaw::base::Text sourceTitle;
     float length {};
     float bpm {};
     int channels {};
@@ -210,7 +210,7 @@ struct SampleCatalog::Raw {
 
 struct SampleCatalog::Extract {
     std::vector<Raw> raws;
-    std::map<juce::String, juce::String> titles; // bank id -> title
+    std::map<cydaw::base::Text, cydaw::base::Text> titles; // bank id -> title
 };
 
 SampleCatalog::Extract SampleCatalog::extract() const
@@ -251,9 +251,9 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
     auto& raws = extract.raws;
     // Where each comes from, named (the records of one bank follow each other).
     {
-        std::map<juce::String, juce::String> folders;
-        juce::String lastSource;
-        juce::String lastTitle;
+        std::map<cydaw::base::Text, cydaw::base::Text> folders;
+        cydaw::base::Text lastSource;
+        cydaw::base::Text lastTitle;
         for (auto& raw : raws) {
             raw.bank = raw.source.isNotEmpty();
             if (raw.bank) {
@@ -268,7 +268,7 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
                 raw.sourceKey = "folder:" + raw.root;
                 auto& title = folders[raw.root];
                 if (title.isEmpty())
-                    title = juce::File(raw.root).getFileName();
+                    title = cydaw::base::File(raw.root).getFileName();
                 raw.sourceTitle = title;
             }
         }
@@ -279,10 +279,10 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
     data->items.resize(count);
     data->haystacks.resize(count);
     data->byPath.reserve(count);
-    std::array<std::unordered_map<juce::String, int>, facetCount> interned;
+    std::array<std::unordered_map<cydaw::base::Text, int>, facetCount> interned;
     // Each value with what orders it in its column.
     std::array<std::vector<double>, facetCount> orders;
-    const auto intern = [&](const Facet facet, const juce::String& key, const juce::String& label, const double order,
+    const auto intern = [&](const Facet facet, const cydaw::base::Text& key, const cydaw::base::Text& label, const double order,
                             const int family = -1) -> std::uint16_t {
         auto& map = interned[static_cast<std::size_t>(facet)];
         if (const auto found = map.find(key); found != map.end())
@@ -304,12 +304,12 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
         auto& item = data->items[index];
         item.path = raw.path;
         const auto hasLetters = raw.name.containsAnyOf("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-        const auto folder = juce::File(raw.path).getParentDirectory().getFileName();
+        const auto folder = cydaw::base::File(raw.path).getParentDirectory().getFileName();
         // The folders under its root, words to find it by ("Aerophones/Recorder").
         const auto folders = raw.path.length() > raw.root.length() + 1
-                                 ? raw.path.substring(raw.root.length() + 1).upToLastOccurrenceOf(juce::File::getSeparatorString(), false, false)
+                                 ? raw.path.substring(raw.root.length() + 1).upToLastOccurrenceOf(cydaw::base::File::getSeparatorString(), false, false)
                                        .replaceCharacters("\\/_-", "    ")
-                                 : juce::String();
+                                 : cydaw::base::Text();
         item.label = hasLetters ? raw.name : raw.name + "  \xc2\xb7  " + folder;
         item.family = familyIndex(raw.category);
         item.categoryText = categoryShort(raw.category, french);
@@ -317,8 +317,8 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
         item.sourceText = raw.sourceTitle;
         item.typeText = raw.type == "one-shot" ? (french ? "Coup" : "One-shot")
                         : raw.type == "loop"   ? (french ? "Boucle" : "Loop")
-                        : raw.type == "long"   ? juce::String("Long")
-                                               : juce::String();
+                        : raw.type == "long"   ? cydaw::base::Text("Long")
+                                               : cydaw::base::Text();
         item.keyText = raw.key;
         item.length = raw.length;
         item.bpm = raw.bpm;
@@ -329,27 +329,27 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
         item.bank = raw.bank;
         item.lengthText = durationText(raw.length);
         if (raw.bpm > 0.0f)
-            item.bpmText = juce::String(juce::roundToInt(raw.bpm));
+            item.bpmText = cydaw::base::Text(cydaw::base::roundToInt(raw.bpm));
         if (raw.rate > 0.0f)
-            item.rateText = juce::String(raw.rate / 1000.0f, raw.rate == std::floor(raw.rate / 1000.0f) * 1000.0f ? 0 : 1);
+            item.rateText = cydaw::base::Text(raw.rate / 1000.0f, raw.rate == std::floor(raw.rate / 1000.0f) * 1000.0f ? 0 : 1);
 
-        item.facets[category] = intern(category, raw.category.isEmpty() ? juce::String("-") : raw.category,
+        item.facets[category] = intern(category, raw.category.isEmpty() ? cydaw::base::Text("-") : raw.category,
                                        categoryLabel(raw.category, french), categoryOrder(raw.category), item.family);
         item.facets[group] = intern(group, item.groupText, item.groupText, 0.0);
         item.facets[source] = intern(source, raw.sourceKey, raw.sourceTitle, raw.bank ? 0.0 : 1.0);
-        item.facets[type] = intern(type, raw.type.isEmpty() ? juce::String("-") : raw.type,
+        item.facets[type] = intern(type, raw.type.isEmpty() ? cydaw::base::Text("-") : raw.type,
                                    item.typeText.isNotEmpty() ? item.typeText : (french ? "Sans type" : "No type"),
                                    raw.type == "one-shot" ? 0.0 : raw.type == "loop" ? 1.0 : raw.type == "long" ? 2.0 : 3.0);
-        item.facets[key] = intern(key, raw.key.isEmpty() ? juce::String("-") : raw.key,
-                                  raw.key.isNotEmpty() ? raw.key : juce::String::fromUTF8(french ? "Sans tonalité" : "No key"),
+        item.facets[key] = intern(key, raw.key.isEmpty() ? cydaw::base::Text("-") : raw.key,
+                                  raw.key.isNotEmpty() ? raw.key : cydaw::base::Text::fromUTF8(french ? "Sans tonalité" : "No key"),
                                   keyOrder(raw.key));
         const auto tempoIndex = tempoBucket(raw.bpm);
-        item.facets[tempo] = intern(tempo, juce::String(tempoIndex),
-                                    tempoIndex == 0 ? juce::String(french ? "Sans tempo" : "No tempo")
-                                                    : juce::String::fromUTF8(tempoLabels[tempoIndex]) + " BPM",
+        item.facets[tempo] = intern(tempo, cydaw::base::Text(tempoIndex),
+                                    tempoIndex == 0 ? cydaw::base::Text(french ? "Sans tempo" : "No tempo")
+                                                    : cydaw::base::Text::fromUTF8(tempoLabels[tempoIndex]) + " BPM",
                                     tempoIndex == 0 ? 99.0 : tempoIndex);
         const auto lengthIndex = lengthBucket(raw.length);
-        item.facets[length] = intern(length, juce::String(lengthIndex), juce::String::fromUTF8(lengthLabels[lengthIndex]), lengthIndex);
+        item.facets[length] = intern(length, cydaw::base::Text(lengthIndex), cydaw::base::Text::fromUTF8(lengthLabels[lengthIndex]), lengthIndex);
 
         data->haystacks[index] = fold(raw.name + " " + raw.category + " " + categoryLabel(raw.category, true) + " "
                                       + categoryLabel(raw.category, false) + " " + raw.type + " " + raw.key + " "
@@ -414,7 +414,7 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
         const auto& familyList = app::SampleLibrary::categoryFamilies();
         for (const auto& [family, categories] : families) {
             const auto& info = familyList[static_cast<std::size_t>(family)];
-            TreeNode node { info.key, juce::String::fromUTF8(french ? info.french : info.english), familyCounts[family], {} };
+            TreeNode node { info.key, cydaw::base::Text::fromUTF8(french ? info.french : info.english), familyCounts[family], {} };
             std::vector<int> ids;
             for (const auto& [id, counts] : categories)
                 ids.push_back(id);
@@ -438,8 +438,8 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
             }
             data->categoryTree.push_back(std::move(node));
         }
-        TreeNode banks { "banks", french ? juce::String("Banques de CyDAW") : juce::String("CyDAW's banks"), 0, {} };
-        TreeNode folders { "folders", french ? juce::String("Mes dossiers") : juce::String("My folders"), 0, {} };
+        TreeNode banks { "banks", french ? cydaw::base::Text("Banques de CyDAW") : cydaw::base::Text("CyDAW's banks"), 0, {} };
+        TreeNode folders { "folders", french ? cydaw::base::Text("Mes dossiers") : cydaw::base::Text("My folders"), 0, {} };
         std::vector<int> ids;
         for (const auto& [id, sourceCount] : sourceCounts)
             ids.push_back(id);
@@ -461,13 +461,13 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
     return data;
 }
 
-int SampleCatalog::Data::find(const juce::String& path) const
+int SampleCatalog::Data::find(const cydaw::base::Text& path) const
 {
     const auto found = byPath.find(path);
     return found != byPath.end() ? found->second : -1;
 }
 
-int SampleCatalog::Data::valueOf(const Facet facet, const juce::String& key) const
+int SampleCatalog::Data::valueOf(const Facet facet, const cydaw::base::Text& key) const
 {
     const auto& list = values[static_cast<std::size_t>(facet)];
     for (std::size_t id = 0; id < list.size(); ++id)
@@ -673,11 +673,11 @@ void SampleCatalog::startBuild()
     auto copied = std::make_shared<Extract>(extract());
     const auto extractMs = nowMs() - started;
     const auto generation = ++generation_;
-    pool_.addJob([catalog = juce::WeakReference<SampleCatalog>(this), copied, generation, extractMs]() mutable {
+    pool_.addJob([catalog = cydaw::base::WeakReference<SampleCatalog>(this), copied, generation, extractMs]() mutable {
         auto built = build(std::move(*copied), generation);
         built->extractMs = extractMs;
         std::shared_ptr<const Data> data = std::move(built);
-        juce::MessageManager::callAsync([catalog, data] {
+        cydaw::base::EventLoop::post([catalog, data] {
             auto* owner = catalog.get();
             if (owner == nullptr)
                 return;
@@ -703,8 +703,8 @@ std::shared_ptr<const SampleCatalog::Data> SampleCatalog::synthetic(const int co
         const auto& taxonomy = app::SampleLibrary::categoryTaxonomy();
         for (auto index = 0; index < 64; ++index) {
             Raw raw;
-            raw.path = "C:\\synthetic\\sound" + juce::String(index) + ".wav";
-            raw.name = "sound " + juce::String(index);
+            raw.path = "C:\\synthetic\\sound" + cydaw::base::Text(index) + ".wav";
+            raw.name = "sound " + cydaw::base::Text(index);
             raw.category = taxonomy[static_cast<std::size_t>(index) % taxonomy.size()].key;
             raw.root = "C:\\synthetic";
             raw.type = index % 3 == 0 ? "loop" : "one-shot";

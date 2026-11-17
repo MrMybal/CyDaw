@@ -1,3 +1,6 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
 #include "Locations.h"
 
 #include <algorithm>
@@ -15,9 +18,9 @@ std::mutex& settingsLock()
     return lock;
 }
 
-std::map<Location, juce::File>& chosen()
+std::map<Location, cydaw::base::File>& chosen()
 {
-    static std::map<Location, juce::File> folders;
+    static std::map<Location, cydaw::base::File> folders;
     return folders;
 }
 
@@ -27,34 +30,34 @@ std::atomic<bool>& saving()
     return on;
 }
 
-juce::File localData()
+cydaw::base::File localData()
 {
-   #if JUCE_WINDOWS
-    return juce::File::getSpecialLocation(juce::File::windowsLocalAppData).getChildFile("CyDAW");
+   #if defined(_WIN32)
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::windowsLocalAppData).getChildFile("CyDAW");
    #else
-    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("CyDAW");
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory).getChildFile("CyDAW");
    #endif
 }
 
-juce::File documents()
+cydaw::base::File documents()
 {
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("CyDAW");
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::userDocumentsDirectory).getChildFile("CyDAW");
 }
 
-void save(const std::map<Location, juce::File>& folders)
+void save(const std::map<Location, cydaw::base::File>& folders)
 {
     if (!saving().load())
         return;
-    auto* list = new juce::DynamicObject();
+    auto* list = new cydaw::base::Object();
     for (const auto& [location, folder] : folders)
         list->setProperty(key(location), folder.getFullPathName());
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "CyDAW Locations");
     root->setProperty("version", 1);
-    root->setProperty("folders", juce::var(list));
+    root->setProperty("folders", cydaw::base::Value(list));
     const auto file = settingsFile();
     (void) file.getParentDirectory().createDirectory();
-    (void) file.replaceWithText(juce::JSON::toString(juce::var(root)));
+    (void) file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(root)));
 }
 
 } // namespace
@@ -78,7 +81,7 @@ const char* key(const Location location)
     return "";
 }
 
-std::optional<Location> fromKey(const juce::String& name)
+std::optional<Location> fromKey(const cydaw::base::Text& name)
 {
     for (const auto location : allLocations)
         if (name == key(location))
@@ -86,12 +89,12 @@ std::optional<Location> fromKey(const juce::String& name)
     return std::nullopt;
 }
 
-juce::File defaultFolder(const Location location)
+cydaw::base::File defaultFolder(const Location location)
 {
     switch (location) {
     case Location::banks:
-        if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_BANKS_DIR", {}); other.isNotEmpty())
-            return juce::File(other);
+        if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_BANKS_DIR", {}); other.isNotEmpty())
+            return cydaw::base::File(other);
         return localData().getChildFile("Banks");
     case Location::downloads: return localData().getChildFile("Downloads");
     case Location::cache: return localData().getChildFile("Cache");
@@ -110,7 +113,7 @@ juce::File defaultFolder(const Location location)
     return localData();
 }
 
-juce::File folder(const Location location)
+cydaw::base::File folder(const Location location)
 {
     {
         const std::scoped_lock lock(settingsLock());
@@ -126,25 +129,25 @@ bool isDefault(const Location location)
     return !chosen().contains(location);
 }
 
-juce::File settingsFile()
+cydaw::base::File settingsFile()
 {
-    if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_LOCATIONS_FILE", {}); other.isNotEmpty())
-        return juce::File(other);
-    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+    if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_LOCATIONS_FILE", {}); other.isNotEmpty())
+        return cydaw::base::File(other);
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory)
         .getChildFile("CyDAW")
         .getChildFile("Locations.json");
 }
 
 void load()
 {
-    const auto json = juce::JSON::parse(settingsFile().loadFileAsString());
+    const auto json = cydaw::base::JSON::parse(settingsFile().loadFileAsString());
     const std::scoped_lock lock(settingsLock());
     chosen().clear();
     if (const auto* folders = json.getProperty("folders", {}).getDynamicObject())
         for (const auto& [name, value] : folders->getProperties())
             if (const auto location = fromKey(name.toString()); location.has_value())
-                if (const auto path = value.toString(); juce::File::isAbsolutePath(path))
-                    chosen()[*location] = juce::File(path);
+                if (const auto path = value.toString(); cydaw::base::File::isAbsolutePath(path))
+                    chosen()[*location] = cydaw::base::File(path);
 }
 
 void setSaving(const bool on)
@@ -152,12 +155,12 @@ void setSaving(const bool on)
     saving() = on;
 }
 
-void set(const Location location, const juce::File& where)
+void set(const Location location, const cydaw::base::File& where)
 {
-    std::map<Location, juce::File> folders;
+    std::map<Location, cydaw::base::File> folders;
     {
         const std::scoped_lock lock(settingsLock());
-        if (where == juce::File {} || where == defaultFolder(location))
+        if (where == cydaw::base::File {} || where == defaultFolder(location))
             chosen().erase(location);
         else
             chosen()[location] = where;
@@ -172,7 +175,7 @@ bool downloaded(const Location location)
            || location == Location::companion || location == Location::aiModels;
 }
 
-juce::File inside(const Location location, const juce::File& root)
+cydaw::base::File inside(const Location location, const cydaw::base::File& root)
 {
     return root.getChildFile(defaultFolder(location).getFileName());
 }
@@ -182,19 +185,19 @@ bool movable(const Location location)
     return location != Location::downloads && location != Location::pluginExports;
 }
 
-juce::Array<juce::File> contentOf(const Location location, const juce::File& where)
+cydaw::base::Array<cydaw::base::File> contentOf(const Location location, const cydaw::base::File& where)
 {
-    juce::Array<juce::File> items;
+    cydaw::base::Array<cydaw::base::File> items;
     if (!where.isDirectory())
         return items;
     switch (location) {
     case Location::banks:
         // A bank is a folder with its bank.json; the lists beside them.
-        for (const auto& child : where.findChildFiles(juce::File::findDirectories, false))
+        for (const auto& child : where.findChildFiles(cydaw::base::File::findDirectories, false))
             if (child.getChildFile("bank.json").existsAsFile())
                 items.add(child);
         for (const auto& pattern : { "banks.json", "manifest.json", "*-tree.json" })
-            items.addArray(where.findChildFiles(juce::File::findFiles, false, pattern));
+            items.addArray(where.findChildFiles(cydaw::base::File::findFiles, false, pattern));
         break;
     case Location::cache:
         // VST3 builds stay: CMake's build folder cannot move (it is made again).
@@ -203,20 +206,20 @@ juce::Array<juce::File> contentOf(const Location location, const juce::File& whe
         break;
     case Location::aiModels:
         // A folder by model, each with its versions.
-        for (const auto& child : where.findChildFiles(juce::File::findDirectories, false))
-            if (!child.findChildFiles(juce::File::findFiles, true, "receipt.json").isEmpty())
+        for (const auto& child : where.findChildFiles(cydaw::base::File::findDirectories, false))
+            if (!child.findChildFiles(cydaw::base::File::findFiles, true, "receipt.json").isEmpty())
                 items.add(child);
         break;
     case Location::companion:
         // The environment itself, when it is one.
         if (where.getChildFile("pyvenv.cfg").existsAsFile())
-            items.addArray(where.findChildFiles(juce::File::findFilesAndDirectories, false));
+            items.addArray(where.findChildFiles(cydaw::base::File::findFilesAndDirectories, false));
         break;
     case Location::soundModels:
-        items.addArray(where.findChildFiles(juce::File::findFiles, false, "*.cysound"));
+        items.addArray(where.findChildFiles(cydaw::base::File::findFiles, false, "*.cysound"));
         break;
     case Location::devices:
-        items.addArray(where.findChildFiles(juce::File::findFiles, false, "*.cydawdevice"));
+        items.addArray(where.findChildFiles(cydaw::base::File::findFiles, false, "*.cydawdevice"));
         break;
     case Location::presets:
         // A folder by kind: devices', plug-ins', chains'.
@@ -225,13 +228,13 @@ juce::Array<juce::File> contentOf(const Location location, const juce::File& whe
                 items.add(folder);
         break;
     case Location::processings:
-        items.addArray(where.findChildFiles(juce::File::findFiles, false, "*.cyprocess"));
+        items.addArray(where.findChildFiles(cydaw::base::File::findFiles, false, "*.cyprocess"));
         break;
     case Location::mixes:
     case Location::foundry:
         // The sound files made there.
         for (const auto* pattern : { "*.wav", "*.flac", "*.aiff", "*.aif", "*.ogg" })
-            items.addArray(where.findChildFiles(juce::File::findFiles, false, pattern));
+            items.addArray(where.findChildFiles(cydaw::base::File::findFiles, false, pattern));
         break;
     case Location::downloads:
     case Location::pluginExports:
@@ -242,10 +245,10 @@ juce::Array<juce::File> contentOf(const Location location, const juce::File& whe
 
 // ---- Moving ----------------------------------------------------------------------------
 
-Move::Move(const Location location, juce::File from, juce::File to)
-    : juce::Thread("CyDAW location move"), location_(location), from_(std::move(from)), to_(std::move(to))
+Move::Move(const Location location, cydaw::base::File from, cydaw::base::File to)
+    : cydaw::base::Thread("CyDAW location move"), location_(location), from_(std::move(from)), to_(std::move(to))
 {
-    startThread(juce::Thread::Priority::low);
+    startThread(cydaw::base::Thread::Priority::low);
 }
 
 Move::~Move()
@@ -264,7 +267,7 @@ void Move::cancel()
     signalThreadShouldExit();
 }
 
-void Move::fail(const juce::String& error)
+void Move::fail(const cydaw::base::Text& error)
 {
     const std::scoped_lock lock(mutex_);
     progress_.error = error;
@@ -284,14 +287,14 @@ void Move::run()
     // On the same drive an item is renamed at once; the others are copied
     // file by file.
     struct Copy {
-        juce::File source;
-        juce::File target;
-        juce::int64 size {};
+        cydaw::base::File source;
+        cydaw::base::File target;
+        std::int64_t size {};
     };
     std::vector<Copy> copies;
-    juce::Array<juce::File> sources;
+    cydaw::base::Array<cydaw::base::File> sources;
     // Renamed at once: renamed back if the move is cancelled or fails.
-    std::vector<std::pair<juce::File, juce::File>> renamed;
+    std::vector<std::pair<cydaw::base::File, cydaw::base::File>> renamed;
     for (const auto& item : items) {
         const auto target = to_.getChildFile(item.getFileName());
         if (sameDrive && !target.exists() && item.moveFileTo(target)) {
@@ -300,7 +303,7 @@ void Move::run()
         }
         sources.add(item);
         if (item.isDirectory()) {
-            for (const auto& entry : juce::RangedDirectoryIterator(item, true, "*", juce::File::findFiles))
+            for (const auto& entry : cydaw::base::RangedDirectoryIterator(item, true, "*", cydaw::base::File::findFiles))
                 copies.push_back({ entry.getFile(), target.getChildFile(entry.getFile().getRelativePathFrom(item)),
                                    entry.getFileSize() });
         } else {
@@ -314,7 +317,7 @@ void Move::run()
     }
 
     // Copies first: the originals go only once every one is there.
-    juce::Array<juce::File> made;
+    cydaw::base::Array<cydaw::base::File> made;
     const auto undo = [&made, &renamed] {
         for (const auto& file : made)
             (void) file.deleteFile();
@@ -322,7 +325,7 @@ void Move::run()
             (void) target.moveFileTo(item);
     };
     // The originals that may go: those now in the new folder, the same.
-    juce::Array<juce::File> copied;
+    cydaw::base::Array<cydaw::base::File> copied;
     auto kept = 0;
     for (const auto& copy : copies) {
         if (threadShouldExit()) {
@@ -362,15 +365,15 @@ void Move::run()
     // The folders emptied go, deepest first; one still holding a kept file stays.
     for (const auto& source : sources)
         if (source.isDirectory()) {
-            juce::Array<juce::File> folders;
-            for (const auto& entry : juce::RangedDirectoryIterator(source, true, "*", juce::File::findDirectories))
+            cydaw::base::Array<cydaw::base::File> folders;
+            for (const auto& entry : cydaw::base::RangedDirectoryIterator(source, true, "*", cydaw::base::File::findDirectories))
                 folders.add(entry.getFile());
-            std::sort(folders.begin(), folders.end(), [](const juce::File& a, const juce::File& b) {
+            std::sort(folders.begin(), folders.end(), [](const cydaw::base::File& a, const cydaw::base::File& b) {
                 return a.getFullPathName().length() > b.getFullPathName().length();
             });
             folders.add(source);
             for (const auto& folder : folders)
-                if (folder.getNumberOfChildFiles(juce::File::findFilesAndDirectories | juce::File::ignoreHiddenFiles) == 0)
+                if (folder.getNumberOfChildFiles(cydaw::base::File::findFilesAndDirectories | cydaw::base::File::ignoreHiddenFiles) == 0)
                     (void) folder.deleteRecursively();
         }
     const std::scoped_lock lock(mutex_);

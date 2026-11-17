@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The MIDI effects' displays and large views (Arpège, Accords, Gamme, Écho de
 // notes, Aléa, Durée, Séquenceur, Roulement). Included by
 // StudioEffectsView.cpp inside its anonymous namespace. What they draw comes
@@ -9,29 +10,29 @@ namespace midid = engine::midifx;
 constexpr ImU32 kMidiNote = IM_COL32(212, 123, 232, 255);
 constexpr ImU32 kMidiGhost = IM_COL32(212, 123, 232, 90);
 
-juce::String midiNoteName(const int note)
+cydaw::base::Text midiNoteName(const int note)
 {
     if (note < 0 || note > 127)
-        return juce::String::fromUTF8("\xe2\x80\x94");
-    return juce::String(midid::keyNames[static_cast<std::size_t>(note % 12)]) + juce::String(note / 12 - 1);
+        return cydaw::base::Text::fromUTF8("\xe2\x80\x94");
+    return cydaw::base::Text(midid::keyNames[static_cast<std::size_t>(note % 12)]) + cydaw::base::Text(note / 12 - 1);
 }
 
-juce::String namedOf(const midid::Named& named)
+cydaw::base::Text namedOf(const midid::Named& named)
 {
-    return juce::String::fromUTF8(ui::french() ? named.french : named.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? named.french : named.english);
 }
 
-juce::String divisionName(const double value, const bool freeAtZero)
+cydaw::base::Text divisionName(const double value, const bool freeAtZero)
 {
     if (const auto* division = engine::noteDivisionFor(static_cast<float>(value)))
-        return juce::String(std::string(division->name));
-    return freeAtZero ? ui::Ls("Libre", "Free") : juce::String("1/16");
+        return cydaw::base::Text(std::string(division->name));
+    return freeAtZero ? ui::Ls("Libre", "Free") : cydaw::base::Text("1/16");
 }
 
-juce::String semitones(const double value)
+cydaw::base::Text semitones(const double value)
 {
     const auto whole = static_cast<int>(std::lround(value));
-    return (whole > 0 ? "+" : "") + juce::String(whole) + " st";
+    return (whole > 0 ? "+" : "") + cydaw::base::Text(whole) + " st";
 }
 
 // The settings the engine reads, from the card's values.
@@ -47,23 +48,23 @@ engine::MidiEffectSettings midiSettings(std::vector<Param>& parameters, const Pa
     return settings;
 }
 
-juce::String arpModeName(const int index)
+cydaw::base::Text arpModeName(const int index)
 {
     return namedOf(midid::arpModes[static_cast<std::size_t>(std::clamp(index, 0, 8))]);
 }
-juce::String chordName(const int index)
+cydaw::base::Text chordName(const int index)
 {
     return namedOf(midid::chordShapes[static_cast<std::size_t>(std::clamp(index, 0, 11))].name);
 }
-juce::String scaleName(const int index)
+cydaw::base::Text scaleName(const int index)
 {
     return namedOf(midid::scaleShapes[static_cast<std::size_t>(std::clamp(index, 0, 11))].name);
 }
-juce::String keyName(const int index)
+cydaw::base::Text keyName(const int index)
 {
-    return juce::String(midid::keyNames[static_cast<std::size_t>(std::clamp(index, 0, 11))]);
+    return cydaw::base::Text(midid::keyNames[static_cast<std::size_t>(std::clamp(index, 0, 11))]);
 }
-juce::String noHint(int)
+cydaw::base::Text noHint(int)
 {
     return {};
 }
@@ -141,7 +142,7 @@ void infoLabel(ImDrawList* list, const Box& box, const char* value, const bool l
 }
 
 // Where a chooser at the top right begins, for that name.
-float chooserLeft(const Box& box, const juce::String& name, const bool large)
+float chooserLeft(const Box& box, const cydaw::base::Text& name, const bool large)
 {
     return box.max.x - textSize((name + "  ").toRawUTF8(), large ? 0.8f : 0.62f).x - dp(16.0f);
 }
@@ -220,12 +221,12 @@ bool accordsDisplay(std::vector<Param>& parameters, const Pane& pane, const Box&
                  return 0.0f;
              },
              root, colour);
-    juce::String names;
+    cydaw::base::Text names;
     for (int index = 0; index < count; ++index)
         names << (index > 0 ? " " : "") << midiNoteName(notes[static_cast<std::size_t>(index)]);
     const auto strum = v[midid::accordsStrum];
     if (strum > 0.5f)
-        names << (ui::french() ? "   égrené " : "   strummed ") << juce::String(juce::roundToInt(strum)) << " ms";
+        names << (ui::french() ? "   égrené " : "   strummed ") << cydaw::base::Text(cydaw::base::roundToInt(strum)) << " ms";
     const auto type = whole(v[midid::accordsChord], 12);
     const auto left = chooserLeft(box, chordName(type), large);
     if (large)
@@ -263,7 +264,7 @@ bool gammeDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& b
             const auto target = engine::midiScaleNote(note, key, scale, mode, 0, 0);
             const auto x = keysBox.min.x + (static_cast<float>(white) - (black ? 0.0f : 0.5f)) * keysBox.width() / columns;
             const auto y = keysBox.max.y + dp(10.0f);
-            const auto label = target < 0 ? juce::String::fromUTF8("\xc3\x97") : (target > note ? juce::String::fromUTF8("\xe2\x86\x92") : juce::String::fromUTF8("\xe2\x86\x90"));
+            const auto label = target < 0 ? cydaw::base::Text::fromUTF8("\xc3\x97") : (target > note ? cydaw::base::Text::fromUTF8("\xe2\x86\x92") : cydaw::base::Text::fromUTF8("\xe2\x86\x90"));
             centred(list, ImVec2(x, y), target < 0 ? p.textFaint : colour, label.toRawUTF8(), 0.6f);
         }
     }
@@ -272,8 +273,8 @@ bool gammeDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& b
     const auto transpose = whole(values[midid::gammeTranspose] + 24.0f, 49) - 24;
     const auto degrees = whole(values[midid::gammeDegrees] + 7.0f, 15) - 7;
     if (transpose != 0 || degrees != 0) {
-        const auto moved = (transpose != 0 ? semitones(transpose) : juce::String()) + (transpose != 0 && degrees != 0 ? "  " : "")
-                           + (degrees != 0 ? (degrees > 0 ? "+" : "") + juce::String(degrees) + ui::Ls(" degrés", " degrees") : juce::String());
+        const auto moved = (transpose != 0 ? semitones(transpose) : cydaw::base::Text()) + (transpose != 0 && degrees != 0 ? "  " : "")
+                           + (degrees != 0 ? (degrees > 0 ? "+" : "") + cydaw::base::Text(degrees) + ui::Ls(" degrés", " degrees") : cydaw::base::Text());
         text(list, ImVec2(lane.min.x, lane.max.y - ImGui::GetFontSize() * 0.75f), colour, moved.toRawUTF8(), large ? 0.7f : 0.56f);
     }
     return chooser("##scale", at(parameters, pane, midid::gammeScale), 12, scaleName, noHint, ImVec2(left, box.min.y + dp(2.0f)), colour,
@@ -308,8 +309,8 @@ bool echoNotesDisplay(std::vector<Param>& parameters, const Pane& pane, const Bo
                 velocity, repeat == 0 ? p.text : colour);
         velocity *= 1.0f - decay;
     }
-    const auto label = (division != nullptr ? juce::String(std::string(division->name)) : juce::String(juce::roundToInt(values[midid::echoNotesTime])) + " ms")
-                       + juce::String::fromUTF8("  \xc3\x97") + juce::String(repeats);
+    const auto label = (division != nullptr ? cydaw::base::Text(std::string(division->name)) : cydaw::base::Text(cydaw::base::roundToInt(values[midid::echoNotesTime])) + " ms")
+                       + cydaw::base::Text::fromUTF8("  \xc3\x97") + cydaw::base::Text(repeats);
     infoLabel(list, box, label.toRawUTF8(), large);
     return false;
 }
@@ -347,7 +348,7 @@ bool aleaDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& bo
         }
     }
     char label[96];
-    std::snprintf(label, sizeof(label), "%s %d %%", ui::french() ? "joue" : "plays", juce::roundToInt(chance * 100.0f));
+    std::snprintf(label, sizeof(label), "%s %d %%", ui::french() ? "joue" : "plays", cydaw::base::roundToInt(chance * 100.0f));
     infoLabel(list, box, label, large);
     return false;
 }
@@ -519,8 +520,8 @@ bool roulementDisplay(std::vector<Param>& parameters, const Pane& pane, const Bo
         const auto top = lane.max.y - dp(6.0f) - (lane.height() - dp(10.0f)) * velocity;
         list->AddRectFilled(ImVec2(x0, top), ImVec2(x1, lane.max.y - dp(6.0f)), theme::alpha(colour, 0.85f), dp(1.5f));
     }
-    const auto label = division != nullptr ? juce::String(std::string(division->name))
-                                            : juce::String(values[midid::roulementRate], 1) + " Hz";
+    const auto label = division != nullptr ? cydaw::base::Text(std::string(division->name))
+                                            : cydaw::base::Text(values[midid::roulementRate], 1) + " Hz";
     infoLabel(list, box, label.toRawUTF8(), large);
     return false;
 }
@@ -598,7 +599,7 @@ bool midifxLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& para
 
 std::vector<int> midifxCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     switch (kind) {
     case PaneKind::arpege: return { midid::arpegeRate, midid::arpegeOctaves, midid::arpegeGate, midid::arpegeSwing };
     case PaneKind::accords: return { midid::accordsInversion, midid::accordsStrum, midid::accordsVelocity };
@@ -612,9 +613,9 @@ std::vector<int> midifxCardFields(const PaneKind kind, std::vector<Param>& param
     }
 }
 
-juce::String midifxFormat(const juce::String& binding, const double value)
+cydaw::base::Text midifxFormat(const cydaw::base::Text& binding, const double value)
 {
-    const auto suffixOf = [&binding](const char* prefix) { return binding.fromLastOccurrenceOf(juce::String(prefix) + ".", false, false); };
+    const auto suffixOf = [&binding](const char* prefix) { return binding.fromLastOccurrenceOf(cydaw::base::Text(prefix) + ".", false, false); };
     const auto index = static_cast<int>(std::lround(value));
     const auto onOffText = [](const double v) { return v >= 0.5 ? ui::Ls("Actif", "On") : ui::Ls("Coupé", "Off"); };
     if (binding.contains("arpege.")) {
@@ -624,7 +625,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix == "mode")
             return arpModeName(index);
         if (suffix == "octaves")
-            return juce::String(std::clamp(index, 1, 4)) + " oct";
+            return cydaw::base::Text(std::clamp(index, 1, 4)) + " oct";
         if (suffix == "velocityMode")
             return namedOf(midid::arpVelocities[static_cast<std::size_t>(std::clamp(index, 0, 2))]);
         if (suffix == "latch" || suffix == "retrigger")
@@ -632,7 +633,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix == "gate" || suffix == "swing")
             return percent(value);
         if (suffix == "velocity")
-            return juce::String(index);
+            return cydaw::base::Text(index);
         return {};
     }
     if (binding.contains("accords.")) {
@@ -640,9 +641,9 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix == "chord")
             return chordName(index);
         if (suffix.startsWith("interval"))
-            return index == 0 ? juce::String::fromUTF8("\xe2\x80\x94") : semitones(value);
+            return index == 0 ? cydaw::base::Text::fromUTF8("\xe2\x80\x94") : semitones(value);
         if (suffix == "inversion")
-            return (index > 0 ? "+" : "") + juce::String(index);
+            return (index > 0 ? "+" : "") + cydaw::base::Text(index);
         if (suffix == "spread")
             return value >= 0.5 ? ui::Ls("Ouvert", "Open") : ui::Ls("Serré", "Close");
         if (suffix == "strumMode")
@@ -666,7 +667,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix == "transpose")
             return semitones(value);
         if (suffix == "degrees")
-            return (index > 0 ? "+" : "") + juce::String(index) + ui::Ls(" degrés", " degrees");
+            return (index > 0 ? "+" : "") + cydaw::base::Text(index) + ui::Ls(" degrés", " degrees");
         return {};
     }
     if (binding.contains("echonotes.")) {
@@ -674,7 +675,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix == "sync")
             return divisionName(value, true);
         if (suffix == "repeats")
-            return juce::String::fromUTF8("\xc3\x97") + juce::String(index);
+            return cydaw::base::Text::fromUTF8("\xc3\x97") + cydaw::base::Text(index);
         if (suffix == "decay")
             return percent(value);
         if (suffix == "pitch")
@@ -686,7 +687,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix == "velocity" || suffix == "chance" || suffix == "pitchChance")
             return percent(value);
         if (suffix == "pitchRange")
-            return juce::String::fromUTF8("\xc2\xb1") + juce::String(index) + " st";
+            return cydaw::base::Text::fromUTF8("\xc2\xb1") + cydaw::base::Text(index) + " st";
         return {};
     }
     if (binding.contains("duree.")) {
@@ -696,7 +697,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix == "sync")
             return divisionName(value, false);
         if (suffix == "factor")
-            return juce::String::fromUTF8("\xc3\x97") + juce::String(value, 2);
+            return cydaw::base::Text::fromUTF8("\xc3\x97") + cydaw::base::Text(value, 2);
         return {};
     }
     if (binding.contains("sequenceur.")) {
@@ -710,7 +711,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix == "root")
             return midiNoteName(index);
         if (suffix == "steps")
-            return juce::String(index);
+            return cydaw::base::Text(index);
         if (suffix == "swing" || suffix == "gate")
             return percent(value);
         if (suffix.endsWith("On"))
@@ -718,7 +719,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
         if (suffix.endsWith("Note"))
             return semitones(value);
         if (suffix.endsWith("Velocity"))
-            return juce::String(index);
+            return cydaw::base::Text(index);
         if (suffix.endsWith("Length"))
             return percent(value);
         return {};
@@ -736,7 +737,7 @@ juce::String midifxFormat(const juce::String& binding, const double value)
     return {};
 }
 
-bool midifxStepped(const juce::String& binding)
+bool midifxStepped(const cydaw::base::Text& binding)
 {
     static const char* stepped[] { "arpege.rate", "arpege.mode", "arpege.octaves", "arpege.velocityMode", "arpege.latch", "arpege.retrigger",
                                    "accords.chord", "accords.strumMode", "accords.key", "accords.scale", "gamme.key", "gamme.scale",

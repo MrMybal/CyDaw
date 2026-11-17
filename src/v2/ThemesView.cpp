@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "ThemesView.h"
 
 #include "Locations.h"
@@ -12,7 +13,7 @@ using ui::L;
 
 ThemesView::ThemesView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 
-juce::File ThemesView::folder()
+cydaw::base::File ThemesView::folder()
 {
     return locations::folder(Location::presets).getChildFile("Themes");
 }
@@ -29,15 +30,15 @@ void ThemesView::reload()
                      : entry.key == "dark"       ? ui::Ls("Sombre (d'origine)", "Dark (the first)")
                                                  : entry.name;
     std::vector<theme::Theme> own;
-    for (const auto& file : folder().findChildFiles(juce::File::findFiles, false, "*.cytheme")) {
-        const auto json = juce::JSON::parse(file);
-        if (json.getProperty("format", juce::var()).toString() != "CyDAW Theme")
+    for (const auto& file : folder().findChildFiles(cydaw::base::File::findFiles, false, "*.cytheme")) {
+        const auto json = cydaw::base::JSON::parse(file);
+        if (json.getProperty("format", cydaw::base::Value()).toString() != "CyDAW Theme")
             continue;
         theme::Theme entry;
         entry.key = "file:" + file.getFileNameWithoutExtension();
         entry.name = json.getProperty("name", file.getFileNameWithoutExtension()).toString();
         // What a file lacks: the default theme's.
-        entry.palette = theme::paletteFromJson(json.getProperty("colours", juce::var()), theme::builtInThemes().front().palette);
+        entry.palette = theme::paletteFromJson(json.getProperty("colours", cydaw::base::Value()), theme::builtInThemes().front().palette);
         entry.file = file;
         own.push_back(std::move(entry));
     }
@@ -52,7 +53,7 @@ const std::vector<theme::Theme>& ThemesView::themes()
     return themes_;
 }
 
-const theme::Theme* ThemesView::find(const juce::String& key)
+const theme::Theme* ThemesView::find(const cydaw::base::Text& key)
 {
     for (const auto& entry : themes())
         if (entry.key == key)
@@ -67,7 +68,7 @@ void ThemesView::applySaved()
         (void) choose(theme::defaultThemeKey);
 }
 
-bool ThemesView::choose(const juce::String& key)
+bool ThemesView::choose(const cydaw::base::Text& key)
 {
     const auto* found = find(key);
     if (found == nullptr)
@@ -79,37 +80,37 @@ bool ThemesView::choose(const juce::String& key)
     return true;
 }
 
-juce::String ThemesView::createFrom(const juce::String& from, const juce::String& name)
+cydaw::base::Text ThemesView::createFrom(const cydaw::base::Text& from, const cydaw::base::Text& name)
 {
     const auto* base = find(from);
     if (base == nullptr)
         return {};
     const auto dir = folder();
     (void) dir.createDirectory();
-    auto stem = juce::File::createLegalFileName(name.trim().isNotEmpty() ? name.trim() : juce::String("Theme"));
+    auto stem = cydaw::base::File::createLegalFileName(name.trim().isNotEmpty() ? name.trim() : cydaw::base::Text("Theme"));
     auto file = dir.getNonexistentChildFile(stem, ".cytheme", false);
     const auto palette = base->palette;
     const auto key = "file:" + file.getFileNameWithoutExtension();
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "CyDAW Theme");
     root->setProperty("name", name.trim().isNotEmpty() ? name.trim() : file.getFileNameWithoutExtension());
     root->setProperty("colours", theme::paletteToJson(palette));
-    if (!file.replaceWithText(juce::JSON::toString(juce::var(root))))
+    if (!file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(root))))
         return {};
     reload();
     return key;
 }
 
-bool ThemesView::save(const juce::String& key, const juce::String& name, const theme::Palette& palette)
+bool ThemesView::save(const cydaw::base::Text& key, const cydaw::base::Text& name, const theme::Palette& palette)
 {
     const auto* found = find(key);
     if (found == nullptr || found->builtIn)
         return false;
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "CyDAW Theme");
     root->setProperty("name", name);
     root->setProperty("colours", theme::paletteToJson(palette));
-    if (!found->file.replaceWithText(juce::JSON::toString(juce::var(root))))
+    if (!found->file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(root))))
         return false;
     for (auto& entry : themes_)
         if (entry.key == key) {
@@ -119,7 +120,7 @@ bool ThemesView::save(const juce::String& key, const juce::String& name, const t
     return true;
 }
 
-bool ThemesView::remove(const juce::String& key)
+bool ThemesView::remove(const cydaw::base::Text& key)
 {
     const auto* found = find(key);
     if (found == nullptr || found->builtIn)
@@ -193,7 +194,7 @@ void ThemesView::draw()
         const auto builtIn = shown->builtIn;
         auto palette = shown->palette;
         if (name_[0] == 0 || !builtIn)
-            if (juce::String::fromUTF8(name_) != shown->name && !ImGui::IsAnyItemActive())
+            if (cydaw::base::Text::fromUTF8(name_) != shown->name && !ImGui::IsAnyItemActive())
                 std::snprintf(name_, sizeof(name_), "%s", shown->name.toRawUTF8());
         if (builtIn) {
             ImGui::PushFont(theme::boldFont(), 0.0f);
@@ -208,8 +209,8 @@ void ThemesView::draw()
             ImGui::SameLine();
             ImGui::SetNextItemWidth(dp(260.0f));
             ImGui::InputText("##themeName", name_, sizeof(name_));
-            if (ImGui::IsItemDeactivatedAfterEdit() && juce::String::fromUTF8(name_).trim().isNotEmpty())
-                (void) save(key, juce::String::fromUTF8(name_).trim(), palette);
+            if (ImGui::IsItemDeactivatedAfterEdit() && cydaw::base::Text::fromUTF8(name_).trim().isNotEmpty())
+                (void) save(key, cydaw::base::Text::fromUTF8(name_).trim(), palette);
         }
         if (ui::primaryButton(L("Créer à partir de celui-ci", "Make one from this"))) {
             const auto made = createFrom(key, shown->name + ui::Ls(" (à moi)", " (mine)"));
@@ -281,7 +282,7 @@ void ThemesView::draw()
                 theme::setPalette(palette);
         }
         if (finished && !builtIn)
-            (void) save(key, juce::String::fromUTF8(name_).trim().isNotEmpty() ? juce::String::fromUTF8(name_).trim() : shown->name, palette);
+            (void) save(key, cydaw::base::Text::fromUTF8(name_).trim().isNotEmpty() ? cydaw::base::Text::fromUTF8(name_).trim() : shown->name, palette);
     }
     ImGui::EndChild();
     ImGui::End();

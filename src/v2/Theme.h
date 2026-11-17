@@ -1,8 +1,8 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <cyui/Theme.h>
 
-#include <juce_core/juce_core.h>
 
 #include <vector>
 
@@ -36,11 +36,11 @@ void setPalette(const Palette& palette);
 
 // A colour theme: a built-in one, or a file of the person's (.cytheme).
 struct Theme {
-    juce::String key;
-    juce::String name;
+    cydaw::base::Text key;
+    cydaw::base::Text name;
     Palette palette {};
     bool builtIn {};
-    juce::File file;
+    cydaw::base::File file;
 };
 // Shared built-in themes with legacy CyDAW keys. Mid grey remains the default;
 // ThemesView translates their display names in the application's language.
@@ -58,8 +58,8 @@ struct PaletteField {
 [[nodiscard]] const std::vector<PaletteField>& paletteFields();
 // A theme file's colours ("#RRGGBB" or "#RRGGBBAA"), and back; what a file
 // lacks keeps `base`'s.
-[[nodiscard]] juce::var paletteToJson(const Palette& palette);
-[[nodiscard]] Palette paletteFromJson(const juce::var& colours, const Palette& base);
+[[nodiscard]] cydaw::base::Value paletteToJson(const Palette& palette);
+[[nodiscard]] Palette paletteFromJson(const cydaw::base::Value& colours, const Palette& base);
 
 // Applies colours and sizes, scaled for the display.
 void apply(float dpiScale);

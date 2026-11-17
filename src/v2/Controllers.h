@@ -1,10 +1,10 @@
+#include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
 
 #include <memory>
 
-// The controllers tool (Options › Contrôleurs MIDI / OSC…). RAW devices: the
+// The controllers tool (Options › Contrôleurs et entrées…). RAW devices: the
 // MIDI ports, OSC sockets (local or on the network) and the devices that
 // application plug-ins (.cyctl) bring. Virtual controllers made from them,
 // a chain of modifiers between each raw address and its virtual control,
@@ -14,20 +14,24 @@
 // controllers, the assignments for every project) and in the project (its
 // tracks' and cards' assignments).
 //
-// Everything runs on the message thread; the devices' own threads only
-// queue what they hear.
+// Configuration, DAW commands and feedback run on the application thread.
+// Input/service threads convert mapped MIDI before queueing UI monitoring and
+// DAW commands. The audio callback never executes controller configuration.
 
 namespace cydaw::v2 {
 
 class Studio;
 struct UiState;
 class ImGuiHost;
+class ComputerKeyboard;
 
 class Controllers final {
 public:
-    Controllers(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings);
+    Controllers(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings, ComputerKeyboard* keyboard = nullptr);
     ~Controllers();
 
+    // Physical MIDI inputs share the same model as the controller editor.
+    bool setMidiInputEnabled(const cydaw::base::Text& identifier, bool enabled);
     // The window.
     void draw(bool& visible);
     // The toolbar's button: the window, and learning on a right click.
@@ -41,7 +45,7 @@ public:
     void setLearning(bool on);
     [[nodiscard]] bool learning() const;
     // The control port's "controllers" command.
-    juce::var command(const juce::var& request);
+    cydaw::base::Value command(const cydaw::base::Value& request);
 
     class Impl;
 

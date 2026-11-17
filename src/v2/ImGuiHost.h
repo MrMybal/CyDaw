@@ -1,24 +1,26 @@
+#include <cydaw/base/Image.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_gui_extra/juce_gui_extra.h>
+#include <cydaw/base/Geometry.h>
 
 #include <functional>
 #include <memory>
 
-// A JUCE component showing a Dear ImGui interface. On Windows it embeds a
-// native child window rendered with Direct3D 11; everything — input, the
-// interface code, the rendering — runs on the message thread, paced by the
-// display's vertical blank, so the interface can call the engine directly.
+// A native child window showing Dear ImGui with Direct3D 11. Everything — input, the
+// interface code, the rendering — runs on the message thread, so the
+// interface can call the engine directly.
 //
-// Frames run at the display rate while something moves (input, playback,
-// animation) and drop to a low idle rate otherwise.
+// Frames use the selected 30/60/120 FPS ceiling (60 by default) while
+// something moves, and drop to 12 FPS at rest, independently of the monitor.
 
 namespace cydaw::v2 {
 
-class ImGuiHost final : public juce::Component {
+class ImGuiHost final {
 public:
     ImGuiHost();
-    ~ImGuiHost() override;
+    ~ImGuiHost();
 
     // Builds the interface; called between ImGui::NewFrame() and Render().
     std::function<void()> onFrame;
@@ -27,7 +29,7 @@ public:
     std::function<void()> beforeNewFrame;
     // Files dropped from the system file manager, at a point in interface
     // coordinates (physical pixels of the host).
-    std::function<void(const juce::StringArray&, float x, float y)> onFilesDropped;
+    std::function<void(const cydaw::base::TextList&, float x, float y)> onFilesDropped;
     // Called once the ImGui context and fonts exist, before the first frame.
     std::function<void()> onInitialised;
     // Panels may leave the window as windows of their own (the studio);
@@ -37,29 +39,44 @@ public:
     // its own, which would make its window the active one.
     bool background {};
 
-    // Keeps the display rate for a while (input, a change on screen).
+    // Optional desktop window chrome. Embedded/exported plugin editors leave
+    // these callbacks empty and keep the host application's window frame.
+    enum class WindowAction { minimize, maximizeRestore, close };
+    std::function<void(WindowAction)> onWindowAction;
+    std::function<bool()> windowMaximized;
+    // Native screen coordinates -> Windows non-client hit-test code. The
+    // child surface passes non-client points through to its desktop parent.
+    std::function<int(int, int)> onWindowHitTest;
+    cydaw::base::Rectangle<int> windowDragRegion;
+
+
+    // Keeps the selected frame rate for a while (input, a change on screen).
     void wake(int frames = 12);
-    // Full rate for as long as it is set (playback, meters moving).
+    // Selected rate for as long as it is set (playback, meters moving).
     void setAnimating(bool animating);
+    // A maximum, not a requirement to redraw an idle interface at full rate.
+    void setFrameRateLimit(int framesPerSecond) noexcept;
+    [[nodiscard]] int frameRateLimit() const noexcept { return static_cast<int>(frameRateHz_); }
 
     [[nodiscard]] bool isReady() const noexcept;
     [[nodiscard]] float dpiScale() const noexcept;
-    [[nodiscard]] juce::String rendererDescription() const;
+    [[nodiscard]] cydaw::base::Text rendererDescription() const;
     // The next rendered frame, written as PNG (probes and snapshots).
-    void captureNextFrame(const juce::File& target, std::function<void(bool)> done = {});
-    // Renders one frame now, outside the vertical blank pacing.
+    void captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done = {});
+    // Renders one frame now, outside normal pacing (captures/scripted input).
     void renderNow();
     // An image the interface can draw (ImGui::Image), made once per key and
     // kept; 0 until the graphics device exists.
-    [[nodiscard]] unsigned long long texture(const juce::String& key, const juce::Image& image);
+    [[nodiscard]] unsigned long long texture(const cydaw::base::Text& key, const cydaw::base::Image& image);
 
-    [[nodiscard]] unsigned long long updateTexture(const juce::String& key,const juce::Image& image);
-    void releaseTexture(const juce::String& key);
+    [[nodiscard]] unsigned long long updateTexture(const cydaw::base::Text& key,const cydaw::base::Image& image);
+    void releaseTexture(const cydaw::base::Text& key);
 
-    void resized() override;
-    void parentHierarchyChanged() override;
-    void visibilityChanged() override;
-    void focusGained(FocusChangeType) override;
+    // The caller owns the parent window. This object owns its native child.
+    void create(void* parent, int width, int height);
+    void setBounds(cydaw::base::Rectangle<int> bounds);
+    [[nodiscard]] void* nativeHandle() const noexcept;
+    void poll();
 
     struct Native;
 
@@ -69,30 +86,16 @@ private:
     void frame();
 
     std::unique_ptr<Native> native_;
-    juce::HWNDComponent embed_;
-    double lastVBlankMs_ {};
-    juce::VBlankAttachment vblank_;
-    // Frames when no vertical blank comes (a window on no screen, a host
-    // that has none to give): a timer paces them instead.
-    struct Fallback final : juce::Timer {
-        explicit Fallback(ImGuiHost& owner) : host(owner) {}
-        void timerCallback() override;
-        ImGuiHost& host;
-    };
-    Fallback fallback_ { *this };
+    void* parent_{};
+    cydaw::base::Rectangle<int> bounds_{0, 0, 1600, 960};
+    double frameRateHz_{60};
     int wakeFrames_ { 30 };
     bool animating_ {};
-    double lastFrameSeconds_ {};
-    juce::File captureTarget_;
+    double nextFrameSeconds_ {};
+    cydaw::base::File captureTarget_;
     std::function<void(bool)> captureDone_;
 
     friend struct NativeAccess;
 };
-
-// An automated session's window (--hidden): kept off every screen, without a
-// taskbar button, never made the active window, so it never comes in front of
-// what the person is doing. It renders as any other (snapshots, input sent
-// through the control port). Called once the window is on the desktop.
-void keepInBackground(juce::Component& window);
 
 } // namespace cydaw::v2

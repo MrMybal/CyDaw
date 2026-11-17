@@ -1,3 +1,8 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "SemanticSearchView.h"
 
 #include "Icons.h"
@@ -17,7 +22,7 @@ using ui::L;
 namespace {
 
 // A link: the text in the accent colour, opened in the browser on a click.
-void link(const juce::String& text, const juce::String& url)
+void link(const cydaw::base::Text& text, const cydaw::base::Text& url)
 {
     const auto& p = theme::palette();
     ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(p.accent));
@@ -28,7 +33,7 @@ void link(const juce::String& text, const juce::String& url)
         ui::tooltip(url.toRawUTF8());
     }
     if (ImGui::IsItemClicked() && url.isNotEmpty())
-        (void) juce::URL(url).launchInDefaultBrowser();
+        (void) cydaw::base::Url(url).launchInDefaultBrowser();
 }
 
 void heading(const char* text)
@@ -44,7 +49,7 @@ void heading(const char* text)
 
 SemanticSearchView::SemanticSearchView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 
-void SemanticSearchView::report(const juce::String& text, const bool error)
+void SemanticSearchView::report(const cydaw::base::Text& text, const bool error)
 {
     if (text.isEmpty())
         return;
@@ -125,7 +130,7 @@ void SemanticSearchView::drawEngine()
                   "has PyTorch and transformers."));
     ImGui::SameLine();
     if (ImGui::Button(L("Utiliser", "Use"))) {
-        companion.setPythonCommand(juce::String::fromUTF8(python_));
+        companion.setPythonCommand(cydaw::base::Text::fromUTF8(python_));
         semantic.checkEngine();
     }
     ImGui::SameLine();
@@ -193,7 +198,7 @@ void SemanticSearchView::drawModels()
         const auto fraction = progress.total > 0 ? static_cast<float>(static_cast<double>(progress.done) / static_cast<double>(progress.total)) : 0.0f;
         auto overlay = ui::sizeText(progress.done) + " / " + ui::sizeText(progress.total);
         if (progress.bytesPerSecond > 0.0)
-            overlay << "  \xc2\xb7  " << ui::sizeText(static_cast<juce::int64>(progress.bytesPerSecond)) << "/s";
+            overlay << "  \xc2\xb7  " << ui::sizeText(static_cast<std::int64_t>(progress.bytesPerSecond)) << "/s";
         const auto step = progress.step == "verify" ? ui::Ls("Vérification ", "Checking ")
                           : progress.step == "copy" ? ui::Ls("Copie ", "Copying ")
                                                     : ui::Ls("Téléchargement ", "Downloading ");
@@ -269,7 +274,7 @@ void SemanticSearchView::drawModel(const AiModel& model)
             semantic.setActiveModel(model.id);
         ImGui::SameLine();
         if (ImGui::SmallButton(L("Retirer", "Remove"))) {
-            juce::String error;
+            cydaw::base::Text error;
             if (models.remove(model.id, error)) {
                 semantic.modelsChanged();
                 report(ui::Ls("Modèle retiré (corbeille) : ", "Model removed (recycle bin): ") + model.title, false);
@@ -283,7 +288,7 @@ void SemanticSearchView::drawModel(const AiModel& model)
         if (model.requiresAcceptance) {
             if (ImGui::Checkbox(L("J'ai lu cette licence et je l'accepte personnellement", "I have read this licence and accept it personally"),
                                 &ticked))
-                accepted_ = ticked ? model.id : juce::String();
+                accepted_ = ticked ? model.id : cydaw::base::Text();
         }
         const auto busy = models.progress().running;
         ImGui::BeginDisabled(busy || (model.requiresAcceptance && !ticked));
@@ -296,14 +301,14 @@ void SemanticSearchView::drawModel(const AiModel& model)
         if (ImGui::Button(L("Depuis un dossier…", "From a folder…"))) {
             const auto id = model.id;
             const auto accepted = !model.requiresAcceptance || ticked;
-            chooser_ = std::make_unique<juce::FileChooser>(L("Dossier qui contient déjà ce modèle", "Folder that already holds this model"),
-                                                           juce::File {});
-            chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                                  [this, id, accepted](const juce::FileChooser& chooser) {
+            chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Dossier qui contient déjà ce modèle", "Folder that already holds this model"),
+                                                           cydaw::base::File {});
+            chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                                  [this, id, accepted](const cydaw::base::FileDialog& chooser) {
                                       const auto folder = chooser.getResult();
                                       if (!folder.isDirectory())
                                           return;
-                                      juce::String error;
+                                      cydaw::base::Text error;
                                       if (!studio_.aiModels().importFrom(id, folder, accepted, error))
                                           report(error, true);
                                   });
@@ -331,7 +336,7 @@ void SemanticSearchView::drawIndex()
     }
     if (!studio_.samples().loaded())
         studio_.ensureSamples();
-    auto text = juce::String(status.indexed) + " / " + juce::String(status.total) + ui::Ls(" sons indexés", " sounds indexed");
+    auto text = cydaw::base::Text(status.indexed) + " / " + cydaw::base::Text(status.total) + ui::Ls(" sons indexés", " sounds indexed");
     if (status.device.isNotEmpty())
         text << "  \xc2\xb7  " << (status.device == "cuda" ? ui::Ls("carte graphique", "graphics card") : ui::Ls("processeur", "processor"));
     ImGui::TextUnformatted(text.toRawUTF8());
@@ -339,7 +344,7 @@ void SemanticSearchView::drawIndex()
         const auto total = std::max(1, status.done + status.pending);
         ImGui::ProgressBar(static_cast<float>(status.done) / static_cast<float>(total), ImVec2(-dp(110.0f), 0.0f),
                            (status.loadingModel ? ui::Ls("chargement du modèle…", "loading the model…")
-                                                : juce::String(status.done) + " / " + juce::String(total))
+                                                : cydaw::base::Text(status.done) + " / " + cydaw::base::Text(total))
                                .toRawUTF8());
         ImGui::SameLine();
         if (ImGui::Button(L("Arrêter", "Stop"), ImVec2(-1.0f, 0.0f)))
@@ -360,10 +365,10 @@ void SemanticSearchView::drawIndex()
     }
     if (status.failed > 0)
         ImGui::TextColored(theme::vec(p.textFaint), "%s",
-                           (juce::String(status.failed) + ui::Ls(" fichier(s) illisible(s)", " unreadable file(s)")).toRawUTF8());
+                           (cydaw::base::Text(status.failed) + ui::Ls(" fichier(s) illisible(s)", " unreadable file(s)")).toRawUTF8());
     if (status.classified > 0)
         ImGui::TextColored(theme::vec(p.textDim), "%s",
-                           (juce::String(status.classified) + ui::Ls(" catégorie(s) donnée(s) par l'IA", " category(ies) given by the AI"))
+                           (cydaw::base::Text(status.classified) + ui::Ls(" catégorie(s) donnée(s) par l'IA", " category(ies) given by the AI"))
                                .toRawUTF8());
     auto automatic = semantic.autoIndex();
     if (ImGui::Checkbox(L("Indexer les nouveaux sons automatiquement", "Index new sounds automatically"), &automatic))
@@ -434,7 +439,7 @@ void SemanticSearchView::drawConfirm()
         ImGui::PopFont();
         ImGui::TextUnformatted((ui::Ls("Depuis : ", "From: ") + model->host + " (" + model->homepage + ")").toRawUTF8());
         ImGui::TextUnformatted((ui::Ls("Taille : ", "Size: ") + ui::sizeText(model->bytes()) + ui::Ls(", ", ", ")
-                                + juce::String(static_cast<int>(model->files.size())) + ui::Ls(" fichiers vérifiés (taille et SHA-256)",
+                                + cydaw::base::Text(static_cast<int>(model->files.size())) + ui::Ls(" fichiers vérifiés (taille et SHA-256)",
                                                                                                  " files checked (size and SHA-256)"))
                                    .toRawUTF8());
         ImGui::TextUnformatted((ui::Ls("Dans : ", "Into: ") + studio_.aiModels().folderOf(*model).getFullPathName()).toRawUTF8());
@@ -454,14 +459,14 @@ void SemanticSearchView::drawConfirm()
             // The environment's own Python from now on.
             studio_.companion().setPythonCommand({});
             // Through the companion's components: their licences checked, a receipt kept.
-            const auto id = engineInstall_ == "cuda" ? juce::String("torch-cuda") : juce::String("torch-cpu");
-            juce::String error;
+            const auto id = engineInstall_ == "cuda" ? cydaw::base::Text("torch-cuda") : cydaw::base::Text("torch-cpu");
+            cydaw::base::Text error;
             if (!studio_.companion().install(id, engineInstall_ != "cuda" || engineLicencesAccepted_, error, { "--clap" }))
                 report(error, true);
             else
                 report(ui::Ls("Installation du moteur…", "Installing the engine…"), false);
         } else if (const auto* model = studio_.aiModels().find(confirming_)) {
-            juce::String error;
+            cydaw::base::Text error;
             if (studio_.aiModels().install(model->id, !model->requiresAcceptance || accepted_ == model->id, error))
                 report(ui::Ls("Téléchargement de ", "Downloading ") + model->title, false);
             else

@@ -1,3 +1,13 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "PluginFiles.h"
 // The control port's commands for CyDAW 2, one function per verb, on the
 // message thread. A port of CyDAW 1's WorkspaceComponentRemote.cpp: the same
@@ -15,6 +25,7 @@
 #include "SoundModelFile.h"
 #include "GraphPolySynthRenderer.h"
 #include "NativeDspRuntime.h"
+#include "KeyLatencyProbe.h"
 
 #include "GraphLayout.h"
 #include "Localization.h"
@@ -39,24 +50,24 @@
 
 namespace cydaw::v2 {
 
-using PresetMenuCapture = std::function<juce::var()>;
-using PresetMenuApply = std::function<bool(const juce::var&, juce::String&)>;
+using PresetMenuCapture = std::function<cydaw::base::Value()>;
+using PresetMenuApply = std::function<bool(const cydaw::base::Value&, cydaw::base::Text&)>;
 namespace {
 
 using Engine = app::AudioTrackController;
 
-juce::var object()
+cydaw::base::Value object()
 {
-    return juce::var(new juce::DynamicObject());
+    return cydaw::base::Value(new cydaw::base::Object());
 }
 
-void set(juce::var& target, const char* name, const juce::var& value)
+void set(cydaw::base::Value& target, const char* name, const cydaw::base::Value& value)
 {
     if (auto* dynamic = target.getDynamicObject())
         dynamic->setProperty(name, value);
 }
 
-juce::var ok(const juce::var& result)
+cydaw::base::Value ok(const cydaw::base::Value& result)
 {
     auto reply = object();
     set(reply, "ok", true);
@@ -64,7 +75,7 @@ juce::var ok(const juce::var& result)
     return reply;
 }
 
-juce::var fail(const juce::String& message)
+cydaw::base::Value fail(const cydaw::base::Text& message)
 {
     auto reply = object();
     set(reply, "ok", false);
@@ -74,47 +85,47 @@ juce::var fail(const juce::String& message)
 
 // Identifiers travel as strings: a 64-bit id does not survive JSON's
 // doubles.
-juce::var idOf(const std::uint64_t id)
+cydaw::base::Value idOf(const std::uint64_t id)
 {
-    return juce::String(static_cast<juce::int64>(id));
+    return cydaw::base::Text(static_cast<std::int64_t>(id));
 }
 
-std::uint64_t idFrom(const juce::var& value)
+std::uint64_t idFrom(const cydaw::base::Value& value)
 {
     return static_cast<std::uint64_t>(value.toString().getLargeIntValue());
 }
 
-juce::var strings(const juce::StringArray& values)
+cydaw::base::Value strings(const cydaw::base::TextList& values)
 {
-    juce::Array<juce::var> out;
+    cydaw::base::Array<cydaw::base::Value> out;
     for (const auto& value : values)
         out.add(value);
     return out;
 }
 
-juce::File fileFor(const juce::String& path)
+cydaw::base::File fileFor(const cydaw::base::Text& path)
 {
-    return juce::File::isAbsolutePath(path) ? juce::File(path)
-                                            : juce::File::getCurrentWorkingDirectory().getChildFile(path);
+    return cydaw::base::File::isAbsolutePath(path) ? cydaw::base::File(path)
+                                            : cydaw::base::File::getCurrentWorkingDirectory().getChildFile(path);
 }
 
-juce::File templatesFolder()
+cydaw::base::File templatesFolder()
 {
-    return juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("templates");
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile).getSiblingFile("templates");
 }
 
-double numberOf(const juce::var& value, const char* name, const double fallback)
+double numberOf(const cydaw::base::Value& value, const char* name, const double fallback)
 {
-    const auto field = value.getProperty(name, juce::var());
+    const auto field = value.getProperty(name, cydaw::base::Value());
     return field.isVoid() ? fallback : static_cast<double>(field);
 }
 
-juce::String colourText(const juce::uint32 argb)
+cydaw::base::Text colourText(const std::uint32_t argb)
 {
-    return "#" + juce::Colour(argb).toDisplayString(false);
+    return "#" + cydaw::base::Colour(argb).toDisplayString(false);
 }
 
-std::uint32_t colourFrom(const juce::String& text)
+std::uint32_t colourFrom(const cydaw::base::Text& text)
 {
     auto hex = text.trim().trimCharactersAtStart("#");
     if (hex.length() == 6)
@@ -123,9 +134,9 @@ std::uint32_t colourFrom(const juce::String& text)
 }
 
 // A PNG's size, read from its header (IHDR follows the signature).
-juce::Point<int> pngSize(const juce::File& file)
+cydaw::base::Point<int> pngSize(const cydaw::base::File& file)
 {
-    juce::FileInputStream stream(file);
+    cydaw::base::FileInputStream stream(file);
     std::array<std::uint8_t, 24> header {};
     if (!stream.openedOk() || stream.read(header.data(), static_cast<int>(header.size())) != static_cast<int>(header.size()))
         return {};
@@ -161,31 +172,31 @@ struct GraphTarget {
     // The device the workshop edits ("track": "workshop"), not a track's.
     bool workshop {};
 
-    [[nodiscard]] app::NodeGraphComponent& graph() const noexcept { return slot->graph(); }
+    [[nodiscard]] app::GraphDocument& graph() const noexcept { return slot->graph(); }
 };
 
 class Commands final {
 public:
-    Commands(Studio& studio, RemoteUi& ui, const juce::var& request)
+    Commands(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request)
         : studio_(studio),
           engine_(studio.engine()),
           ui_(ui),
           request_(request),
-          command_(request.getProperty("cmd", juce::var()).toString())
+          command_(request.getProperty("cmd", cydaw::base::Value()).toString().toRawUTF8())
     {
     }
 
-    juce::var run();
+    cydaw::base::Value run();
 
 private:
     // ---- The request -----------------------------------------------------------------
-    [[nodiscard]] juce::String text(const char* name) const
+    [[nodiscard]] cydaw::base::Text text(const char* name) const
     {
-        return request_.getProperty(name, juce::var()).toString();
+        return request_.getProperty(name, cydaw::base::Value()).toString();
     }
     [[nodiscard]] bool has(const char* name) const
     {
-        return !request_.getProperty(name, juce::var()).isVoid();
+        return !request_.getProperty(name, cydaw::base::Value()).isVoid();
     }
     [[nodiscard]] double number(const char* name, const double fallback) const
     {
@@ -197,16 +208,16 @@ private:
     }
 
     // ---- What the session looks like ---------------------------------------------------
-    [[nodiscard]] juce::StringArray deviceNames(const TrackRef& track, const int limit) const
+    [[nodiscard]] cydaw::base::TextList deviceNames(const TrackRef& track, const int limit) const
     {
         if (const auto* slot = studio_.graphFor(track))
             return slot->graph().deviceNames(limit);
         return {};
     }
 
-    [[nodiscard]] juce::var describeTracks() const
+    [[nodiscard]] cydaw::base::Value describeTracks() const
     {
-        juce::Array<juce::var> audioTracks;
+        cydaw::base::Array<cydaw::base::Value> audioTracks;
         for (std::size_t index = 0; index < engine_.trackCount(); ++index) {
             const auto info = engine_.trackInfo(index);
             const TrackRef ref { false, index, 0 };
@@ -228,10 +239,10 @@ private:
             set(entry, "inputBus", idOf(info.inputBusId));
             set(entry, "inputAfterEffects", engine_.trackMixState(index).inputAfterEffects);
             set(entry, "channels", studio_.trackChannels(ref));
-            set(entry, "format", juce::String(std::string(cydaw::engine::layoutKey(studio_.trackChannels(ref)))));
+            set(entry, "format", cydaw::base::Text(std::string(cydaw::engine::layoutKey(studio_.trackChannels(ref)))));
             set(entry, "clips", static_cast<int>(info.clips.size()));
             set(entry, "devices", strings(deviceNames(ref, 16)));
-            juce::Array<juce::var> plugins;
+            cydaw::base::Array<cydaw::base::Value> plugins;
             for (std::size_t plugin = 0; plugin < info.plugins.size(); ++plugin) {
                 auto pluginEntry = object();
                 set(pluginEntry, "index", static_cast<int>(plugin));
@@ -239,6 +250,12 @@ private:
                 set(pluginEntry, "file", info.plugins[plugin].file.getFullPathName());
                 set(pluginEntry, "running", info.plugins[plugin].running);
                 set(pluginEntry, "latencySamples", info.plugins[plugin].latencySamples);
+                set(pluginEntry, "missedBlocks", static_cast<std::int64_t>(info.plugins[plugin].missedBlocks));
+                const auto& sleep = info.plugins[plugin].sleep;
+                set(pluginEntry, "sleepAvailable", sleep.available);
+                set(pluginEntry, "sleeping", sleep.sleeping);
+                set(pluginEntry, "processedBlocks", static_cast<std::int64_t>(sleep.processedBlocks));
+                set(pluginEntry, "skippedBlocks", static_cast<std::int64_t>(sleep.skippedBlocks));
                 plugins.add(pluginEntry);
             }
             set(entry, "plugins", plugins);
@@ -255,7 +272,7 @@ private:
                 set(entry, "companionOf", studio_.trackName(studio_.shownTrackOf(ref)));
             audioTracks.add(entry);
         }
-        juce::Array<juce::var> midiTracks;
+        cydaw::base::Array<cydaw::base::Value> midiTracks;
         const auto tracks = engine_.midiTracks();
         for (std::size_t position = 0; position < tracks.size(); ++position) {
             const auto& info = tracks[position];
@@ -279,14 +296,14 @@ private:
             set(entry, "compensationSamples", engine_.midiTrackCompensationSamples(info.id));
             // The MIDI effects its notes go through, by type, in order.
             {
-                juce::Array<juce::var> effects;
+                cydaw::base::Array<cydaw::base::Value> effects;
                 if (const auto plan = engine_.midiTrackInstrumentGraph(info.id); plan.midiEffects != nullptr)
                     for (std::size_t index = 0; index < plan.midiEffects->count; ++index)
                         if (const auto* effect = engine::effectForKind(plan.midiEffects->effects[index].kind))
-                            effects.add(juce::String(std::string(effect->typeKey)));
+                            effects.add(cydaw::base::Text(std::string(effect->typeKey)));
                 set(entry, "midiEffects", effects);
             }
-            juce::Array<juce::var> clips;
+            cydaw::base::Array<cydaw::base::Value> clips;
             for (const auto& clip : info.clips) {
                 auto clipEntry = object();
                 set(clipEntry, "id", idOf(clip.id));
@@ -309,11 +326,11 @@ private:
         set(result, "midiTracks", midiTracks);
         // Every track in the order shown (every kind together), by name; a
         // group track and the group each is in.
-        juce::Array<juce::var> order;
+        cydaw::base::Array<cydaw::base::Value> order;
         for (const auto& shown : studio_.tracks()) {
             auto entry = object();
             set(entry, "name", studio_.trackName(shown));
-            set(entry, "kind", shown.midi ? juce::String("midi") : studio_.isBusTrack(shown) ? juce::String("bus") : juce::String("audio"));
+            set(entry, "kind", shown.midi ? cydaw::base::Text("midi") : studio_.isBusTrack(shown) ? cydaw::base::Text("bus") : cydaw::base::Text("audio"));
             if (studio_.isGroupTrack(shown)) {
                 set(entry, "group", true);
                 set(entry, "folded", studio_.isFolded(shown));
@@ -323,16 +340,16 @@ private:
             // A hybrid track: its companion's kind, named "<name>@midi" or
             // "<name>@audio" by the commands.
             if (const auto companion = studio_.companionOf(shown))
-                set(entry, "hybrid", companion->midi ? juce::String("midi") : juce::String("audio"));
+                set(entry, "hybrid", companion->midi ? cydaw::base::Text("midi") : cydaw::base::Text("audio"));
             order.add(entry);
         }
         set(result, "order", order);
         return result;
     }
 
-    [[nodiscard]] juce::var describeBuses() const
+    [[nodiscard]] cydaw::base::Value describeBuses() const
     {
-        juce::Array<juce::var> buses;
+        cydaw::base::Array<cydaw::base::Value> buses;
         for (const auto& bus : engine_.virtualBuses()) {
             auto entry = object();
             set(entry, "id", idOf(bus.id));
@@ -343,15 +360,15 @@ private:
             set(entry, "physicalB", bus.physicalChannelB);
             set(entry, "destinationA", bus.destinationChannelA);
             set(entry, "destinationB", bus.destinationChannelB);
-            juce::Array<juce::var> deviceChannels;
+            cydaw::base::Array<cydaw::base::Value> deviceChannels;
             for (auto channel = 0; channel < bus.channels; ++channel)
                 deviceChannels.add(bus.deviceChannel(channel));
             set(entry, "deviceChannels", deviceChannels);
-            set(entry, "format", juce::String(std::string(cydaw::engine::layoutKey(bus.channels))));
+            set(entry, "format", cydaw::base::Text(std::string(cydaw::engine::layoutKey(bus.channels))));
             if (bus.direction == app::VirtualBusDirection::output)
                 set(entry, "carriesMaster", bus.carriesMaster);
             // Its effects: the cards of its graph.
-            juce::StringArray effects;
+            cydaw::base::TextList effects;
             if (const auto* slot = const_cast<Studio&>(studio_).busGraph(bus.id))
                 for (const auto& node : slot->graph().editorNodes())
                     if (!node.boundary)
@@ -366,7 +383,7 @@ private:
         return buses;
     }
 
-    [[nodiscard]] juce::var status() const
+    [[nodiscard]] cydaw::base::Value status() const
     {
         auto result = describeTracks();
         if (const auto opening = studio_.projectOpening(); opening.active) {
@@ -381,8 +398,8 @@ private:
         set(result, "project", studio_.projectFile().getFullPathName());
         set(result, "dirty", studio_.isDirty());
         set(result, "tempo", engine_.tempo());
-        set(result, "timeSignature", juce::String(engine_.timeSignatureNumerator()) + "/"
-                                         + juce::String(engine_.timeSignatureDenominator()));
+        set(result, "timeSignature", cydaw::base::Text(engine_.timeSignatureNumerator()) + "/"
+                                         + cydaw::base::Text(engine_.timeSignatureDenominator()));
         set(result, "playing", engine_.isPlaying());
         set(result, "speakersSilenced", engine_.speakersSilenced());
         set(result, "position", engine_.position());
@@ -412,14 +429,14 @@ private:
         const auto toDb = [](const float gain) {
             return gain > 1.0e-6f ? std::round(200.0 * std::log10(static_cast<double>(gain))) / 10.0 : -120.0;
         };
-        const auto meterEntry = [&](const juce::String& name, const MeterState& meter) {
+        const auto meterEntry = [&](const cydaw::base::Text& name, const MeterState& meter) {
             auto entry = object();
             set(entry, "name", name);
             set(entry, "peakDb", toDb(std::max(meter.peak[0], meter.peak[1])));
             set(entry, "rmsDb", toDb(std::max(meter.rms[0], meter.rms[1])));
             return entry;
         };
-        juce::Array<juce::var> meters;
+        cydaw::base::Array<cydaw::base::Value> meters;
         for (const auto& track : studio_.tracks())
             meters.add(meterEntry(studio_.trackName(track), studio_.trackMeter(track)));
         set(result, "meters", meters);
@@ -428,7 +445,7 @@ private:
         set(result, "latencyCompensationSamples", engine_.mixLatencySamples());
         set(result, "language", ui::language());
         set(result, "translatedTexts", ui::translationCount());
-        juce::StringArray languages;
+        cydaw::base::TextList languages;
         for (const auto& language : app::Localization::availableLanguages())
             languages.add(language.code);
         set(result, "languages", strings(languages));
@@ -450,7 +467,7 @@ private:
     // ---- Tracks by index (audio first, then MIDI), by name, or a bus --------------
     // "<name>@midi" / "<name>@audio": a hybrid track's clips of that kind
     // (the track itself, or its companion).
-    [[nodiscard]] std::optional<RemoteTrack> resolveTrack(const juce::var& spec) const
+    [[nodiscard]] std::optional<RemoteTrack> resolveTrack(const cydaw::base::Value& spec) const
     {
         if (const auto named = spec.toString().trim(); spec.isString()
                                                        && (named.endsWithIgnoreCase("@midi") || named.endsWithIgnoreCase("@audio"))) {
@@ -490,8 +507,8 @@ private:
             for (const auto& bus : engine_.virtualBuses()) {
                 const auto matches = wanted.isEmpty()
                                          ? bus.direction == app::VirtualBusDirection::output
-                                         : bus.name.equalsIgnoreCase(wanted)
-                                               || juce::String(static_cast<juce::int64>(bus.id)) == wanted;
+                                         : bus.name.equalsIgnoreCase(wanted.toRawUTF8())
+                                               || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == wanted;
                 if (matches)
                     return RemoteTrack { false, 0, 0, 0, true, bus.id };
             }
@@ -507,7 +524,7 @@ private:
             if (studio_.isCompanion(TrackRef { false, index, 0 }))
                 continue;
             const auto candidate = studio_.trackName(TrackRef { false, index, 0 });
-            if (candidate.equalsIgnoreCase(name))
+            if (candidate.equalsIgnoreCase(name.toRawUTF8()))
                 return RemoteTrack { false, index, 0, index };
             if (candidate.containsIgnoreCase(name)) {
                 loose = RemoteTrack { false, index, 0, index };
@@ -518,7 +535,7 @@ private:
             const auto channel = audioCount + position;
             if (studio_.isCompanion(TrackRef { true, 0, summaries[position].id }))
                 continue;
-            if (summaries[position].name.equalsIgnoreCase(name))
+            if (summaries[position].name.equalsIgnoreCase(name.toRawUTF8()))
                 return RemoteTrack { true, position, summaries[position].id, channel };
             if (summaries[position].name.containsIgnoreCase(name)) {
                 loose = RemoteTrack { true, position, summaries[position].id, channel };
@@ -530,9 +547,9 @@ private:
 
     // Fills `track` from the request, or returns the answer to give. Buses
     // pass only where the command says it takes them.
-    juce::var trackOrFail(std::optional<RemoteTrack>& track, const bool busAllowed = false) const
+    cydaw::base::Value trackOrFail(std::optional<RemoteTrack>& track, const bool busAllowed = false) const
     {
-        track = resolveTrack(request_.getProperty("track", juce::var()));
+        track = resolveTrack(request_.getProperty("track", cydaw::base::Value()));
         if (!track)
             return fail("no track matches \"" + text("track")
                         + "\"; status lists them by index and name, and"
@@ -572,7 +589,7 @@ private:
         return target;
     }
 
-    [[nodiscard]] juce::var noGraph() const
+    [[nodiscard]] cydaw::base::Value noGraph() const
     {
         return fail("\"" + text("track") + "\" has no graph");
     }
@@ -607,20 +624,20 @@ private:
     // between them.
     // A track's outputs: where each goes ("master" or the track's name), at
     // what level.
-    [[nodiscard]] juce::var outputsSummary(const TrackRef& track) const
+    [[nodiscard]] cydaw::base::Value outputsSummary(const TrackRef& track) const
     {
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& output : studio_.trackOutputs(track)) {
             auto entry = object();
             const auto to = studio_.trackForKey(output.destination);
             if (output.hardware != 0) {
                 const auto bus = engine_.virtualBus(output.hardware);
-                set(entry, "hardware", bus ? bus->name : juce::String("(gone)"));
+                set(entry, "hardware", bus ? bus->name : cydaw::base::Text("(gone)"));
                 set(entry, "hardwareId", idOf(output.hardware));
                 if (output.hardwareAfterEffects)
                     set(entry, "hardwareAfterEffects", true);
             } else {
-                set(entry, "destination", to ? studio_.trackName(*to) : juce::String("master"));
+                set(entry, "destination", to ? studio_.trackName(*to) : cydaw::base::Text("master"));
             }
             set(entry, "gainDb", output.gainDb);
             if (to && output.input != 0)
@@ -633,9 +650,9 @@ private:
     }
 
     // Its audio inputs beside the main one, by name.
-    [[nodiscard]] juce::var inputsSummary(const TrackRef& track) const
+    [[nodiscard]] cydaw::base::Value inputsSummary(const TrackRef& track) const
     {
-        juce::StringArray names;
+        cydaw::base::TextList names;
         for (const auto& input : studio_.trackInputs(track))
             names.add(input.name);
         return strings(names);
@@ -643,13 +660,13 @@ private:
 
     // An input of `track` named by its name or its number (2 the first
     // beside the main one); 0 the main one, nothing when there is none.
-    [[nodiscard]] std::optional<std::uint64_t> inputOf(const TrackRef& track, const juce::var& value) const
+    [[nodiscard]] std::optional<std::uint64_t> inputOf(const TrackRef& track, const cydaw::base::Value& value) const
     {
         if (value.isVoid() || value.toString().isEmpty() || value.toString().equalsIgnoreCase("main"))
             return 0;
         const auto inputs = studio_.trackInputs(track);
         for (const auto& input : inputs)
-            if (input.name.equalsIgnoreCase(value.toString()))
+            if (input.name.equalsIgnoreCase(value.toString().toRawUTF8()))
                 return input.node;
         if (value.isInt() || value.isInt64() || value.isDouble() || value.toString().containsOnly("0123456789")) {
             const auto number = static_cast<int>(value.toString().getIntValue());
@@ -661,40 +678,40 @@ private:
         return std::nullopt;
     }
 
-    [[nodiscard]] juce::var graphSummary(const GraphTarget& target) const
+    [[nodiscard]] cydaw::base::Value graphSummary(const GraphTarget& target) const
     {
         const auto state = target.graph().serialise();
         // The cards described once, found by id: described again for each
         // card, a graph of a thousand took seconds to answer.
         const auto cards = target.graph().editorNodes();
-        std::unordered_map<std::uint64_t, const app::NodeGraphComponent::EditorNode*> cardById;
+        std::unordered_map<std::uint64_t, const app::GraphDocument::EditorNode*> cardById;
         cardById.reserve(cards.size());
         for (const auto& card : cards)
             cardById.emplace(card.id, &card);
-        juce::Array<juce::var> nodes;
-        if (const auto* list = state.getProperty("nodes", juce::var()).getArray())
+        cydaw::base::Array<cydaw::base::Value> nodes;
+        if (const auto* list = state.getProperty("nodes", cydaw::base::Value()).getArray())
             for (const auto& node : *list) {
                 auto entry = object();
-                set(entry, "id", static_cast<int>(static_cast<juce::int64>(node.getProperty("id", 0))));
-                set(entry, "type", node.getProperty("type", juce::var()).toString());
-                set(entry, "title", node.getProperty("title", juce::var()).toString());
-                juce::Array<juce::var> parameters;
+                set(entry, "id", static_cast<int>(static_cast<std::int64_t>(node.getProperty("id", 0))));
+                set(entry, "type", node.getProperty("type", cydaw::base::Value()).toString());
+                set(entry, "title", node.getProperty("title", cydaw::base::Value()).toString());
+                cydaw::base::Array<cydaw::base::Value> parameters;
                 if (const auto* published
-                    = node.getProperty("interface", juce::var()).getProperty("parameters", juce::var()).getArray())
+                    = node.getProperty("interface", cydaw::base::Value()).getProperty("parameters", cydaw::base::Value()).getArray())
                     for (const auto& parameter : *published) {
                         auto knob = object();
-                        set(knob, "key", parameter.getProperty("key", juce::var()).toString());
-                        set(knob, "label", parameter.getProperty("label", juce::var()).toString());
-                        set(knob, "value", parameter.getProperty("value", juce::var()));
+                        set(knob, "key", parameter.getProperty("key", cydaw::base::Value()).toString());
+                        set(knob, "label", parameter.getProperty("label", cydaw::base::Value()).toString());
+                        set(knob, "value", parameter.getProperty("value", cydaw::base::Value()));
                         parameters.add(knob);
                     }
                 set(entry, "parameters", parameters);
                 // A device made of a graph: open_device edits its inside.
                 if (const auto module = target.graph().editorModuleOf(
-                        static_cast<std::uint64_t>(static_cast<juce::int64>(node.getProperty("id", 0)))))
+                        static_cast<std::uint64_t>(static_cast<std::int64_t>(node.getProperty("id", 0)))))
                     set(entry, "graphDevice", true);
                 // A designed interface: device_window opens it.
-                if (const auto card = cardById.find(static_cast<std::uint64_t>(static_cast<juce::int64>(node.getProperty("id", 0))));
+                if (const auto card = cardById.find(static_cast<std::uint64_t>(static_cast<std::int64_t>(node.getProperty("id", 0))));
                     card != cardById.end()) {
                     // The name its card shows, in the interface's language.
                     set(entry, "name", card->second->title);
@@ -703,8 +720,8 @@ private:
                 }
                 nodes.add(entry);
             }
-        juce::Array<juce::var> connections;
-        if (const auto* list = state.getProperty("connections", juce::var()).getArray())
+        cydaw::base::Array<cydaw::base::Value> connections;
+        if (const auto* list = state.getProperty("connections", cydaw::base::Value()).getArray())
             for (const auto& connection : *list) {
                 auto entry = object();
                 set(entry, "source", static_cast<int>(connection.getProperty("source", 0)));
@@ -723,18 +740,18 @@ private:
         set(result, "connections", connections);
         // The cards switched off, as the engine is told: the node whose
         // output is replaced and the one whose input passes (0: silence).
-        juce::Array<juce::var> bypasses;
+        cydaw::base::Array<cydaw::base::Value> bypasses;
         for (const auto& bypass : target.graph().nativeDspGraph().bypasses) {
-            juce::Array<juce::var> pair;
-            pair.add(static_cast<juce::int64>(bypass.node));
-            pair.add(static_cast<juce::int64>(bypass.from));
+            cydaw::base::Array<cydaw::base::Value> pair;
+            pair.add(static_cast<std::int64_t>(bypass.node));
+            pair.add(static_cast<std::int64_t>(bypass.from));
             bypasses.add(pair);
         }
         set(result, "bypasses", bypasses);
         if (!target.track) {
-            juce::StringArray names;
+            cydaw::base::TextList names;
             for (const auto& node : nodes)
-                names.add(node.getProperty("type", juce::var()).toString());
+                names.add(node.getProperty("type", cydaw::base::Value()).toString());
             set(result, "devices", strings(names));
         } else {
             set(result, "devices", strings(target.graph().deviceNames(32)));
@@ -742,7 +759,7 @@ private:
         if (const auto error = target.slot->lastCompileError(); error.isNotEmpty())
             set(result, "compileError", error);
         if (target.workshop) {
-            juce::StringArray trail;
+            cydaw::base::TextList trail;
             for (const auto& name : studio_.workshop().trail)
                 trail.add(name);
             set(result, "workshopTrail", strings(trail));
@@ -751,16 +768,16 @@ private:
     }
 
     // The published key of a knob on the last card of a type.
-    [[nodiscard]] static juce::String knobKey(const app::NodeGraphComponent& graph, const juce::String& typeKey,
-                                              const juce::String& suffix)
+    [[nodiscard]] static cydaw::base::Text knobKey(const app::GraphDocument& graph, const cydaw::base::Text& typeKey,
+                                              const cydaw::base::Text& suffix)
     {
         const auto id = graph.lastNodeIdOfType(typeKey);
-        return id == 0 ? juce::String() : "node." + juce::String(static_cast<juce::int64>(id)) + "." + suffix;
+        return id == 0 ? cydaw::base::Text() : "node." + cydaw::base::Text(static_cast<std::int64_t>(id)) + "." + suffix;
     }
 
     // The graph whose catalogue answers list_devices and describe_node_type:
     // the selected track's, else any, else a fresh one.
-    [[nodiscard]] app::NodeGraphComponent& catalogueGraph()
+    [[nodiscard]] app::GraphDocument& catalogueGraph()
     {
         if (const auto selected = ui_.selectedTrack())
             if (auto* slot = studio_.graphFor(*selected))
@@ -771,7 +788,7 @@ private:
         for (auto& entry : studio_.busStates())
             if (entry.second.graph != nullptr)
                 return entry.second.graph->graph();
-        scratchGraph_ = std::make_unique<app::NodeGraphComponent>();
+        scratchGraph_ = std::make_unique<app::GraphDocument>();
         return *scratchGraph_;
     }
 
@@ -785,7 +802,7 @@ private:
     }
 
     [[nodiscard]] static std::optional<Engine::MidiClip> midiClipNamed(const Engine::MidiTrackInfo& info,
-                                                                       const juce::String& clipName)
+                                                                       const cydaw::base::Text& clipName)
     {
         if (info.clips.empty())
             return std::nullopt;
@@ -797,9 +814,9 @@ private:
         return std::nullopt;
     }
 
-    [[nodiscard]] juce::var describeAudioClips(const std::size_t index) const
+    [[nodiscard]] cydaw::base::Value describeAudioClips(const std::size_t index) const
     {
-        juce::Array<juce::var> clips;
+        cydaw::base::Array<cydaw::base::Value> clips;
         if (const auto* list = engine_.audioClipsView(index))
             for (const auto& clip : *list) {
                 auto entry = object();
@@ -825,7 +842,7 @@ private:
                 clips.add(entry);
             }
         // The launcher's slots, by their scene.
-        juce::Array<juce::var> launcher;
+        cydaw::base::Array<cydaw::base::Value> launcher;
         for (const auto& clip : engine_.launcherClips(index)) {
             auto entry = object();
             set(entry, "scene", clip.sceneIndex);
@@ -845,7 +862,7 @@ private:
             set(entry, "playStart", clip.playStartSeconds);
             set(entry, "playEnd", clip.playEndSeconds);
             // Its sounds: their ids (clip_lanes event), modes and own lanes.
-            juce::Array<juce::var> sounds;
+            cydaw::base::Array<cydaw::base::Value> sounds;
             for (const auto& event : clip.events) {
                 auto sound = object();
                 set(sound, "id", idOf(event.id));
@@ -867,12 +884,12 @@ private:
     }
 
     // The playing modes by name, and back (anything else: `fallback`).
-    static juce::String stretchModeName(const Engine::StretchMode mode)
+    static cydaw::base::Text stretchModeName(const Engine::StretchMode mode)
     {
         static const char* const names[] = { "repitch", "tonal", "beats", "texture", "raw", "complex" };
         return names[std::clamp(static_cast<int>(mode), 0, Engine::stretchModeCount - 1)];
     }
-    static Engine::StretchMode stretchModeNamed(const juce::String& text, const Engine::StretchMode fallback)
+    static Engine::StretchMode stretchModeNamed(const cydaw::base::Text& text, const Engine::StretchMode fallback)
     {
         const auto name = text.trim().toLowerCase();
         for (auto mode = 0; mode < Engine::stretchModeCount; ++mode)
@@ -881,21 +898,21 @@ private:
         return fallback;
     }
     // Lanes as {name: [[seconds, value], ...]}.
-    static juce::var lanesToVar(const std::map<juce::String, std::vector<Engine::AutomationPoint>>& lanes)
+    static cydaw::base::Value lanesToVar(const std::map<cydaw::base::Text, std::vector<Engine::AutomationPoint>>& lanes)
     {
         auto shown = object();
         for (const auto& [name, points] : lanes) {
-            juce::Array<juce::var> list;
+            cydaw::base::Array<cydaw::base::Value> list;
             for (const auto& point : points)
-                list.add(juce::Array<juce::var> { point.timeSeconds, static_cast<double>(point.valueDb) });
+                list.add(cydaw::base::Array<cydaw::base::Value> { point.timeSeconds, static_cast<double>(point.valueDb) });
             set(shown, name.toRawUTF8(), list);
         }
         return shown;
     }
 
-    [[nodiscard]] juce::var describeAutomation(const RemoteTrack& track) const
+    [[nodiscard]] cydaw::base::Value describeAutomation(const RemoteTrack& track) const
     {
-        juce::Array<juce::var> entries;
+        cydaw::base::Array<cydaw::base::Value> entries;
         for (const auto& point : studio_.automationPoints(track.ref())) {
             auto entry = object();
             set(entry, "id", idOf(point.id));
@@ -912,14 +929,14 @@ private:
     // A point's shape when it has one: shape (0 straight, 1 bent, 2 a
     // B-spline's, 3 a Bezier one with one tangent, 4 with two), bend, and
     // handles [inTime, inValue, outTime, outValue].
-    static void describeShape(juce::var& entry, const Studio::AutomationPoint& point)
+    static void describeShape(cydaw::base::Value& entry, const Studio::AutomationPoint& point)
     {
         if (point.curve != Studio::AutomationCurve::linear) {
             set(entry, "shape", static_cast<int>(point.curve));
             set(entry, "bend", point.curveAmount);
         }
         if (point.handles != engine::CurveHandles {}) {
-            juce::Array<juce::var> handles;
+            cydaw::base::Array<cydaw::base::Value> handles;
             for (const auto value : { point.handles.inTime, point.handles.inValue, point.handles.outTime, point.handles.outValue })
                 handles.add(static_cast<double>(value));
             set(entry, "handles", handles);
@@ -927,7 +944,7 @@ private:
     }
 
     // The shapes a request's points asked for, put on the points just added.
-    void applyShapes(const TrackRef& ref, const juce::String& lane, const std::vector<std::pair<std::uint64_t, juce::var>>& shaped)
+    void applyShapes(const TrackRef& ref, const cydaw::base::Text& lane, const std::vector<std::pair<std::uint64_t, cydaw::base::Value>>& shaped)
     {
         if (shaped.empty())
             return;
@@ -938,108 +955,128 @@ private:
                     if (spec.hasProperty("shape"))
                         point.curve = static_cast<Studio::AutomationCurve>(engine::clampedCurveShape(static_cast<int>(spec.getProperty("shape", 0))));
                     if (spec.hasProperty("bend"))
-                        point.curveAmount = juce::jlimit(-1.0f, 1.0f, static_cast<float>(static_cast<double>(spec.getProperty("bend", 0.0))));
-                    if (const auto* handles = spec.getProperty("handles", juce::var()).getArray(); handles != nullptr && handles->size() >= 4)
+                        point.curveAmount = cydaw::base::limit(-1.0f, 1.0f, static_cast<float>(static_cast<double>(spec.getProperty("bend", 0.0))));
+                    if (const auto* handles = spec.getProperty("handles", cydaw::base::Value()).getArray(); handles != nullptr && handles->size() >= 4)
                         point.handles = { static_cast<float>(static_cast<double>((*handles)[0])), static_cast<float>(static_cast<double>((*handles)[1])),
                                           static_cast<float>(static_cast<double>((*handles)[2])), static_cast<float>(static_cast<double>((*handles)[3])) };
                 }
         studio_.setLanePoints(ref, lane, points);
     }
 
-    [[nodiscard]] static bool asksShape(const juce::var& point)
+    [[nodiscard]] static bool asksShape(const cydaw::base::Value& point)
     {
         return point.hasProperty("shape") || point.hasProperty("handles") || point.hasProperty("bend");
     }
 
     // ---- The commands -------------------------------------------------------------------
-    juce::var onPing() const;
-    juce::var onOpenProject();
-    juce::var onSaveProject();
-    juce::var onTemplates();
-    juce::var onTransport();
-    juce::var onSetTempo();
-    juce::var onSetLoop();
-    juce::var onSetMasterGain();
-    juce::var onAddMidiTrack();
-    juce::var onAddAudioTrack();
-    juce::var onSetTrack();
-    juce::var onNotes();
-    juce::var onListDevices();
-    juce::var onInsertDevice();
-    juce::var onParameters();
-    juce::var onSetView();
-    juce::var onSnapshot();
-    juce::var onExportMix();
-    juce::var onQuit();
-    juce::var onImportProject();
-    juce::var onNewProject();
-    juce::var onRemoveTrack();
-    juce::var onGetTrackGraph();
-    juce::var onSoundMatching();
-    juce::var onProcessing();
-    juce::var onSampler();
-    juce::var onBanks();
-    juce::var onPresets();
-    juce::var onPrism();
-    juce::var onKick();
-    juce::var onSynth();
-    juce::var onBatterie();
-    juce::var onGroove();
-    juce::var onLocations();
-    juce::var onSlotStop();
-    juce::var onMasterClip();
-    juce::var onRemoveDevice();
-    juce::var onGraphDevices();
-    juce::var onWorkshop();
-    [[nodiscard]] juce::var workshopStatus();
+    cydaw::base::Value onPing() const;
+    cydaw::base::Value onOpenProject();
+    cydaw::base::Value onSaveProject();
+    cydaw::base::Value onTemplates();
+    cydaw::base::Value onTransport();
+    cydaw::base::Value onSetTempo();
+    cydaw::base::Value onSetLoop();
+    cydaw::base::Value onSetMasterGain();
+    cydaw::base::Value onAddMidiTrack();
+    cydaw::base::Value onAddAudioTrack();
+    cydaw::base::Value onSetTrack();
+    cydaw::base::Value onNotes();
+    cydaw::base::Value onListDevices();
+    cydaw::base::Value onInsertDevice();
+    cydaw::base::Value onParameters();
+    cydaw::base::Value onSetView();
+    cydaw::base::Value onSnapshot();
+    cydaw::base::Value onExportMix();
+    cydaw::base::Value onQuit();
+    cydaw::base::Value onImportProject();
+    cydaw::base::Value onNewProject();
+    cydaw::base::Value onRemoveTrack();
+    cydaw::base::Value onGetTrackGraph();
+    cydaw::base::Value onSoundMatching();
+    cydaw::base::Value onProcessing();
+    cydaw::base::Value onSampler();
+    cydaw::base::Value onBanks();
+    cydaw::base::Value onPresets();
+    cydaw::base::Value onPrism();
+    cydaw::base::Value onKick();
+    cydaw::base::Value onSynth();
+    cydaw::base::Value onBatterie();
+    cydaw::base::Value onGroove();
+    cydaw::base::Value onLocations();
+    cydaw::base::Value onSlotStop();
+    cydaw::base::Value onMasterClip();
+    cydaw::base::Value onRemoveDevice();
+    cydaw::base::Value onGraphDevices();
+    cydaw::base::Value onWorkshop();
+    [[nodiscard]] cydaw::base::Value workshopStatus();
     // The graph a graph command edits: the workshop's device ("track":
     // "workshop" or "atelier"), a track's or a bus's. The answer to give
     // when there is none.
-    juce::var targetOrFail(std::optional<GraphTarget>& target);
-    juce::var onEditNotes();
-    juce::var onRemoveClip();
-    juce::var onAudioClips();
-    juce::var onClipLanes();
-    juce::var onAutomation();
-    juce::var onModulate();
-    juce::var onLaunchScene();
-    juce::var onVoiceLive();
-    juce::var onLaunchClip();
-    juce::var onArm();
-    juce::var onRecord();
-    juce::var onUndoRedo();
-    juce::var onMoveTrack();
-    juce::var onAddMidiClip();
-    juce::var onDescribeNodeType();
-    juce::var onModulator();
-    juce::var onContainer();
-    juce::var onNodes();
-    juce::var onListPlugins();
-    juce::var onPlugins();
-    juce::var onEditAudioClip();
-    juce::var onListBuses();
-    juce::var onBuses();
-    juce::var onAudioSettings();
-    juce::var onImportMidi();
-    juce::var onExportMidi();
-    juce::var onSetLaunchQuantization();
-    juce::var onSamples();
+    cydaw::base::Value targetOrFail(std::optional<GraphTarget>& target);
+    cydaw::base::Value onEditNotes();
+    cydaw::base::Value onRemoveClip();
+    cydaw::base::Value onAudioClips();
+    cydaw::base::Value onClipLanes();
+    cydaw::base::Value onAutomation();
+    cydaw::base::Value onModulate();
+    cydaw::base::Value onLaunchScene();
+    cydaw::base::Value onVoiceLive();
+    cydaw::base::Value onLaunchClip();
+    cydaw::base::Value onArm();
+    cydaw::base::Value onRecord();
+    cydaw::base::Value onUndoRedo();
+    cydaw::base::Value onMoveTrack();
+    cydaw::base::Value onAddMidiClip();
+    cydaw::base::Value onDescribeNodeType();
+    cydaw::base::Value onModulator();
+    cydaw::base::Value onContainer();
+    cydaw::base::Value onNodes();
+    cydaw::base::Value onListPlugins();
+    cydaw::base::Value onPlugins();
+    cydaw::base::Value onEditAudioClip();
+    cydaw::base::Value onListBuses();
+    cydaw::base::Value onBuses();
+    cydaw::base::Value onAudioSettings();
+    cydaw::base::Value onImportMidi();
+    cydaw::base::Value onExportMidi();
+    cydaw::base::Value onSetLaunchQuantization();
+    cydaw::base::Value onSamples();
 
     Studio& studio_;
     Engine& engine_;
     RemoteUi& ui_;
-    const juce::var& request_;
-    const juce::String command_;
-    std::unique_ptr<app::NodeGraphComponent> scratchGraph_;
+    const cydaw::base::Value& request_;
+    const cydaw::base::Text command_;
+    std::unique_ptr<app::GraphDocument> scratchGraph_;
 };
 
-juce::var Commands::run()
+cydaw::base::Value Commands::run()
 {
     const auto& command = command_;
     if (command == "ping")
         return onPing();
     if (command == "status")
         return ok(status());
+    if (command == "key_latency") {
+        namespace probe = app::key_latency;
+        if (!probe::enabled) return fail("Start the isolated diagnostic session with CYDAW_KEY_LATENCY_PROBE=1");
+        // Opt-in diagnostic: occupy the application dispatcher, never the audio thread.
+        if(const auto stall=std::clamp(int(number("stallMs",0)),0,500);stall>0)
+            cydaw::base::Thread::sleep(stall);
+        if (flag("arm", false)) probe::arm(static_cast<int>(number("virtualKey", 65)));
+        auto result = object();
+        set(result, "nowNs", static_cast<std::int64_t>(probe::now()));
+        set(result, "windowNs", static_cast<std::int64_t>(probe::windowNs.load()));
+        set(result, "queuedNs", static_cast<std::int64_t>(probe::queuedNs.load()));
+        set(result, "collectedNs", static_cast<std::int64_t>(probe::collectedNs.load()));
+        set(result, "outputNs", static_cast<std::int64_t>(probe::outputNs.load()));
+        set(result, "midiFrame", probe::offset.load());
+        set(result, "signalFrame", probe::firstSignalFrame.load());
+        set(result, "note", probe::note.load());
+        set(result, "preSignalPeak", static_cast<double>(probe::preSignalPeak.load()));
+        set(result, "armed", probe::armed.load());
+        return ok(result);
+    }
     // While a project opens, the session is not whole: only looking at it.
     if (studio_.openingProject() && command != "snapshot" && command != "quit" && command != "ui_input")
         return fail("a project is opening; try again once it is open (status: opening)");
@@ -1105,7 +1142,7 @@ juce::var Commands::run()
         // What a pad, a layer or a Replacer can play: CyDAW's instruments
         // (catalogue keys), the factory's ("factory:<key>", with their
         // category, and whether their samples are still to download).
-        juce::Array<juce::var> listed;
+        cydaw::base::Array<cydaw::base::Value> listed;
         for (const auto& choice : studio_.instrumentChoices()) {
             auto entry = object();
             set(entry, "key", choice.key);
@@ -1130,20 +1167,20 @@ juce::var Commands::run()
         const auto ref = track->ref();
         if (!ref.midi)
             return fail("a rack is an instrument track's");
-        const auto action = text("action").isNotEmpty() ? text("action") : juce::String("list");
+        const auto action = text("action").isNotEmpty() ? text("action") : cydaw::base::Text("list");
         const auto note = static_cast<int>(number("note", 36.0));
         std::optional<std::size_t> pad;
         if (has("pad"))
             pad = static_cast<std::size_t>(number("pad", 0.0));
         else
             pad = studio_.rackPadOfNote(ref, note);
-        juce::String error;
+        cydaw::base::Text error;
         if (action == "add") {
             if (!studio_.addRackPad(ref, note, text("instrument"), error))
                 return fail(error);
         } else if (action == "instrument") {
             if (!pad || !studio_.setRackPadInstrument(ref, *pad, text("instrument"), error))
-                return fail(error.isNotEmpty() ? error : juce::String("no pad there"));
+                return fail(error.isNotEmpty() ? error : cydaw::base::Text("no pad there"));
         } else if (action == "sample") {
             if (!studio_.loadRackPadSample(ref, note, fileFor(text("file")), error))
                 return fail(error);
@@ -1192,10 +1229,10 @@ juce::var Commands::run()
         }
         auto result = object();
         set(result, "rack", studio_.isRack(ref));
-        set(result, "kind", juce::String(engine::instrument_container::name(studio_.containerKind(ref))));
+        set(result, "kind", cydaw::base::Text(engine::instrument_container::name(studio_.containerKind(ref))));
         set(result, "padsKind", studio_.padsKindName(ref));
         set(result, "selected", studio_.selectedLayer(ref));
-        juce::Array<juce::var> pads;
+        cydaw::base::Array<cydaw::base::Value> pads;
         for (std::size_t index = 0; index < studio_.rackPadCount(ref); ++index) {
             const auto* item = studio_.rackPad(ref, index);
             auto entry = object();
@@ -1212,20 +1249,20 @@ juce::var Commands::run()
             set(entry, "keyHigh", item->keyHigh);
             set(entry, "velocityLow", item->velocityLow);
             set(entry, "velocityHigh", item->velocityHigh);
-            juce::Array<juce::var> devices;
-            juce::Array<juce::var> cards;
+            cydaw::base::Array<cydaw::base::Value> devices;
+            cydaw::base::Array<cydaw::base::Value> cards;
             for (const auto& node : item->graph->graph().editorNodes())
                 if (!node.boundary) {
                     devices.add(node.typeKey);
                     auto card = object();
-                    set(card, "id", static_cast<juce::int64>(node.id));
+                    set(card, "id", static_cast<std::int64_t>(node.id));
                     set(card, "type", node.typeKey);
                     cards.add(card);
                 }
             set(entry, "devices", devices);
             set(entry, "cards", cards);
             set(entry, "peak", studio_.rackPadPeak(ref, index));
-            pads.add(juce::var(entry));
+            pads.add(cydaw::base::Value(entry));
         }
         set(result, "pads", pads);
         return ok(result);
@@ -1248,9 +1285,9 @@ juce::var Commands::run()
             return fail("that track has no graph");
         const auto state = slot->graph().createVst3RuntimeState();
         // "stateOut": the state itself, for a host to hand to the plug-in.
-        if (has("stateOut") && !fileFor(text("stateOut")).replaceWithText(juce::JSON::toString(state, true)))
+        if (has("stateOut") && !fileFor(text("stateOut")).replaceWithText(cydaw::base::JSON::toString(state, true)))
             return fail("cannot write " + text("stateOut"));
-        juce::String error;
+        cydaw::base::Text error;
         // As the plug-in's setStateInformation: the chain after the voices
         // first (it stops there when that does not restore or compile).
         const auto native = app::restoreNativeDspGraphState(state.getProperty("native", {}), error);
@@ -1272,13 +1309,13 @@ juce::var Commands::run()
                                   || app::SampleStore::instance().waitUntilReady(*plan->sampler, 60'000);
         constexpr auto rate = 48'000.0;
         constexpr auto block = 512;
-        const auto samples = static_cast<int>(juce::jlimit(0.05, 30.0, number("seconds", 1.0)) * rate);
+        const auto samples = static_cast<int>(cydaw::base::limit(0.05, 30.0, number("seconds", 1.0)) * rate);
         app::GraphPolySynthRenderer renderer;
         renderer.prepare(rate);
         renderer.setPlan(*plan);
-        juce::AudioBuffer<float> audio(2, samples);
+        cydaw::audio::SampleBuffer<float> audio(2, samples);
         audio.clear();
-        juce::AudioBuffer<float> scratch(2, block);
+        cydaw::audio::SampleBuffer<float> scratch(2, block);
         // "notes": [[note, velocity, seconds, length], ...] played at their
         // times (let go after `length` seconds when given); else the one note
         // at the start. "controllers": [[number, value, seconds], ...].
@@ -1292,34 +1329,34 @@ juce::var Commands::run()
         if (const auto* list = request_.getProperty("notes", {}).getArray())
             for (const auto& item : *list)
                 if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 3) {
-                    Hit hit { juce::jlimit(0, 127, static_cast<int>((*fields)[0])),
-                              static_cast<float>(juce::jlimit(0.0, 1.0, static_cast<double>((*fields)[1]))),
-                              static_cast<int>(juce::jmax(0.0, static_cast<double>((*fields)[2])) * rate) };
+                    Hit hit { cydaw::base::limit(0, 127, static_cast<int>((*fields)[0])),
+                              static_cast<float>(cydaw::base::limit(0.0, 1.0, static_cast<double>((*fields)[1]))),
+                              static_cast<int>(cydaw::base::maximum(0.0, static_cast<double>((*fields)[2])) * rate) };
                     if (fields->size() >= 4)
-                        hit.off = hit.at + static_cast<int>(juce::jmax(0.0, static_cast<double>((*fields)[3])) * rate);
+                        hit.off = hit.at + static_cast<int>(cydaw::base::maximum(0.0, static_cast<double>((*fields)[3])) * rate);
                     hits.push_back(hit);
                 }
         if (hits.empty())
-            hits.push_back({ juce::jlimit(0, 127, static_cast<int>(number("note", 69.0))), static_cast<float>(number("velocity", 0.8)), 0 });
+            hits.push_back({ cydaw::base::limit(0, 127, static_cast<int>(number("note", 69.0))), static_cast<float>(number("velocity", 0.8)), 0 });
         std::vector<std::array<int, 3>> moves;
         if (const auto* list = request_.getProperty("controllers", {}).getArray())
             for (const auto& item : *list)
                 if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 3)
-                    moves.push_back({ juce::jlimit(0, 127, static_cast<int>((*fields)[0])), juce::jlimit(0, 127, static_cast<int>((*fields)[1])),
-                                      static_cast<int>(juce::jmax(0.0, static_cast<double>((*fields)[2])) * rate) });
+                    moves.push_back({ cydaw::base::limit(0, 127, static_cast<int>((*fields)[0])), cydaw::base::limit(0, 127, static_cast<int>((*fields)[1])),
+                                      static_cast<int>(cydaw::base::maximum(0.0, static_cast<double>((*fields)[2])) * rate) });
         // Faster than real time: a lane waits for frames still on the disk.
-        const juce::ScopedValueSetter<bool> mayWait(engine::samplerMayWait, true);
+        const cydaw::base::ScopedValueSetter<bool> mayWait(engine::samplerMayWait, true);
         for (auto start = 0; start < samples; start += block) {
             const auto count = std::min(block, samples - start);
-            juce::MidiBuffer midi;
+            cydaw::midi::EventBuffer midi;
             for (const auto& [controller, value, at] : moves)
                 if (at >= start && at < start + count)
-                    midi.addEvent(juce::MidiMessage::controllerEvent(1, controller, value), at - start);
+                    midi.addEvent(cydaw::midi::Message::controllerEvent(1, controller, value), at - start);
             for (const auto& hit : hits) {
                 if (hit.at >= start && hit.at < start + count)
-                    midi.addEvent(juce::MidiMessage::noteOn(1, hit.note, hit.velocity), hit.at - start);
+                    midi.addEvent(cydaw::midi::Message::noteOn(1, hit.note, hit.velocity), hit.at - start);
                 if (hit.off >= start && hit.off < start + count)
-                    midi.addEvent(juce::MidiMessage::noteOff(1, hit.note), hit.off - start);
+                    midi.addEvent(cydaw::midi::Message::noteOff(1, hit.note), hit.off - start);
             }
             scratch.clear();
             renderer.render(scratch, midi, 0, count);
@@ -1337,14 +1374,14 @@ juce::var Commands::run()
         if (plan->sampler != nullptr) {
             set(result, "samplerZones", static_cast<int>(plan->sampler->zones.size()));
             set(result, "samplesReady", samplesReady);
-            juce::Array<juce::var> samplerValues;
+            cydaw::base::Array<cydaw::base::Value> samplerValues;
             for (std::size_t index = 0; index < cydaw::engine::samplerSettingCount; ++index)
                 samplerValues.add(plan->samplerValues[index]);
             set(result, "samplerValues", samplerValues);
             set(result, "rmsRight", audio.getRMSLevel(1, settle, samples - settle));
         }
         set(result, "enabled", plan->enabled);
-        juce::Array<juce::var> values;
+        cydaw::base::Array<cydaw::base::Value> values;
         for (std::size_t index = 0; index < cydaw::engine::soundModelSettingCount; ++index)
             values.add(plan->soundModelValues[index]);
         set(result, "soundModelValues", values);
@@ -1352,14 +1389,14 @@ juce::var Commands::run()
         // The last half second: a held note still sounding (a loop) or not.
         const auto tail = std::min(samples, static_cast<int>(rate * 0.5));
         set(result, "tailRms", audio.getRMSLevel(0, samples - tail, tail));
-        set(result, "peakDb", juce::Decibels::gainToDecibels(audio.getMagnitude(0, 0, samples), -120.0f));
+        set(result, "peakDb", cydaw::audio::Decibels::gainToDecibels(audio.getMagnitude(0, 0, samples), -120.0f));
         // Its level every 50 ms (dB RMS): what happens over time.
-        juce::Array<juce::var> windows;
+        cydaw::base::Array<cydaw::base::Value> windows;
         const auto window = static_cast<int>(rate * 0.05);
         for (auto at = 0; at + window <= samples; at += window)
-            windows.add(juce::Decibels::gainToDecibels(audio.getRMSLevel(0, at, window), -120.0f));
+            windows.add(cydaw::audio::Decibels::gainToDecibels(audio.getRMSLevel(0, at, window), -120.0f));
         set(result, "windowsDb", windows);
-        set(result, "stateBytes", static_cast<juce::int64>(juce::JSON::toString(state, true).getNumBytesAsUTF8()));
+        set(result, "stateBytes", static_cast<std::int64_t>(cydaw::base::JSON::toString(state, true).getNumBytesAsUTF8()));
         return ok(result);
     }
     if (command == "track_modulation") {
@@ -1387,11 +1424,11 @@ juce::var Commands::run()
             settings.shape = static_cast<int>(std::lround(read("shape", settings.shape)));
             studio_.setModulationLfo(ref, settings);
         }
-        juce::StringArray problems;
+        cydaw::base::TextList problems;
         if (const auto* assign = request_.getProperty("assign", {}).getDynamicObject())
             for (const auto& property : assign->getProperties()) {
                 const auto key = property.name.toString();
-                juce::String binding;
+                cydaw::base::Text binding;
                 for (const auto& target : studio_.modulationTargets(ref))
                     if (target.binding == key || target.binding.endsWith("." + key.fromFirstOccurrenceOf(".", false, false))
                         || target.binding.endsWith(key))
@@ -1414,7 +1451,7 @@ juce::var Commands::run()
         set(result, "lfo", settings);
         set(result, "output", studio_.modulationOutput(ref));
         set(result, "active", studio_.modulationActive(ref));
-        juce::Array<juce::var> targets;
+        cydaw::base::Array<cydaw::base::Value> targets;
         for (const auto& target : studio_.modulationTargets(ref)) {
             auto entry = object();
             set(entry, "binding", target.binding);
@@ -1439,7 +1476,7 @@ juce::var Commands::run()
         auto* slot = studio_.graphFor(track->ref());
         if (slot == nullptr)
             return fail("that track has no graph");
-        auto nodeId = static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)));
+        auto nodeId = static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0)));
         if (nodeId == 0)
             for (const auto& node : slot->graph().editorNodes())
                 if (node.typeKey == "cab-sim" || node.typeKey == "empreinte") {
@@ -1449,18 +1486,18 @@ juce::var Commands::run()
         if (nodeId == 0)
             return fail("no Baffle et micro or Empreinte card on that track");
         if (has("file")) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!studio_.loadCabImpulse(track->ref(), nodeId, fileFor(text("file")), error))
                 return fail(error);
         } else if (flag("clear", false)) {
             (void) studio_.clearCabImpulse(track->ref(), nodeId);
         }
         auto result = object();
-        set(result, "nodeId", static_cast<juce::int64>(nodeId));
+        set(result, "nodeId", static_cast<std::int64_t>(nodeId));
         if (const auto response = slot->graph().nodeImpulse(nodeId)) {
-            set(result, "name", juce::String(response->name));
+            set(result, "name", cydaw::base::Text(response->name));
             set(result, "channels", static_cast<int>(response->channels.size()));
-            set(result, "frames", static_cast<juce::int64>(response->length()));
+            set(result, "frames", static_cast<std::int64_t>(response->length()));
             set(result, "sampleRate", response->sampleRate);
         }
         return ok(result);
@@ -1475,7 +1512,7 @@ juce::var Commands::run()
         auto* slot = studio_.graphFor(track->ref());
         if (slot == nullptr)
             return fail("that track has no graph");
-        auto nodeId = static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)));
+        auto nodeId = static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0)));
         if (nodeId == 0)
             for (const auto& node : slot->graph().editorNodes())
                 if (studio_.hasSidechain(track->ref(), node.id)) {
@@ -1485,7 +1522,7 @@ juce::var Commands::run()
         if (nodeId == 0 || !studio_.hasSidechain(track->ref(), nodeId))
             return fail("no device with a sidechain (Compresseur Pro, Porte) on that track");
         if (has("source")) {
-            const auto source = resolveTrack(request_.getProperty("source", juce::var()));
+            const auto source = resolveTrack(request_.getProperty("source", cydaw::base::Value()));
             if (!source)
                 return fail("no such source track");
             if (const auto set = studio_.setSidechainSource(track->ref(), nodeId, source->ref()); set.failed())
@@ -1495,12 +1532,12 @@ juce::var Commands::run()
                 return fail(set.getErrorMessage());
         }
         auto result = object();
-        set(result, "nodeId", static_cast<juce::int64>(nodeId));
+        set(result, "nodeId", static_cast<std::int64_t>(nodeId));
         if (const auto source = studio_.sidechainSource(track->ref(), nodeId)) {
             set(result, "source", studio_.trackName(*source));
             for (const auto& output : studio_.trackOutputs(*source))
                 if (output.destination == studio_.routingKey(track->ref()) && output.input != 0)
-                    set(result, "input", static_cast<juce::int64>(output.input));
+                    set(result, "input", static_cast<std::int64_t>(output.input));
         }
         return ok(result);
     }
@@ -1524,7 +1561,7 @@ juce::var Commands::run()
             studio_.attachReplacerInstruments(track->ref(), *native);
         } else {
             const auto state = slot->graph().createVst3RuntimeState();
-            juce::String error;
+            cydaw::base::Text error;
             native = app::restoreNativeDspGraphState(state.getProperty("native", {}), error);
             if (!native)
                 return fail("the chain does not restore: " + error);
@@ -1539,21 +1576,21 @@ juce::var Commands::run()
         chain.prepare(rate, block, 2);
         if (const auto compiled = chain.setGraph(*native); compiled.failed())
             return fail("the chain does not compile: " + compiled.getErrorMessage());
-        const auto hz = juce::jlimit(20.0, 20'000.0, number("hz", 220.0));
-        const auto amplitude = juce::jlimit(0.0, 1.0, number("amplitude", 0.3));
+        const auto hz = cydaw::base::limit(20.0, 20'000.0, number("hz", 220.0));
+        const auto amplitude = cydaw::base::limit(0.0, 1.0, number("amplitude", 0.3));
         // "clicks": a click of `amplitude` every quarter of a second instead
         // of the sine (transients, for a Replacer).
         const auto clicks = text("signal").trim() == "clicks";
-        const auto samples = static_cast<int>(juce::jlimit(0.1, 10.0, number("seconds", 1.0)) * rate);
+        const auto samples = static_cast<int>(cydaw::base::limit(0.1, 10.0, number("seconds", 1.0)) * rate);
         std::vector<float> out;
         out.reserve(static_cast<std::size_t>(samples));
-        juce::AudioBuffer<float> buffer(2, block);
+        cydaw::audio::SampleBuffer<float> buffer(2, block);
         for (auto start = 0; start < samples; start += block) {
             const auto count = std::min(block, samples - start);
             for (auto i = 0; i < count; ++i) {
                 const auto value = clicks ? ((start + i) % static_cast<int>(rate / 4.0) < 4 ? static_cast<float>(amplitude) : 0.0f)
                                           : static_cast<float>(
-                                                amplitude * std::sin(2.0 * juce::MathConstants<double>::pi * hz * (start + i) / rate));
+                                                amplitude * std::sin(2.0 * cydaw::base::MathConstants<double>::pi * hz * (start + i) / rate));
                 buffer.setSample(0, i, value);
                 buffer.setSample(1, i, value);
             }
@@ -1563,7 +1600,7 @@ juce::var Commands::run()
         // Past the first tenth of a second: what it settles to.
         const auto from = static_cast<std::size_t>(rate * 0.1);
         const auto level = [&](const double frequency) {
-            const auto omega = 2.0 * juce::MathConstants<double>::pi * frequency / rate;
+            const auto omega = 2.0 * cydaw::base::MathConstants<double>::pi * frequency / rate;
             const auto coefficient = 2.0 * std::cos(omega);
             double previous {};
             double before {};
@@ -1585,7 +1622,7 @@ juce::var Commands::run()
         auto result = object();
         set(result, "inputDb", 20.0 * std::log10(amplitude / std::sqrt(2.0) + 1.0e-12));
         set(result, "outputDb", 10.0 * std::log10(energy / static_cast<double>(std::max<std::size_t>(1, out.size() - from)) + 1.0e-20));
-        set(result, "peakDb", juce::Decibels::gainToDecibels(peak, -120.0f));
+        set(result, "peakDb", cydaw::audio::Decibels::gainToDecibels(peak, -120.0f));
         const auto fundamental = level(hz);
         set(result, "fundamentalDb", fundamental);
         set(result, "secondDb", level(hz * 2.0) - fundamental);
@@ -1596,8 +1633,8 @@ juce::var Commands::run()
     if (command == "render_sound_model") {
         // {model: .cysound, out: .wav, note, velocity, seconds, held, settings: {key: value}}:
         // the voice played offline into a file, no device, no sound.
-        juce::var json;
-        juce::String error;
+        cydaw::base::Value json;
+        cydaw::base::Text error;
         const auto model = app::loadSoundModelFile(fileFor(text("model")), json, error);
         if (model == nullptr)
             return fail(error);
@@ -1613,13 +1650,13 @@ juce::var Commands::run()
         const auto zone = model->zones.front();
         const auto note = number("note", static_cast<double>(zone.rootNote));
         const auto velocity = number("velocity", static_cast<double>(zone.velocity));
-        const auto samples = static_cast<int>(juce::jlimit(0.01, 60.0, number("seconds", 2.0)) * rate);
+        const auto samples = static_cast<int>(cydaw::base::limit(0.01, 60.0, number("seconds", 2.0)) * rate);
         const auto held = has("held") ? static_cast<int>(number("held", 1.0) * rate) : samples;
         auto voice = std::make_unique<cydaw::engine::SoundModelVoice>();
         voice->prepare(rate);
         voice->start(*model, values, note, velocity, rate);
         // In stereo (a model analysed from a stereo recording keeps its image).
-        juce::AudioBuffer<float> audio(2, samples);
+        cydaw::audio::SampleBuffer<float> audio(2, samples);
         auto ended = -1;
         for (int index = 0; index < samples; ++index) {
             if (index == held)
@@ -1634,19 +1671,19 @@ juce::var Commands::run()
         }
         const auto out = fileFor(text("out"));
         out.deleteFile();
-        juce::WavAudioFormat wav;
-        std::unique_ptr<juce::OutputStream> stream(out.createOutputStream().release());
+        cydaw::integration::WaveFormat wav;
+        std::unique_ptr<cydaw::base::OutputStream> stream(out.createOutputStream().release());
         if (stream == nullptr)
             return fail("cannot write " + out.getFullPathName());
         auto writer = wav.createWriterFor(
-            stream, juce::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(2).withBitsPerSample(24));
+            stream, cydaw::audio::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(2).withBitsPerSample(24));
         if (writer == nullptr)
             return fail("cannot write " + out.getFullPathName());
         writer->writeFromAudioSampleBuffer(audio, 0, samples);
         writer.reset();
         auto result = object();
         set(result, "out", out.getFullPathName());
-        set(result, "peakDb", juce::Decibels::gainToDecibels(audio.getMagnitude(0, 0, samples), -120.0f));
+        set(result, "peakDb", cydaw::audio::Decibels::gainToDecibels(audio.getMagnitude(0, 0, samples), -120.0f));
         set(result, "endedAt", ended >= 0 ? ended / rate : -1.0);
         set(result, "description", app::describeSoundModel(*model));
         return ok(result);
@@ -1664,7 +1701,7 @@ juce::var Commands::run()
             if (!studio_.addTrackInput(ref, text("name")))
                 return fail("no input could be added (3 at most beside the main one)");
         } else {
-            const auto input = inputOf(ref, request_.getProperty("input", request_.getProperty("name", juce::var())));
+            const auto input = inputOf(ref, request_.getProperty("input", request_.getProperty("name", cydaw::base::Value())));
             if (!input || *input == 0)
                 return fail("no such input; status lists them");
             if (const auto removed = studio_.removeTrackInput(ref, *input); removed.failed())
@@ -1683,17 +1720,17 @@ juce::var Commands::run()
         if (auto error = trackOrFail(track); !error.isVoid())
             return error;
         const auto ref = track->ref();
-        if (const auto* list = request_.getProperty("outputs", juce::var()).getArray()) {
+        if (const auto* list = request_.getProperty("outputs", cydaw::base::Value()).getArray()) {
             std::vector<TrackOutput> outputs;
             for (const auto& item : *list) {
                 TrackOutput output;
                 output.gainDb = static_cast<float>(static_cast<double>(item.getProperty("gainDb", 0.0)));
                 const auto destination = item.getProperty("destination", "master");
-                if (const auto hardware = item.getProperty("hardware", juce::var()); !hardware.isVoid()) {
+                if (const auto hardware = item.getProperty("hardware", cydaw::base::Value()); !hardware.isVoid()) {
                     const auto spec = hardware.toString().trim();
                     for (const auto& bus : engine_.virtualBuses())
                         if (bus.direction == app::VirtualBusDirection::output
-                            && (bus.name.equalsIgnoreCase(spec) || juce::String(static_cast<juce::int64>(bus.id)) == spec))
+                            && (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == spec))
                             output.hardware = bus.id;
                     if (output.hardware == 0)
                         return fail("no output bus \"" + spec + "\"; list_buses lists them");
@@ -1703,7 +1740,7 @@ juce::var Commands::run()
                     if (!resolved || resolved->bus || resolved->master)
                         return fail("no track \"" + destination.toString() + "\" to route into");
                     output.destination = studio_.routingKey(resolved->ref());
-                    const auto input = inputOf(resolved->ref(), item.getProperty("input", juce::var()));
+                    const auto input = inputOf(resolved->ref(), item.getProperty("input", cydaw::base::Value()));
                     if (!input)
                         return fail("\"" + destination.toString() + "\" has no input \"" + item.getProperty("input", "").toString()
                                     + "\"; status lists its inputs");
@@ -1718,7 +1755,7 @@ juce::var Commands::run()
         auto result = object();
         set(result, "track", studio_.trackName(ref));
         set(result, "outputs", outputsSummary(ref));
-        juce::StringArray senders;
+        cydaw::base::TextList senders;
         for (const auto& sender : studio_.trackSenders(ref))
             senders.add(studio_.trackName(sender));
         set(result, "senders", strings(senders));
@@ -1756,7 +1793,7 @@ juce::var Commands::run()
         const auto ref = track->ref();
         const auto plugin = static_cast<std::size_t>(number("plugin", 0.0));
         if (ref.midi || ref.master || plugin >= studio_.engine().trackPlugins(ref.audioIndex).size())
-            return fail("no plug-in " + juce::String(static_cast<int>(plugin)) + " on that audio track");
+            return fail("no plug-in " + cydaw::base::Text(static_cast<int>(plugin)) + " on that audio track");
         if (!ui_.showPluginValueList(ref, plugin, flag("open", true)))
             return fail("this interface shows no lists of values");
         auto result = object();
@@ -1780,15 +1817,15 @@ juce::var Commands::run()
         const auto nodes = graph.editorNodes();
         const auto node = std::find_if(nodes.begin(), nodes.end(), [nodeId](const auto& item) { return item.id == nodeId; });
         if (node == nodes.end())
-            return fail("no card " + juce::String(static_cast<juce::int64>(nodeId)) + " on that track");
+            return fail("no card " + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + " on that track");
         const auto filter = text("filter").trim();
-        std::vector<std::pair<std::uint64_t, const app::NodeGraphComponent::EditorParameter*>> order;
+        std::vector<std::pair<std::uint64_t, const app::GraphDocument::EditorParameter*>> order;
         for (const auto& parameter : node->parameters)
             if ((filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
                 && !parameter.binding.endsWith(".ownerLow") && !parameter.binding.endsWith(".ownerHigh"))
                 order.emplace_back(graph.editorParameterTouch(parameter.binding), &parameter);
         std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
-        juce::Array<juce::var> values;
+        cydaw::base::Array<cydaw::base::Value> values;
         for (const auto& [touch, parameter] : order) {
             auto entry = object();
             set(entry, "binding", parameter->binding);
@@ -1812,12 +1849,12 @@ juce::var Commands::run()
         // coordinates ui_input takes; record false stops recording.
         ui::setSpotRecording(flag("record", true));
         const auto filter = text("filter");
-        juce::Array<juce::var> spots;
+        cydaw::base::Array<cydaw::base::Value> spots;
         for (const auto& spot : ui::recordedSpots()) {
-            if (filter.isNotEmpty() && !juce::String(spot.key).contains(filter))
+            if (filter.isNotEmpty() && !cydaw::base::Text(spot.key).contains(filter))
                 continue;
             auto entry = object();
-            set(entry, "key", juce::String(spot.key));
+            set(entry, "key", cydaw::base::Text(spot.key));
             set(entry, "x", (spot.min.x + spot.max.x) * 0.5f);
             set(entry, "y", (spot.min.y + spot.max.y) * 0.5f);
             set(entry, "width", spot.max.x - spot.min.x);
@@ -1858,7 +1895,7 @@ juce::var Commands::run()
         return ok(result);
     }
     if (command == "ui_input") {
-        if (const auto error = ui_.injectInput(request_.getProperty("events", juce::var())); error.isNotEmpty())
+        if (const auto error = ui_.injectInput(request_.getProperty("events", cydaw::base::Value())); error.isNotEmpty())
             return fail(error);
         return ok(status());
     }
@@ -1903,7 +1940,7 @@ juce::var Commands::run()
         return onSlotStop();
     if (command == "manual" || command == "help") {
         const auto answer = ui_.manual(request_);
-        return answer.isObject() ? ok(answer) : fail(answer.isString() ? answer.toString() : juce::String("no manual interface"));
+        return answer.isObject() ? ok(answer) : fail(answer.isString() ? answer.toString() : cydaw::base::Text("no manual interface"));
     }
     if (command == "processing")
         return onProcessing();
@@ -1912,7 +1949,7 @@ juce::var Commands::run()
         // Their own actions ({"action": ...}); app_mode shows them.
         const auto answer = command == "jsfx" ? ui_.jsfx(request_) : command == "cinema" ? ui_.cinema(request_) : command == "transport_sync" ? ui_.transportSync(request_) : command == "controllers" ? ui_.controllers(request_) : command == "dj" ? ui_.dj(request_) : ui_.foundry(request_);
         if (!answer.isObject())
-            return fail(answer.isString() ? answer.toString() : juce::String("no interface"));
+            return fail(answer.isString() ? answer.toString() : cydaw::base::Text("no interface"));
         return ok(answer);
     }
     if (command == "app_mode") {
@@ -1926,13 +1963,13 @@ juce::var Commands::run()
     if (command == "theme") {
         const auto answer = ui_.themes(request_);
         if (!answer.isObject())
-            return fail(answer.isString() ? answer.toString() : juce::String("no interface"));
+            return fail(answer.isString() ? answer.toString() : cydaw::base::Text("no interface"));
         return ok(answer);
     }
     if (command == "computer_keyboard" || command == "midi_inputs") {
         const auto answer = ui_.midiInputs(command, request_);
         if (!answer.isObject())
-            return fail(answer.isString() ? answer.toString() : juce::String("no interface"));
+            return fail(answer.isString() ? answer.toString() : cydaw::base::Text("no interface"));
         return ok(answer);
     }
     if (command == "master_clip")
@@ -1989,17 +2026,16 @@ juce::var Commands::run()
 
 // ---- Application and project --------------------------------------------------------------
 
-juce::var Commands::onPing() const
+cydaw::base::Value Commands::onPing() const
 {
     auto result = object();
     set(result, "app", "CyDAW");
     set(result, "interface", "CyDAW 2");
-    if (auto* application = juce::JUCEApplicationBase::getInstance())
-        set(result, "version", application->getApplicationVersion());
+    set(result, "version", CYDAW_APPLICATION_VERSION);
     return ok(result);
 }
 
-juce::var Commands::onOpenProject()
+cydaw::base::Value Commands::onOpenProject()
 {
     const auto file = fileFor(text("path"));
     if (!file.existsAsFile() || !file.hasFileExtension("cydaw"))
@@ -2025,10 +2061,10 @@ juce::var Commands::onOpenProject()
     return ok(result);
 }
 
-juce::var Commands::onSaveProject()
+cydaw::base::Value Commands::onSaveProject()
 {
     auto file = has("path") ? fileFor(text("path")) : studio_.projectFile();
-    if (file == juce::File {})
+    if (file == cydaw::base::File {})
         return fail("the project has no file yet; give a path");
     file = file.withFileExtension("cydaw");
     if (const auto saved = studio_.saveProject(file); saved.failed())
@@ -2040,11 +2076,11 @@ juce::var Commands::onSaveProject()
     return ok(result);
 }
 
-juce::var Commands::onTemplates()
+cydaw::base::Value Commands::onTemplates()
 {
-    const auto files = studio_.templates();
+    const auto files = ui_.modeTemplateFiles();
     if (command_ == "list_templates") {
-        juce::Array<juce::var> entries;
+        cydaw::base::Array<cydaw::base::Value> entries;
         for (const auto& file : files) {
             auto entry = object();
             set(entry, "name", file.getFileNameWithoutExtension());
@@ -2057,11 +2093,11 @@ juce::var Commands::onTemplates()
         return ok(result);
     }
     const auto name = text("name").trim();
-    juce::File chosen;
+    cydaw::base::File chosen;
     auto looseMatches = 0;
     for (const auto& file : files) {
         const auto candidate = file.getFileNameWithoutExtension();
-        if (candidate.equalsIgnoreCase(name)) {
+        if (candidate.equalsIgnoreCase(name.toRawUTF8())) {
             chosen = file;
             looseMatches = 1;
             break;
@@ -2071,18 +2107,14 @@ juce::var Commands::onTemplates()
             ++looseMatches;
         }
     }
-    if (looseMatches != 1 || chosen == juce::File {})
+    if (looseMatches != 1 || chosen == cydaw::base::File {})
         return fail("no single template matches \"" + name + "\"; list_templates gives their names");
-    if (studio_.isRecording())
-        (void) studio_.stopRecording(false);
-    const auto loaded = studio_.loadProject(chosen);
-    ui_.sessionReplaced();
-    if (loaded.failed())
-        return fail(loaded.getErrorMessage());
+    if (const auto error = ui_.loadModeTemplate(chosen); error.isNotEmpty())
+        return fail(error);
     return ok(status());
 }
 
-juce::var Commands::onImportProject()
+cydaw::base::Value Commands::onImportProject()
 {
     namespace importer = app::project_import;
     const auto file = fileFor(text("file"));
@@ -2104,7 +2136,7 @@ juce::var Commands::onImportProject()
     importer::ImportedProject project;
     if (const auto read = importer::importProjectFile(file, project); read.failed())
         return fail(read.getErrorMessage());
-    juce::String summary;
+    cydaw::base::Text summary;
     const auto imported = studio_.importProject(file, summary);
     ui_.sessionReplaced();
     if (imported.failed())
@@ -2135,8 +2167,8 @@ juce::var Commands::onImportProject()
     set(report, "numerator", project.numerator);
     set(report, "denominator", project.denominator);
     set(report, "masterGainDb", project.masterGainDb);
-    juce::Array<juce::var> tracks;
-    juce::StringArray warnings(project.warnings);
+    cydaw::base::Array<cydaw::base::Value> tracks;
+    cydaw::base::TextList warnings(project.warnings);
     for (const auto& source : project.tracks) {
         auto entry = object();
         set(entry, "name", source.name);
@@ -2168,7 +2200,7 @@ juce::var Commands::onImportProject()
     return ok(report);
 }
 
-juce::var Commands::onNewProject()
+cydaw::base::Value Commands::onNewProject()
 {
     // An empty project, then the one MIDI track a session starts with.
     if (studio_.isRecording())
@@ -2181,7 +2213,7 @@ juce::var Commands::onNewProject()
     return ok(status());
 }
 
-juce::var Commands::onSetView()
+cydaw::base::Value Commands::onSetView()
 {
     const auto mode = static_cast<int>(number("mode", 1.0));
     if (mode < 1 || mode > 11)
@@ -2191,7 +2223,7 @@ juce::var Commands::onSetView()
         const auto spec = text("bus").trim();
         std::uint64_t busId = 0;
         for (const auto& bus : engine_.virtualBuses())
-            if (bus.name.equalsIgnoreCase(spec) || juce::String(static_cast<juce::int64>(bus.id)) == spec)
+            if (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == spec)
                 busId = bus.id;
         if (busId == 0)
             return fail("no bus \"" + spec + "\"; list_buses lists them");
@@ -2230,7 +2262,7 @@ juce::var Commands::onSetView()
     return ok(result);
 }
 
-juce::var Commands::onSnapshot()
+cydaw::base::Value Commands::onSnapshot()
 {
     const auto file = fileFor(text("path")).withFileExtension("png");
     (void) file.getParentDirectory().createDirectory();
@@ -2244,7 +2276,7 @@ juce::var Commands::onSnapshot()
     return ok(result);
 }
 
-juce::var Commands::onExportMix()
+cydaw::base::Value Commands::onExportMix()
 {
     if (engine_.isMasterExporting())
         return fail("an export is already running");
@@ -2260,7 +2292,7 @@ juce::var Commands::onExportMix()
     return ok(result);
 }
 
-juce::var Commands::onQuit()
+cydaw::base::Value Commands::onQuit()
 {
     // The answer goes out first; the interface quits right after.
     ui_.requestQuit();
@@ -2271,7 +2303,7 @@ juce::var Commands::onQuit()
 
 // ---- Transport -------------------------------------------------------------------------------
 
-juce::var Commands::onTransport()
+cydaw::base::Value Commands::onTransport()
 {
     if (engine_.isMasterExporting())
         return fail("an export is running");
@@ -2296,9 +2328,9 @@ juce::var Commands::onTransport()
     return ok(result);
 }
 
-juce::var Commands::onSetTempo()
+cydaw::base::Value Commands::onSetTempo()
 {
-    const auto bpm = juce::jlimit(20.0, 300.0, number("bpm", engine_.tempo()));
+    const auto bpm = cydaw::base::limit(20.0, 300.0, number("bpm", engine_.tempo()));
     engine_.setTempo(bpm);
     // The metre: {"numerator": 5, "denominator": 4}.
     if (has("numerator") || has("denominator"))
@@ -2312,7 +2344,7 @@ juce::var Commands::onSetTempo()
     return ok(result);
 }
 
-juce::var Commands::onSetLoop()
+cydaw::base::Value Commands::onSetLoop()
 {
     if (has("start") || has("end")) {
         const auto start = std::max(0.0, number("start", engine_.loopStart()));
@@ -2330,11 +2362,11 @@ juce::var Commands::onSetLoop()
     return ok(result);
 }
 
-juce::var Commands::onSetMasterGain()
+cydaw::base::Value Commands::onSetMasterGain()
 {
     // {gainDb, muted}: the master's fader, and its mute (a probe that must stay
     // silent whatever a project restores).
-    const auto gainDb = juce::jlimit(-60.0, 12.0, number("gainDb", engine_.masterGainDb()));
+    const auto gainDb = cydaw::base::limit(-60.0, 12.0, number("gainDb", engine_.masterGainDb()));
     engine_.setMasterGain(static_cast<float>(gainDb));
     if (has("muted"))
         engine_.setMasterMuted(flag("muted", false));
@@ -2347,14 +2379,14 @@ juce::var Commands::onSetMasterGain()
 
 // ---- Tracks ------------------------------------------------------------------------------------
 
-juce::var Commands::onAddMidiTrack()
+cydaw::base::Value Commands::onAddMidiTrack()
 {
     if (engine_.isMidiRecording())
         return fail("a MIDI recording is running");
     auto name = text("name").trim();
     if (name.isEmpty())
         name = app::tr("midi.instrument") + " "
-               + juce::String(static_cast<int>(engine_.midiTrackSummaries().size() + 1));
+               + cydaw::base::Text(static_cast<int>(engine_.midiTrackSummaries().size() + 1));
     // "instrument": a factory instrument's device key ("prism-instrument"…).
     const auto track = studio_.addMidiTrack(name, text("instrument").trim());
     if (!track)
@@ -2367,7 +2399,7 @@ juce::var Commands::onAddMidiTrack()
     return ok(result);
 }
 
-juce::var Commands::onAddAudioTrack()
+cydaw::base::Value Commands::onAddAudioTrack()
 {
     const auto file = fileFor(text("file"));
     if (!file.existsAsFile())
@@ -2383,7 +2415,7 @@ juce::var Commands::onAddAudioTrack()
     return ok(result);
 }
 
-juce::var Commands::onSetTrack()
+cydaw::base::Value Commands::onSetTrack()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -2395,8 +2427,8 @@ juce::var Commands::onSetTrack()
     auto muted = current.muted;
     auto solo = current.solo;
     if (has("gainDb") || has("pan")) {
-        gainDb = static_cast<float>(juce::jlimit(-60.0, 12.0, number("gainDb", current.gainDb)));
-        pan = static_cast<float>(juce::jlimit(-1.0, 1.0, number("pan", current.pan)));
+        gainDb = static_cast<float>(cydaw::base::limit(-60.0, 12.0, number("gainDb", current.gainDb)));
+        pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, number("pan", current.pan)));
     }
     if (has("muted"))
         muted = flag("muted", current.muted);
@@ -2429,7 +2461,7 @@ juce::var Commands::onSetTrack()
         const auto spec = text("inputBus").trim();
         std::uint64_t busId = 0;
         for (const auto& bus : engine_.virtualBuses())
-            if (bus.name.equalsIgnoreCase(spec) || juce::String(static_cast<juce::int64>(bus.id)) == spec)
+            if (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == spec)
                 busId = bus.id;
         if (busId == 0 || !engine_.setTrackInputBus(track->index, busId))
             return fail("no input bus \"" + spec + "\"; status lists the buses");
@@ -2453,7 +2485,7 @@ juce::var Commands::onSetTrack()
     return ok(describeTracks());
 }
 
-juce::var Commands::onRemoveTrack()
+cydaw::base::Value Commands::onRemoveTrack()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
@@ -2494,7 +2526,7 @@ juce::var Commands::onRemoveTrack()
     return ok(describeTracks());
 }
 
-juce::var Commands::onMoveTrack()
+cydaw::base::Value Commands::onMoveTrack()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
@@ -2506,7 +2538,7 @@ juce::var Commands::onMoveTrack()
     const auto to = static_cast<int>(number("to", -1.0));
     const auto total = static_cast<int>(shown.size());
     if (to < 0 || to >= total)
-        return fail("to is an index from 0 to " + juce::String(total - 1) + " in the order shown");
+        return fail("to is an index from 0 to " + cydaw::base::Text(total - 1) + " in the order shown");
     const auto found = std::find(shown.begin(), shown.end(), track->ref());
     if (found == shown.end())
         return fail("no such track");
@@ -2524,7 +2556,7 @@ namespace {
 // [{position, value, bend}, ...] (position 0..1 along the note; semitones
 // for the pitch, dB for the gain; bend -1..1, how the way to the next point
 // curves: a glide's arrival toward 1).
-std::vector<Engine::NoteExpressionPoint> expressionFrom(const juce::var& value)
+std::vector<Engine::NoteExpressionPoint> expressionFrom(const cydaw::base::Value& value)
 {
     std::vector<Engine::NoteExpressionPoint> points;
     if (const auto* items = value.getArray())
@@ -2552,29 +2584,29 @@ std::vector<Engine::NoteExpressionPoint> expressionFrom(const juce::var& value)
 
 // A note's timbre, pressure and pan curves and its chance, as given (a
 // curve given replaces the note's; []: none).
-void noteExtras(Engine& engine, const std::uint64_t trackId, const std::uint64_t clipId, const std::uint64_t noteId, const juce::var& given)
+void noteExtras(Engine& engine, const std::uint64_t trackId, const std::uint64_t clipId, const std::uint64_t noteId, const cydaw::base::Value& given)
 {
     using Curve = Engine::NoteCurve;
     for (const auto& [name, curve] : { std::pair { "timbre", Curve::timbre }, std::pair { "pressure", Curve::pressure },
                                        std::pair { "pan", Curve::pan } })
         if (given.hasProperty(name))
-            (void) engine.setMidiNoteCurve(trackId, clipId, noteId, curve, expressionFrom(given.getProperty(name, juce::var())));
+            (void) engine.setMidiNoteCurve(trackId, clipId, noteId, curve, expressionFrom(given.getProperty(name, cydaw::base::Value())));
     if (given.hasProperty("chance"))
         (void) engine.setMidiNoteChance(trackId, clipId, noteId, static_cast<float>(static_cast<double>(given.getProperty("chance", 1.0))));
 }
 
-juce::var expressionVar(const std::vector<Engine::NoteExpressionPoint>& points)
+cydaw::base::Value expressionVar(const std::vector<Engine::NoteExpressionPoint>& points)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& point : points)
-        values.add(point.bend != 0.0f ? juce::Array<juce::var> { point.position, point.value, point.bend }
-                                      : juce::Array<juce::var> { point.position, point.value });
+        values.add(point.bend != 0.0f ? cydaw::base::Array<cydaw::base::Value> { point.position, point.value, point.bend }
+                                      : cydaw::base::Array<cydaw::base::Value> { point.position, point.value });
     return values;
 }
 
 } // namespace
 
-juce::var Commands::onNotes()
+cydaw::base::Value Commands::onNotes()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -2586,11 +2618,11 @@ juce::var Commands::onNotes()
         const auto info = midiInfo(track->id);
         if (!info)
             return fail("the track is gone");
-        juce::Array<juce::var> clips;
+        cydaw::base::Array<cydaw::base::Value> clips;
         for (const auto& clip : info->clips) {
             if (clipName.isNotEmpty() && !clip.name.equalsIgnoreCase(clipName))
                 continue;
-            juce::Array<juce::var> entries;
+            cydaw::base::Array<cydaw::base::Value> entries;
             for (const auto& note : clip.notes) {
                 auto entry = object();
                 set(entry, "id", idOf(note.id));
@@ -2648,7 +2680,7 @@ juce::var Commands::onNotes()
         return ok(result);
     }
     // add_notes: into the clip named, the first one, or a new one.
-    const auto* list = request_.getProperty("notes", juce::var()).getArray();
+    const auto* list = request_.getProperty("notes", cydaw::base::Value()).getArray();
     if (list == nullptr || list->isEmpty())
         return fail("notes must be a non-empty array of {note, start, length, velocity}");
     auto info = midiInfo(track->id);
@@ -2681,13 +2713,13 @@ juce::var Commands::onNotes()
             continue;
         const auto noteId = engine_.addMidiNote(track->id, clip->id, pitch, std::max(0.0, numberOf(note, "start", 0.0)),
                                                 std::max(0.01, numberOf(note, "length", 1.0)),
-                                                static_cast<float>(juce::jlimit(0.01, 1.0, numberOf(note, "velocity", 0.8))));
+                                                static_cast<float>(cydaw::base::limit(0.01, 1.0, numberOf(note, "velocity", 0.8))));
         if (noteId == 0)
             continue;
         ++added;
         if (note.hasProperty("pitch") || note.hasProperty("gain"))
-            (void) engine_.setMidiNoteExpression(track->id, clip->id, noteId, expressionFrom(note.getProperty("pitch", juce::var())),
-                                                 expressionFrom(note.getProperty("gain", juce::var())));
+            (void) engine_.setMidiNoteExpression(track->id, clip->id, noteId, expressionFrom(note.getProperty("pitch", cydaw::base::Value())),
+                                                 expressionFrom(note.getProperty("gain", cydaw::base::Value())));
         noteExtras(engine_, track->id, clip->id, noteId, note);
     }
     // The track written to is the one shown, as a MIDI recording expects.
@@ -2706,7 +2738,7 @@ juce::var Commands::onNotes()
     return ok(result);
 }
 
-juce::var Commands::onEditNotes()
+cydaw::base::Value Commands::onEditNotes()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -2721,7 +2753,7 @@ juce::var Commands::onEditNotes()
         const auto clip = midiClipNamed(*info, clipName);
         if (!clip)
             return fail("no clip on that track"
-                        + (clipName.isNotEmpty() ? " named \"" + clipName + "\"" : juce::String()));
+                        + (clipName.isNotEmpty() ? " named \"" + clipName + "\"" : cydaw::base::Text()));
         const auto looping = has("looping") ? flag("looping", false) : clip->looping;
         auto applied = true;
         // {scene}: into that launcher slot (-1: back into the arrangement,
@@ -2729,7 +2761,7 @@ juce::var Commands::onEditNotes()
         if (has("scene")) {
             const auto scene = static_cast<int>(number("scene", -1.0));
             if (scene >= Engine::maximumLauncherScenes)
-                return fail("scene is 0 to " + juce::String(Engine::maximumLauncherScenes - 1));
+                return fail("scene is 0 to " + cydaw::base::Text(Engine::maximumLauncherScenes - 1));
             if (scene >= 0 && scene != clip->launcherScene && studio_.slotHasClip(TrackRef { true, 0, track->id }, scene))
                 return fail("that launcher slot holds a clip already");
             applied = engine_.setMidiClipLauncherScene(track->id, clip->id, std::max(-1, scene));
@@ -2764,32 +2796,32 @@ juce::var Commands::onEditNotes()
     }
     auto touched = 0;
     if (command_ == "update_notes") {
-        const auto* changes = request_.getProperty("notes", juce::var()).getArray();
+        const auto* changes = request_.getProperty("notes", cydaw::base::Value()).getArray();
         if (changes == nullptr || changes->isEmpty())
             return fail("notes must be a non-empty array of {id, note, start, length, velocity}");
         for (const auto& change : *changes) {
-            const auto noteId = idFrom(change.getProperty("id", juce::var()));
+            const auto noteId = idFrom(change.getProperty("id", cydaw::base::Value()));
             for (const auto& clip : info->clips)
                 for (const auto& note : clip.notes)
                     if (note.id == noteId
                         && engine_.updateMidiNote(
                             track->id, clip.id, noteId,
-                            juce::jlimit(0, 127, static_cast<int>(numberOf(change, "note", note.noteNumber))),
+                            cydaw::base::limit(0, 127, static_cast<int>(numberOf(change, "note", note.noteNumber))),
                             std::max(0.0, numberOf(change, "start", note.startBeats)),
                             std::max(0.01, numberOf(change, "length", note.durationBeats)),
-                            static_cast<float>(juce::jlimit(0.01, 1.0, numberOf(change, "velocity", note.velocity))))) {
+                            static_cast<float>(cydaw::base::limit(0.01, 1.0, numberOf(change, "velocity", note.velocity))))) {
                         ++touched;
                         // An expression given replaces the note's ([]: none).
                         if (change.hasProperty("pitch") || change.hasProperty("gain"))
                             (void) engine_.setMidiNoteExpression(
                                 track->id, clip.id, noteId,
-                                change.hasProperty("pitch") ? expressionFrom(change.getProperty("pitch", juce::var())) : note.pitch,
-                                change.hasProperty("gain") ? expressionFrom(change.getProperty("gain", juce::var())) : note.gain);
+                                change.hasProperty("pitch") ? expressionFrom(change.getProperty("pitch", cydaw::base::Value())) : note.pitch,
+                                change.hasProperty("gain") ? expressionFrom(change.getProperty("gain", cydaw::base::Value())) : note.gain);
                         noteExtras(engine_, track->id, clip.id, noteId, change);
                     }
         }
     } else {
-        const auto* ids = request_.getProperty("ids", juce::var()).getArray();
+        const auto* ids = request_.getProperty("ids", cydaw::base::Value()).getArray();
         const auto ranged = has("from") || has("to");
         if ((ids == nullptr || ids->isEmpty()) && !ranged)
             return fail("give ids, or a from/to range in beats");
@@ -2817,7 +2849,7 @@ juce::var Commands::onEditNotes()
     return ok(result);
 }
 
-juce::var Commands::onAddMidiClip()
+cydaw::base::Value Commands::onAddMidiClip()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -2834,7 +2866,7 @@ juce::var Commands::onAddMidiClip()
     const auto colour = colourFrom(text("colour"));
     const auto scene = has("scene") ? static_cast<int>(number("scene", -1.0)) : -1;
     if (scene >= Engine::maximumLauncherScenes)
-        return fail("scene is 0 to " + juce::String(Engine::maximumLauncherScenes - 1));
+        return fail("scene is 0 to " + cydaw::base::Text(Engine::maximumLauncherScenes - 1));
     if (scene >= 0 && studio_.slotHasClip(TrackRef { true, 0, track->id }, scene))
         return fail("that launcher slot holds a clip already");
     const auto clipId = engine_.addMidiClip(track->id, text("name").isNotEmpty() ? text("name") : app::tr("midi.clip"),
@@ -2850,7 +2882,7 @@ juce::var Commands::onAddMidiClip()
     return ok(result);
 }
 
-juce::var Commands::onRemoveClip()
+cydaw::base::Value Commands::onRemoveClip()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -2865,14 +2897,14 @@ juce::var Commands::onRemoveClip()
         studio_.markDirty();
         return ok(describeTracks());
     }
-    const auto clipId = idFrom(request_.getProperty("clipId", juce::var()));
+    const auto clipId = idFrom(request_.getProperty("clipId", cydaw::base::Value()));
     if (clipId == 0 || !engine_.removeAudioClip(track->index, clipId))
         return fail("no audio clip with that id; list_audio_clips gives them");
     studio_.markDirty();
     return ok(describeAudioClips(track->index));
 }
 
-juce::var Commands::onExportMidi()
+cydaw::base::Value Commands::onExportMidi()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -2894,7 +2926,7 @@ juce::var Commands::onExportMidi()
     return ok(result);
 }
 
-juce::var Commands::onImportMidi()
+cydaw::base::Value Commands::onImportMidi()
 {
     const auto file = fileFor(text("file"));
     if (!file.existsAsFile())
@@ -2917,9 +2949,9 @@ juce::var Commands::onImportMidi()
 
 // ---- Devices and graphs -------------------------------------------------------------------------
 
-juce::var Commands::onListDevices()
+cydaw::base::Value Commands::onListDevices()
 {
-    juce::Array<juce::var> entries;
+    cydaw::base::Array<cydaw::base::Value> entries;
     for (const auto& device : catalogueGraph().deviceCatalogue()) {
         auto entry = object();
         set(entry, "key", device.key);
@@ -2939,7 +2971,7 @@ juce::var Commands::onListDevices()
     return ok(result);
 }
 
-juce::var Commands::onInsertDevice()
+cydaw::base::Value Commands::onInsertDevice()
 {
     const auto key = text("key").trim();
     std::optional<RemoteTrack> track;
@@ -2991,7 +3023,7 @@ juce::var Commands::onInsertDevice()
     return ok(graphSummary(*target));
 }
 
-juce::var Commands::onParameters()
+cydaw::base::Value Commands::onParameters()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
@@ -3008,7 +3040,7 @@ juce::var Commands::onParameters()
             return fail("no published parameter \"" + key + "\" on that track; list_parameters gives the keys");
         commitGraph(*target, false);
     }
-    juce::Array<juce::var> entries;
+    cydaw::base::Array<cydaw::base::Value> entries;
     const auto interfaceState = graph.graphInterfaceState();
     for (const auto& parameter : interfaceState.parameters) {
         auto entry = object();
@@ -3025,7 +3057,7 @@ juce::var Commands::onParameters()
     return ok(result);
 }
 
-juce::var Commands::targetOrFail(std::optional<GraphTarget>& target)
+cydaw::base::Value Commands::targetOrFail(std::optional<GraphTarget>& target)
 {
     const auto named = text("track").trim();
     if (named.equalsIgnoreCase("workshop") || named.equalsIgnoreCase("atelier")) {
@@ -3056,21 +3088,21 @@ juce::var Commands::targetOrFail(std::optional<GraphTarget>& target)
 }
 
 // The sampler: factory instruments, sample maps, SFZ.
-juce::var Commands::onSampler()
+cydaw::base::Value Commands::onSampler()
 {
     const auto trackResult = [this](const TrackRef& track) {
         ui_.selectTrack(track);
         auto result = object();
         set(result, "track", studio_.trackName(track));
         const auto card = studio_.samplerCardOf(track);
-        set(result, "nodeId", static_cast<juce::int64>(card));
+        set(result, "nodeId", static_cast<std::int64_t>(card));
         if (const auto* slot = studio_.graphFor(track))
             set(result, "description", app::describeSamplerMap(slot->graph().nodeSamplerJson(card)));
         return result;
     };
     if (command_ == "factory_instruments") {
         // The instruments CyDAW ships (Factory/catalogue.json).
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& instrument : studio_.factoryInstruments()) {
             auto item = object();
             set(item, "key", instrument.key);
@@ -3078,12 +3110,12 @@ juce::var Commands::onSampler()
             set(item, "category", instrument.categoryName);
             set(item, "range", instrument.range);
             set(item, "map", instrument.map.getFullPathName());
-            if (instrument.model != juce::File())
+            if (instrument.model != cydaw::base::File())
                 set(item, "model", instrument.model.getFullPathName());
             // Its samples still to download, and from which banks.
             set(item, "missingFiles", instrument.missingFiles);
             set(item, "missingBytes", instrument.missingBytes);
-            set(item, "banks", juce::var(instrument.banks));
+            set(item, "banks", cydaw::base::Value(instrument.banks));
             list.add(item);
         }
         auto result = object();
@@ -3096,10 +3128,10 @@ juce::var Commands::onSampler()
         // samples, or its sound model), or on `track` in place of its
         // instrument (its effects kept); with `download`, its samples still
         // missing fetched too.
-        juce::String error;
+        cydaw::base::Text error;
         const auto model = static_cast<bool>(request_.getProperty("model", false));
         if (!model && flag("download", false)) {
-            juce::String ignored;
+            cydaw::base::Text ignored;
             (void) studio_.downloadFactoryInstrument(text("key"), ignored);
         }
         std::optional<TrackRef> onto;
@@ -3123,7 +3155,7 @@ juce::var Commands::onSampler()
     if (command_ == "sampler_file") {
         // {file: .sfz | .cysampler, controllers: {"100": 127}}: the map it makes, read only
         // (no track, no sample decoded); an SFZ with these controllers at the start.
-        juce::String error;
+        cydaw::base::Text error;
         const auto file = fileFor(text("file"));
         std::map<int, double> controllers;
         if (const auto* given = request_.getProperty("controllers", {}).getDynamicObject())
@@ -3140,11 +3172,11 @@ juce::var Commands::onSampler()
     }
     if (command_ == "new_sampler") {
         // {files: [audio...]}: a new sampler track, the files mapped by their names and pitch.
-        juce::Array<juce::File> files;
+        cydaw::base::Array<cydaw::base::File> files;
         if (const auto* list = request_.getProperty("files", {}).getArray())
             for (const auto& item : *list)
                 files.add(fileFor(item.toString()));
-        juce::String error;
+        cydaw::base::Text error;
         const auto track = studio_.newSamplerTrack(files, error);
         if (!track)
             return fail(error);
@@ -3160,7 +3192,7 @@ juce::var Commands::onSampler()
                 return error;
             on = track->ref();
         }
-        juce::String error;
+        cydaw::base::Text error;
         const auto track = studio_.loadSamplerFile(fileFor(text("file")), on, error);
         if (!track)
             return fail(error);
@@ -3170,7 +3202,7 @@ juce::var Commands::onSampler()
     if (auto error = trackOrFail(track); !error.isVoid())
         return error;
     const auto ref = track->ref();
-    const auto card = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)))
+    const auto card = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0)))
                                     : studio_.samplerCardOf(ref);
     const auto* slot = studio_.graphFor(ref);
     if (slot == nullptr || card == 0)
@@ -3178,13 +3210,13 @@ juce::var Commands::onSampler()
     if (command_ == "sampler_map") {
         // {track, nodeId, map}: the card's zones; with "map", replaced (an edit, undoable).
         if (has("map")) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!studio_.setSamplerMap(ref, card, request_.getProperty("map", {}), static_cast<bool>(request_.getProperty("applySettings", false)),
                                        error))
                 return fail(error);
         }
         auto result = object();
-        set(result, "nodeId", static_cast<juce::int64>(card));
+        set(result, "nodeId", static_cast<std::int64_t>(card));
         set(result, "map", slot->graph().nodeSamplerJson(card));
         set(result, "description", app::describeSamplerMap(slot->graph().nodeSamplerJson(card)));
         return ok(result);
@@ -3196,8 +3228,8 @@ juce::var Commands::onSampler()
         auto* editable = studio_.graphFor(ref);
         if (map == nullptr || editable == nullptr)
             return fail("the sampler card holds no map");
-        const auto prefix = "node." + juce::String(static_cast<juce::int64>(card)) + ".sampler.";
-        juce::Array<juce::var> problems;
+        const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(card)) + ".sampler.";
+        cydaw::base::Array<cydaw::base::Value> problems;
         if (const auto* given = request_.getProperty("set", {}).getDynamicObject())
             for (const auto& [name, value] : given->getProperties()) {
                 const auto key = name.toString();
@@ -3208,28 +3240,28 @@ juce::var Commands::onSampler()
             }
         const auto values = slot->graph().editorSamplerControls(card);
         auto result = object();
-        set(result, "nodeId", static_cast<juce::int64>(card));
-        juce::Array<juce::var> controls;
+        set(result, "nodeId", static_cast<std::int64_t>(card));
+        cydaw::base::Array<cydaw::base::Value> controls;
         for (const auto& control : map->controls) {
             const auto number = static_cast<std::size_t>(std::clamp(control.controller, 0, 127));
             const auto onCard = values ? values->controllers[number] : -1.0f;
             auto item = object();
             set(item, "cc", static_cast<int>(number));
-            set(item, "label", juce::String::fromUTF8(control.label.c_str()));
+            set(item, "label", cydaw::base::Text::fromUTF8(control.label.c_str()));
             set(item, "start", map->controllerStart[number]);
             set(item, "value", onCard >= 0.0f ? onCard : map->controllerStart[number]);
             set(item, "set", onCard >= 0.0f);
             controls.add(item);
         }
         set(result, "controls", controls);
-        juce::Array<juce::var> articulations;
+        cydaw::base::Array<cydaw::base::Value> articulations;
         for (int key = 0; key < 128; ++key)
             if (map->keyswitchKeys[static_cast<std::size_t>(key)]) {
                 auto item = object();
                 set(item, "key", key);
                 for (const auto& [labelled, name] : map->keyswitchLabels)
                     if (labelled == key)
-                        set(item, "label", juce::String::fromUTF8(name.c_str()));
+                        set(item, "label", cydaw::base::Text::fromUTF8(name.c_str()));
                 articulations.add(item);
             }
         set(result, "articulations", articulations);
@@ -3259,7 +3291,7 @@ juce::var Commands::onSampler()
     auto ready = 0;
     auto failed = 0;
     auto deferred = 0;
-    juce::int64 frames {};
+    std::int64_t frames {};
     for (const auto& zone : map->zones) {
         if (zone.sample != nullptr && zone.sample->ready.load()) {
             ++ready;
@@ -3290,35 +3322,35 @@ juce::var Commands::onSampler()
     // Read from the disk: this map's long recordings (their heads in memory),
     // every track's: the rings playing now, the frames missed, rings refused.
     auto streamedZones = 0;
-    juce::int64 heldBytes {};
+    std::int64_t heldBytes {};
     for (const auto& zone : map->zones)
         if (zone.sample != nullptr && zone.sample->ready.load() && zone.sample->streamed) {
             ++streamedZones;
-            heldBytes += static_cast<juce::int64>(zone.sample->pcm.size() * sizeof(std::int16_t));
+            heldBytes += static_cast<std::int64_t>(zone.sample->pcm.size() * sizeof(std::int16_t));
         }
     auto& streams = engine::SampleStreams::instance();
     set(result, "streamedZones", streamedZones);
     set(result, "streamedHeadMegabytes", static_cast<double>(heldBytes) / 1.0e6);
     set(result, "storeStreamed", stats.streamed);
     set(result, "streamsBusy", streams.busy());
-    set(result, "streamUnderruns", static_cast<juce::int64>(streams.underruns.load()));
-    set(result, "streamsRefused", static_cast<juce::int64>(streams.refused.load()));
+    set(result, "streamUnderruns", static_cast<std::int64_t>(streams.underruns.load()));
+    set(result, "streamsRefused", static_cast<std::int64_t>(streams.refused.load()));
     return ok(result);
 }
 
 // banks {action: list | download | cancel | remove | reload, bank, instrument, count, wait}:
 // the sound banks CyDAW knows, what of them is here, their download.
-juce::var Commands::onBanks()
+cydaw::base::Value Commands::onBanks()
 {
     auto& banks = studio_.banks();
-    const auto action = text("action").isNotEmpty() ? text("action") : juce::String("list");
+    const auto action = text("action").isNotEmpty() ? text("action") : cydaw::base::Text("list");
     const auto bank = text("bank");
     if (action == "reload") {
         banks.loadRegistry();
         banks.forgetDisk();
     } else if (action == "download") {
         if (has("instrument")) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!studio_.downloadFactoryInstrument(text("instrument"), error))
                 return fail(error);
         } else {
@@ -3331,7 +3363,7 @@ juce::var Commands::onBanks()
     } else if (action == "cancel") {
         banks.cancel();
     } else if (action == "remove") {
-        juce::String error;
+        cydaw::base::Text error;
         if (!banks.remove(bank, error))
             return fail(error);
     } else if (action != "list") {
@@ -3339,14 +3371,14 @@ juce::var Commands::onBanks()
     }
     // Waiting for the downloads (their threads go on meanwhile).
     if (has("wait")) {
-        const auto deadline = juce::Time::getMillisecondCounterHiRes() + number("wait", 30.0) * 1'000.0;
-        while (banks.busy() && juce::Time::getMillisecondCounterHiRes() < deadline)
-            juce::Thread::sleep(20);
+        const auto deadline = cydaw::base::Time::getMillisecondCounterHiRes() + number("wait", 30.0) * 1'000.0;
+        while (banks.busy() && cydaw::base::Time::getMillisecondCounterHiRes() < deadline)
+            cydaw::base::Thread::sleep(20);
     }
     auto result = object();
     set(result, "folder", app::banksFolder().getFullPathName());
     set(result, "registry", banks.registryFile().getFullPathName());
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& entry : banks.banks()) {
         if (bank.isNotEmpty() && entry.id != bank && action == "list")
             continue;
@@ -3395,7 +3427,7 @@ juce::var Commands::onBanks()
 // destination may be given by name ("lfo1", "filter.cutoff"); init puts every
 // setting back to its default first. Answers every value, the sources and the
 // destinations by name.
-juce::var Commands::onPrism()
+cydaw::base::Value Commands::onPrism()
 {
     namespace prism = engine::prism;
     std::optional<RemoteTrack> track;
@@ -3405,7 +3437,7 @@ juce::var Commands::onPrism()
     if (slot == nullptr)
         return fail("that track has no graph");
     auto& graph = slot->graph();
-    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0))) : 0;
+    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0))) : 0;
     if (nodeId == 0)
         for (const auto& node : graph.editorNodes())
             if (node.typeKey == "prism-synth") {
@@ -3415,14 +3447,14 @@ juce::var Commands::onPrism()
     if (!graph.editorPrismValues(nodeId))
         return fail("no Prisme card on that track");
     // An oscillator's own table: a sound file made its table, or taken out.
-    const auto oscillatorOf = [](const juce::var& value) {
+    const auto oscillatorOf = [](const cydaw::base::Value& value) {
         const auto text = value.toString().toLowerCase();
         return text == "b" || text == "1" ? 1 : 0;
     };
     if (const auto* import = request_.getProperty("importTable", {}).getDynamicObject()) {
-        juce::String importError;
+        cydaw::base::Text importError;
         if (!studio_.importPrismTable(track->ref(), nodeId, oscillatorOf(import->getProperty("osc")),
-                                      juce::File(import->getProperty("file").toString()), importError))
+                                      cydaw::base::File(import->getProperty("file").toString()), importError))
             return fail(importError);
     }
     if (has("clearTable"))
@@ -3432,10 +3464,10 @@ juce::var Commands::onPrism()
                                               "pitchBend", "macro1",  "macro2",     "macro3",    "macro4", "random" };
     static_assert(sizeof(sourceKeys) / sizeof(sourceKeys[0]) == static_cast<std::size_t>(prism::Source::count));
     const auto bindingOf = [nodeId](const int index) {
-        return "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".prism." + juce::String(prism::parameter(index).key);
+        return "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".prism." + cydaw::base::Text(prism::parameter(index).key);
     };
     const auto current = [&graph, nodeId] { return *graph.editorPrismValues(nodeId); };
-    juce::StringArray problems;
+    cydaw::base::TextList problems;
     if (flag("init", false)) {
         const auto defaults = prism::defaultValues();
         const auto values = current();
@@ -3464,14 +3496,14 @@ juce::var Commands::onPrism()
                         found = 0;
                     const auto& list = prism::destinations();
                     for (std::size_t at = 1; at < list.size(); ++at)
-                        if (text == juce::String(prism::parameter(list[at]).key))
+                        if (text == cydaw::base::Text(prism::parameter(list[at]).key))
                             found = static_cast<int>(at);
                 } else {
                     // A choice by its English name ("Low pass 24", "Saw up").
                     const auto& choices = prism::parameter(index).choices;
                     for (std::size_t at = 0; at < choices.size(); ++at)
-                        if (text.equalsIgnoreCase(juce::String::fromUTF8(choices[at].second.c_str()))
-                            || text.equalsIgnoreCase(juce::String::fromUTF8(choices[at].first.c_str())))
+                        if (text.equalsIgnoreCase(cydaw::base::Text::fromUTF8(choices[at].second.c_str()))
+                            || text.equalsIgnoreCase(cydaw::base::Text::fromUTF8(choices[at].first.c_str())))
                             found = static_cast<int>(at);
                 }
                 if (found < 0) {
@@ -3485,24 +3517,24 @@ juce::var Commands::onPrism()
             (void) graph.editorSetParameter(bindingOf(index), prism::clampValue(index, static_cast<float>(number)));
         }
     auto result = object();
-    set(result, "nodeId", static_cast<juce::int64>(nodeId));
+    set(result, "nodeId", static_cast<std::int64_t>(nodeId));
     auto values = object();
     const auto now = current();
     for (int index = 0; index < prism::parameterCount; ++index)
         if (auto* fields = values.getDynamicObject())
-            fields->setProperty(juce::Identifier(prism::parameter(index).key), now[static_cast<std::size_t>(index)]);
+            fields->setProperty(cydaw::base::Identifier(prism::parameter(index).key), now[static_cast<std::size_t>(index)]);
     set(result, "values", values);
-    juce::StringArray sources;
+    cydaw::base::TextList sources;
     for (const auto* key : sourceKeys)
         sources.add(key);
     set(result, "sources", strings(sources));
-    juce::StringArray destinations;
+    cydaw::base::TextList destinations;
     for (std::size_t at = 1; at < prism::destinations().size(); ++at)
-        destinations.add(juce::String(prism::parameter(prism::destinations()[at]).key));
+        destinations.add(cydaw::base::Text(prism::parameter(prism::destinations()[at]).key));
     set(result, "destinations", strings(destinations));
-    juce::StringArray tables;
+    cydaw::base::TextList tables;
     for (int table = 0; table < prism::factoryTableCount(); ++table)
-        tables.add(juce::String(prism::factoryTableName(table)));
+        tables.add(cydaw::base::Text(prism::factoryTableName(table)));
     set(result, "tables", strings(tables));
     // The oscillators' own tables (imported): name and frames.
     auto own = object();
@@ -3510,7 +3542,7 @@ juce::var Commands::onPrism()
         for (int oscillator = 0; oscillator < prism::oscillatorCount; ++oscillator)
             if (const auto& table = ownTables->oscillator[static_cast<std::size_t>(oscillator)]) {
                 auto entry = object();
-                set(entry, "name", juce::String(table->name));
+                set(entry, "name", cydaw::base::Text(table->name));
                 set(entry, "frames", table->frameCount);
                 set(own, oscillator == 0 ? "a" : "b", entry);
             }
@@ -3525,7 +3557,7 @@ juce::var Commands::onPrism()
 // "Tube"). init puts every setting back to its default first. Answers every
 // value and what the kick is, measured off the speakers: its peak (dBFS), how
 // long it lasts, the pitch it ends on.
-juce::var Commands::onKick()
+cydaw::base::Value Commands::onKick()
 {
     namespace kick = engine::kick;
     std::optional<RemoteTrack> track;
@@ -3535,7 +3567,7 @@ juce::var Commands::onKick()
     if (slot == nullptr)
         return fail("that track has no graph");
     auto& graph = slot->graph();
-    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0))) : 0;
+    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0))) : 0;
     if (nodeId == 0)
         for (const auto& node : graph.editorNodes())
             if (node.typeKey == "kick-synth") {
@@ -3545,10 +3577,10 @@ juce::var Commands::onKick()
     if (!graph.editorKickValues(nodeId))
         return fail("no Kick card on that track");
     const auto bindingOf = [nodeId](const int index) {
-        return "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".kick." + juce::String(kick::parameter(index).key);
+        return "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".kick." + cydaw::base::Text(kick::parameter(index).key);
     };
     const auto current = [&graph, nodeId] { return *graph.editorKickValues(nodeId); };
-    juce::StringArray problems;
+    cydaw::base::TextList problems;
     if (flag("init", false)) {
         const auto defaults = kick::defaultValues();
         const auto values = current();
@@ -3570,8 +3602,8 @@ juce::var Commands::onKick()
                 auto found = -1;
                 const auto& choices = kick::parameter(index).choices;
                 for (std::size_t at = 0; at < choices.size(); ++at)
-                    if (text.equalsIgnoreCase(juce::String::fromUTF8(choices[at].second.c_str()))
-                        || text.equalsIgnoreCase(juce::String::fromUTF8(choices[at].first.c_str())))
+                    if (text.equalsIgnoreCase(cydaw::base::Text::fromUTF8(choices[at].second.c_str()))
+                        || text.equalsIgnoreCase(cydaw::base::Text::fromUTF8(choices[at].first.c_str())))
                         found = static_cast<int>(at);
                 if (found < 0) {
                     problems.add("\"" + text + "\" is not a value of " + key);
@@ -3584,12 +3616,12 @@ juce::var Commands::onKick()
             (void) graph.editorSetParameter(bindingOf(index), kick::clampValue(index, static_cast<float>(number)));
         }
     auto result = object();
-    set(result, "nodeId", static_cast<juce::int64>(nodeId));
+    set(result, "nodeId", static_cast<std::int64_t>(nodeId));
     auto values = object();
     const auto now = current();
     for (int index = 0; index < kick::parameterCount; ++index)
         if (auto* fields = values.getDynamicObject())
-            fields->setProperty(juce::Identifier(kick::parameter(index).key), now[static_cast<std::size_t>(index)]);
+            fields->setProperty(cydaw::base::Identifier(kick::parameter(index).key), now[static_cast<std::size_t>(index)]);
     set(result, "values", values);
     // The kick as the voice plays it at C2, full velocity, rendered here.
     const auto samples = kick::renderKick(now, 48'000.0);
@@ -3608,7 +3640,7 @@ juce::var Commands::onKick()
     return ok(result);
 }
 
-juce::var Commands::onSynth()
+cydaw::base::Value Commands::onSynth()
 {
     namespace synth = engine::synth;
     std::optional<RemoteTrack> track;
@@ -3623,7 +3655,7 @@ juce::var Commands::onSynth()
     const auto wanted = has("model") ? synth::modelForPrefix(text("model").trim().toLowerCase().toStdString()) : synth::Model::none;
     if (has("model") && wanted == synth::Model::none)
         return fail("no synth model \"" + text("model") + "\"");
-    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0))) : 0;
+    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0))) : 0;
     if (nodeId == 0)
         for (const auto& node : graph.editorNodes()) {
             const auto model = synth::modelForType(node.typeKey.toStdString());
@@ -3638,11 +3670,11 @@ juce::var Commands::onSynth()
     const auto model = found->first;
     const auto& info = synth::info(model);
     const auto bindingOf = [nodeId, &info, model](const int index) {
-        return "node." + juce::String(static_cast<juce::int64>(nodeId)) + "." + juce::String(info.prefix) + "."
-               + juce::String(synth::parameter(model, index).key);
+        return "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + "." + cydaw::base::Text(info.prefix) + "."
+               + cydaw::base::Text(synth::parameter(model, index).key);
     };
     const auto current = [&graph, nodeId] { return graph.editorSynthValues(nodeId)->second; };
-    juce::StringArray problems;
+    cydaw::base::TextList problems;
     if (flag("init", false)) {
         const auto defaults = synth::defaultValues(model);
         const auto values = current();
@@ -3664,8 +3696,8 @@ juce::var Commands::onSynth()
                 auto chosen = -1;
                 const auto& choices = synth::parameter(model, index).choices;
                 for (std::size_t at = 0; at < choices.size(); ++at)
-                    if (text.equalsIgnoreCase(juce::String::fromUTF8(choices[at].second.c_str()))
-                        || text.equalsIgnoreCase(juce::String::fromUTF8(choices[at].first.c_str())))
+                    if (text.equalsIgnoreCase(cydaw::base::Text::fromUTF8(choices[at].second.c_str()))
+                        || text.equalsIgnoreCase(cydaw::base::Text::fromUTF8(choices[at].first.c_str())))
                         chosen = static_cast<int>(at);
                 if (chosen < 0) {
                     problems.add("\"" + text + "\" is not a value of " + key);
@@ -3680,13 +3712,13 @@ juce::var Commands::onSynth()
             (void) graph.editorSetParameter(bindingOf(index), synth::clampValue(model, index, static_cast<float>(number)));
         }
     auto result = object();
-    set(result, "nodeId", static_cast<juce::int64>(nodeId));
-    set(result, "model", juce::String(info.prefix));
+    set(result, "nodeId", static_cast<std::int64_t>(nodeId));
+    set(result, "model", cydaw::base::Text(info.prefix));
     auto values = object();
     const auto now = current();
     for (int index = 0; index < synth::parameterCount(model); ++index)
         if (auto* fields = values.getDynamicObject())
-            fields->setProperty(juce::Identifier(synth::parameter(model, index).key), now[static_cast<std::size_t>(index)]);
+            fields->setProperty(cydaw::base::Identifier(synth::parameter(model, index).key), now[static_cast<std::size_t>(index)]);
     set(result, "values", values);
     // Heard here, offline (nothing reaches the speakers): the notes held
     // `seconds`, then released and left to end.
@@ -3744,7 +3776,7 @@ juce::var Commands::onSynth()
     return ok(result);
 }
 
-juce::var Commands::onBatterie()
+cydaw::base::Value Commands::onBatterie()
 {
     namespace drum = engine::drum;
     std::optional<RemoteTrack> track;
@@ -3754,7 +3786,7 @@ juce::var Commands::onBatterie()
     if (slot == nullptr)
         return fail("that track has no graph");
     auto& graph = slot->graph();
-    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0))) : 0;
+    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0))) : 0;
     if (nodeId == 0)
         for (const auto& node : graph.editorNodes())
             if (node.typeKey == "batterie") {
@@ -3764,22 +3796,22 @@ juce::var Commands::onBatterie()
     if (!graph.editorDrumValues(nodeId))
         return fail("no Batterie card on that track");
     const auto bindingOf = [nodeId](const int index) {
-        return "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".batterie." + juce::String(drum::parameter(index).key);
+        return "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".batterie." + cydaw::base::Text(drum::parameter(index).key);
     };
-    juce::StringArray problems;
+    cydaw::base::TextList problems;
     // A kit: by its number, its name or its instrument's key.
     if (has("kit")) {
         auto kit = -1;
         const auto wanted = request_.getProperty("kit", {});
         if (wanted.isString()) {
             for (std::size_t at = 0; at < drum::kits.size(); ++at)
-                if (wanted.toString().equalsIgnoreCase(juce::String::fromUTF8(drum::kits[at].french))
+                if (wanted.toString().equalsIgnoreCase(cydaw::base::Text::fromUTF8(drum::kits[at].french))
                     || wanted.toString().equalsIgnoreCase(drum::kits[at].english) || wanted.toString() == drum::kits[at].instrument)
                     kit = static_cast<int>(at);
         } else {
             kit = static_cast<int>(wanted);
         }
-        juce::String error;
+        cydaw::base::Text error;
         if (kit < 0 || kit >= static_cast<int>(drum::kits.size()))
             problems.add("no kit \"" + wanted.toString() + "\"");
         else if (!studio_.setBatterieKit(track->ref(), nodeId, kit, error))
@@ -3805,32 +3837,32 @@ juce::var Commands::onBatterie()
         }
     (void) studio_.publishGraph(track->ref(), true);
     auto result = object();
-    set(result, "nodeId", static_cast<juce::int64>(nodeId));
+    set(result, "nodeId", static_cast<std::int64_t>(nodeId));
     const auto now = *graph.editorDrumValues(nodeId);
     auto values = object();
     for (int index = 0; index < drum::valueCount; ++index)
         if (auto* fields = values.getDynamicObject())
-            fields->setProperty(juce::Identifier(drum::parameter(index).key), now[static_cast<std::size_t>(index)]);
+            fields->setProperty(cydaw::base::Identifier(drum::parameter(index).key), now[static_cast<std::size_t>(index)]);
     set(result, "values", values);
     const auto kit = std::clamp(static_cast<int>(std::lround(now[static_cast<std::size_t>(drum::globalBase + drum::globalKit)])), 0,
                                 static_cast<int>(drum::kits.size()) - 1);
-    set(result, "kit", juce::String::fromUTF8(drum::kits[static_cast<std::size_t>(kit)].english));
-    set(result, "kitInstrument", juce::String(drum::kits[static_cast<std::size_t>(kit)].instrument));
+    set(result, "kit", cydaw::base::Text::fromUTF8(drum::kits[static_cast<std::size_t>(kit)].english));
+    set(result, "kitInstrument", cydaw::base::Text(drum::kits[static_cast<std::size_t>(kit)].instrument));
     set(result, "zones", graph.nodeSamplerJson(nodeId).getProperty("zones", {}).size());
-    juce::StringArray kits;
+    cydaw::base::TextList kits;
     for (const auto& item : drum::kits)
         kits.add(item.english);
     set(result, "kits", strings(kits));
-    juce::StringArray grooves;
+    cydaw::base::TextList grooves;
     for (const auto& groove : drum::grooves())
-        grooves.add(juce::String(groove.key));
+        grooves.add(cydaw::base::Text(groove.key));
     set(result, "grooves", strings(grooves));
     if (!problems.isEmpty())
         set(result, "problems", strings(problems));
     return ok(result);
 }
 
-juce::var Commands::onGroove()
+cydaw::base::Value Commands::onGroove()
 {
     namespace drum = engine::drum;
     std::optional<RemoteTrack> track;
@@ -3847,7 +3879,7 @@ juce::var Commands::onGroove()
         if (fill < 0)
             return fail("no fill \"" + text("fill") + "\"");
     }
-    juce::String error;
+    cydaw::base::Text error;
     const auto clip = studio_.addGrooveClip(track->ref(), groove, static_cast<int>(number("bars", 4.0)), fill,
                                             has("startBeats") ? number("startBeats", 0.0) : -1.0, error);
     if (clip == 0)
@@ -3858,7 +3890,7 @@ juce::var Commands::onGroove()
     return ok(result);
 }
 
-juce::var Commands::onPresets()
+cydaw::base::Value Commands::onPresets()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
@@ -3873,10 +3905,10 @@ juce::var Commands::onPresets()
     PresetMenuCapture capture;
     PresetMenuApply apply;
     if (has("nodeId")) {
-        const auto nodeId = static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)));
+        const auto nodeId = static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0)));
         holder = studio_.devicePresetHolder(ref, nodeId);
         capture = [this, ref, nodeId] { return studio_.devicePresetState(ref, nodeId); };
-        apply = [this, ref, nodeId](const juce::var& state, juce::String& error) {
+        apply = [this, ref, nodeId](const cydaw::base::Value& state, cydaw::base::Text& error) {
             return studio_.applyDevicePreset(ref, nodeId, state, error);
         };
     } else if (has("plugin")) {
@@ -3884,22 +3916,22 @@ juce::var Commands::onPresets()
         pluginIndex = index;
         holder = studio_.pluginPresetHolder(ref, index);
         capture = [this, ref, index] { return studio_.pluginPresetState(ref, index); };
-        apply = [this, ref, index](const juce::var& state, juce::String& error) {
+        apply = [this, ref, index](const cydaw::base::Value& state, cydaw::base::Text& error) {
             return studio_.applyPluginPreset(ref, index, state, error);
         };
     } else {
         wholeChain = true;
         holder = studio_.chainPresetHolder(ref);
         capture = [this, ref] { return studio_.chainPresetState(ref); };
-        apply = [this, ref](const juce::var& state, juce::String& error) { return studio_.applyChainPreset(ref, state, error); };
+        apply = [this, ref](const cydaw::base::Value& state, cydaw::base::Text& error) { return studio_.applyChainPreset(ref, state, error); };
     }
     if (!holder)
         return fail("nothing with presets there");
-    const auto action = text("action").isNotEmpty() ? text("action") : juce::String("list");
+    const auto action = text("action").isNotEmpty() ? text("action") : cydaw::base::Text("list");
     const auto name = text("name").trim();
     auto entries = presets::list(holder->kind, holder->target);
     const auto* entry = presets::find(entries, name);
-    juce::String error;
+    cydaw::base::Text error;
     if (action == "save") {
         if (!presets::save(holder->kind, holder->target, name, capture(), error))
             return fail(error);
@@ -3918,12 +3950,12 @@ juce::var Commands::onPresets()
         if (entry == nullptr || !presets::rename(*entry, text("newName"), error))
             return fail(entry == nullptr ? "no preset \"" + name + "\"" : error);
     } else if (action == "program" && pluginIndex) {
-        juce::StringArray names;
+        cydaw::base::TextList names;
         auto current = -1;
         const auto index = static_cast<int>(number("index", -1.0));
         (void) studio_.pluginPrograms(ref, *pluginIndex, names, current);
         if (index < 0 || index >= names.size())
-            return fail("no program " + juce::String(index));
+            return fail("no program " + cydaw::base::Text(index));
         if (!studio_.selectPluginProgram(ref, *pluginIndex, index, error))
             return fail(error);
         studio_.setPresetName(holder->key, names[index]);
@@ -3945,7 +3977,7 @@ juce::var Commands::onPresets()
     set(result, "target", holder->target);
     set(result, "current", studio_.presetName(holder->key));
     set(result, "folder", presets::userFolder(holder->kind, holder->target).getFullPathName());
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& item : entries) {
         auto value = object();
         set(value, "name", item.name);
@@ -3954,7 +3986,7 @@ juce::var Commands::onPresets()
     }
     set(result, "presets", list);
     if (wholeChain) {
-        juce::Array<juce::var> chains;
+        cydaw::base::Array<cydaw::base::Value> chains;
         for (const auto& [chainKey, chainName] : studio_.factoryChains(ref)) {
             auto value = object();
             set(value, "key", chainKey);
@@ -3964,10 +3996,10 @@ juce::var Commands::onPresets()
         set(result, "chains", chains);
     }
     if (pluginIndex) {
-        juce::StringArray names;
+        cydaw::base::TextList names;
         auto current = -1;
         (void) studio_.pluginPrograms(ref, *pluginIndex, names, current);
-        juce::Array<juce::var> programs;
+        cydaw::base::Array<cydaw::base::Value> programs;
         for (const auto& programName : names)
             programs.add(programName);
         set(result, "programs", programs);
@@ -3981,12 +4013,12 @@ juce::var Commands::onPresets()
 // exports; one changed (folder "" for its default), or all of them in one
 // folder (each in its own folder there; `creations`: the person's too), their
 // content taken along unless `take` is false.
-juce::var Commands::onLocations()
+cydaw::base::Value Commands::onLocations()
 {
     if (flag("cancel", false))
         studio_.cancelLocationMove();
     if (has("all")) {
-        juce::String error;
+        cydaw::base::Text error;
         if (!studio_.setAllLocations(fileFor(text("all")), flag("creations", false), flag("take", true), error))
             return fail(error);
     }
@@ -3994,13 +4026,13 @@ juce::var Commands::onLocations()
         const auto location = locations::fromKey(text("set"));
         if (!location.has_value())
             return fail("no location \"" + text("set") + "\"");
-        const auto folder = text("folder").isNotEmpty() ? fileFor(text("folder")) : juce::File();
-        juce::String error;
+        const auto folder = text("folder").isNotEmpty() ? fileFor(text("folder")) : cydaw::base::File();
+        cydaw::base::Text error;
         if (!studio_.setLocation(*location, folder, flag("take", true), error))
             return fail(error);
     }
     auto result = object();
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto location : allLocations) {
         auto item = object();
         set(item, "key", locations::key(location));
@@ -4037,7 +4069,7 @@ juce::var Commands::onLocations()
 // tail}: a sound file through it into another; {apply: name, track, clip,
 // values, tail, seed}: on a clip (one undo step); {open: track, clip}: the
 // apply window; {show, select, testFile, reload}: the mode's window.
-juce::var Commands::onProcessing()
+cydaw::base::Value Commands::onProcessing()
 {
     namespace proc = processing;
     if (flag("show", false) || has("select") || has("testFile") || has("reload") || has("state")) {
@@ -4052,7 +4084,7 @@ juce::var Commands::onProcessing()
             return fail(written.getErrorMessage());
         auto result = object();
         set(result, "folder", folder.getFullPathName());
-        set(result, "count", static_cast<int>(folder.findChildFiles(juce::File::findFiles, false, juce::String("*") + proc::fileExtension).size()));
+        set(result, "count", static_cast<int>(folder.findChildFiles(cydaw::base::File::findFiles, false, cydaw::base::Text("*") + proc::fileExtension).size()));
         return ok(result);
     }
     if (has("check")) {
@@ -4061,7 +4093,7 @@ juce::var Commands::onProcessing()
             const auto info = proc::inspectJsfx(text("check"));
             set(result, "ok", info.ok);
             set(result, "error", info.error);
-            juce::Array<juce::var> sliders;
+            cydaw::base::Array<cydaw::base::Value> sliders;
             for (const auto& slider : info.sliders)
                 sliders.add(slider.name);
             set(result, "sliders", sliders);
@@ -4069,7 +4101,7 @@ juce::var Commands::onProcessing()
             const auto error = proc::checkNoteScript(text("check"));
             set(result, "ok", error.isEmpty());
             set(result, "error", error);
-            juce::Array<juce::var> settings;
+            cydaw::base::Array<cydaw::base::Value> settings;
             for (const auto& setting : proc::noteScriptSettings(text("check")))
                 settings.add(setting.name);
             set(result, "settings", settings);
@@ -4077,14 +4109,14 @@ juce::var Commands::onProcessing()
         return ok(result);
     }
     if (has("save")) {
-        juce::String error;
+        cydaw::base::Text error;
         auto processing = proc::fromJson(request_.getProperty("save", {}), error);
         if (!processing)
             return fail(error);
-        const auto file = proc::userFolder().getChildFile(juce::File::createLegalFileName(processing->name) + proc::fileExtension);
+        const auto file = proc::userFolder().getChildFile(cydaw::base::File::createLegalFileName(processing->name) + proc::fileExtension);
         if (const auto saved = proc::save(*processing, file); saved.failed())
             return fail(saved.getErrorMessage());
-        (void) ui_.processing(juce::JSON::parse("{\"reload\": true}"));
+        (void) ui_.processing(cydaw::base::JSON::parse("{\"reload\": true}"));
         auto result = object();
         set(result, "file", file.getFullPathName());
         return ok(result);
@@ -4094,7 +4126,7 @@ juce::var Commands::onProcessing()
         if (!found || found->factory)
             return fail("no processing of mine named \"" + text("delete") + "\"");
         (void) found->file.moveToTrash();
-        (void) ui_.processing(juce::JSON::parse("{\"reload\": true}"));
+        (void) ui_.processing(cydaw::base::JSON::parse("{\"reload\": true}"));
         return ok(object());
     }
     if (has("open")) {
@@ -4122,12 +4154,12 @@ juce::var Commands::onProcessing()
         }
         auto result = object();
         const auto report = [&](const proc::AudioResult& rendered, const double rate, const std::int64_t before) {
-            set(result, "framesBefore", static_cast<juce::int64>(before));
-            set(result, "framesAfter", static_cast<juce::int64>(rendered.channels.empty() ? 0 : rendered.channels.front().size()));
+            set(result, "framesBefore", static_cast<std::int64_t>(before));
+            set(result, "framesAfter", static_cast<std::int64_t>(rendered.channels.empty() ? 0 : rendered.channels.front().size()));
             set(result, "tailSeconds", static_cast<double>(rendered.tailFrames) / rate);
             set(result, "endless", rendered.endless);
             set(result, "channels", static_cast<int>(rendered.channels.size()));
-            juce::Array<juce::var> notes;
+            cydaw::base::Array<cydaw::base::Value> notes;
             for (const auto& note : rendered.notes)
                 notes.add(note);
             set(result, "notes", notes);
@@ -4188,7 +4220,7 @@ juce::var Commands::onProcessing()
         kind = proc::Kind::audio;
     else if (text("kind") == "midi")
         kind = proc::Kind::midi;
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& item : proc::library(kind)) {
         auto entry = object();
         set(entry, "name", item.name);
@@ -4196,11 +4228,11 @@ juce::var Commands::onProcessing()
         set(entry, "factory", item.factory);
         set(entry, "file", item.file.getFullPathName());
         set(entry, "description", item.description);
-        juce::Array<juce::var> steps;
+        cydaw::base::Array<cydaw::base::Value> steps;
         for (const auto& step : item.steps)
-            steps.add(juce::String(proc::keyOf(step.type)));
+            steps.add(cydaw::base::Text(proc::keyOf(step.type)));
         set(entry, "steps", steps);
-        juce::Array<juce::var> parameters;
+        cydaw::base::Array<cydaw::base::Value> parameters;
         for (const auto& parameter : proc::parametersOf(item)) {
             auto p = object();
             set(p, "id", parameter.id);
@@ -4220,7 +4252,7 @@ juce::var Commands::onProcessing()
     return ok(result);
 }
 
-juce::var Commands::onSoundMatching()
+cydaw::base::Value Commands::onSoundMatching()
 {
     const auto statusOf = [this] {
         const auto matching = studio_.soundMatching();
@@ -4232,7 +4264,7 @@ juce::var Commands::onSoundMatching()
             set(value, "error", matching.error);
         if (matching.description.isNotEmpty())
             set(value, "description", matching.description);
-        if (matching.model != juce::File())
+        if (matching.model != cydaw::base::File())
             set(value, "model", matching.model.getFullPathName());
         if (matching.track)
             set(value, "track", studio_.trackName(*matching.track));
@@ -4245,7 +4277,7 @@ juce::var Commands::onSoundMatching()
         // A licence that asks to be accepted is the person's to accept: an
         // agent passes acceptLicence only when the person said so, having
         // read it. Followed with companion_info (its job).
-        juce::String error;
+        cydaw::base::Text error;
         if (!studio_.companion().install(text("component"), flag("acceptLicence", false), error))
             return fail(error);
     }
@@ -4255,9 +4287,9 @@ juce::var Commands::onSoundMatching()
         // the job that runs (an installation's progress).
         if (has("python"))
             studio_.companion().setPythonCommand(text("python"));
-        juce::String error;
+        cydaw::base::Text error;
         const auto job = studio_.companion().status();
-        auto info = job.running && job.command == "setup" ? juce::var() : studio_.companion().runNow({ "info" }, error);
+        auto info = job.running && job.command == "setup" ? cydaw::base::Value() : studio_.companion().runNow({ "info" }, error);
         auto result = object();
         set(result, "python", studio_.companion().pythonCommand());
         set(result, "package", Companion::packageFolder().getFullPathName());
@@ -4266,7 +4298,7 @@ juce::var Commands::onSoundMatching()
             set(result, "info", info);
         if (error.isNotEmpty())
             set(result, "error", error);
-        juce::Array<juce::var> components;
+        cydaw::base::Array<cydaw::base::Value> components;
         const auto catalogue = Companion::componentCatalogue();
         const auto listed = catalogue.getProperty("components", {});
         if (const auto* list = listed.getArray())
@@ -4293,7 +4325,7 @@ juce::var Commands::onSoundMatching()
     if (command_ == "match_synth") {
         // {file: wav, synth: auto|opale|quartz, note, evaluations}: a synth
         // patch found for the note; status with sound_matching.
-        if (const auto started = studio_.matchSynth(fileFor(text("file")), has("synth") ? text("synth") : juce::String("auto"),
+        if (const auto started = studio_.matchSynth(fileFor(text("file")), has("synth") ? text("synth") : cydaw::base::Text("auto"),
                                                     has("note") ? static_cast<int>(number("note", -1.0)) : -1,
                                                     has("evaluations") ? static_cast<int>(number("evaluations", 3'000.0)) : 3'000);
             started.failed())
@@ -4303,16 +4335,16 @@ juce::var Commands::onSoundMatching()
     if (command_ == "recreate_sound") {
         // {files: [wav...], name, refine, kind, partials, split, pitch}: one zone per file (a longer
         // recording: per note found); status with sound_matching.
-        juce::Array<juce::File> files;
+        cydaw::base::Array<cydaw::base::File> files;
         if (const auto* list = request_.getProperty("files", {}).getArray())
             for (const auto& item : *list)
                 files.add(fileFor(item.toString()));
         else if (has("file"))
             files.add(fileFor(text("file")));
-        juce::StringArray options;
+        cydaw::base::TextList options;
         for (const auto* option : { "kind", "partials", "split", "pitch" })
             if (has(option))
-                options.addArray({ "--" + juce::String(option), text(option) });
+                options.addArray({ "--" + cydaw::base::Text(option), text(option) });
         if (const auto started = studio_.recreateSound(files, text("name"), static_cast<bool>(request_.getProperty("refine", false)),
                                                        options);
             started.failed())
@@ -4328,7 +4360,7 @@ juce::var Commands::onSoundMatching()
                 return error;
             on = track->ref();
         }
-        juce::String error;
+        cydaw::base::Text error;
         const auto track = studio_.loadSoundModel(fileFor(text("file")), on, error);
         if (!track)
             return fail(error);
@@ -4340,8 +4372,8 @@ juce::var Commands::onSoundMatching()
     }
     if (command_ == "readable_patch") {
         // {track | file}: the model as a wavetable instrument on a new track.
-        juce::var json;
-        juce::String error;
+        cydaw::base::Value json;
+        cydaw::base::Text error;
         if (has("file")) {
             if (app::loadSoundModelFile(fileFor(text("file")), json, error) == nullptr)
                 return fail(error);
@@ -4367,7 +4399,7 @@ juce::var Commands::onSoundMatching()
     return ok(statusOf());
 }
 
-juce::var Commands::onGetTrackGraph()
+cydaw::base::Value Commands::onGetTrackGraph()
 {
     std::optional<GraphTarget> target;
     if (auto error = targetOrFail(target); !error.isVoid())
@@ -4383,10 +4415,10 @@ juce::var Commands::onGetTrackGraph()
 
 // Devices made of a graph: made from cards, kept in My devices and put
 // back into any track.
-juce::var Commands::onGraphDevices()
+cydaw::base::Value Commands::onGraphDevices()
 {
     if (command_ == "list_my_devices") {
-        juce::Array<juce::var> devices;
+        cydaw::base::Array<cydaw::base::Value> devices;
         for (const auto& device : studio_.libraryDevices()) {
             auto entry = object();
             set(entry, "name", device.name);
@@ -4406,13 +4438,13 @@ juce::var Commands::onGraphDevices()
         if (auto error = targetOrFail(target); !error.isVoid())
             return error;
         std::vector<std::uint64_t> ids;
-        if (const auto* list = request_.getProperty("nodeIds", juce::var()).getArray())
+        if (const auto* list = request_.getProperty("nodeIds", cydaw::base::Value()).getArray())
             for (const auto& id : *list)
-                ids.push_back(static_cast<std::uint64_t>(static_cast<juce::int64>(id)));
-        juce::String error;
+                ids.push_back(static_cast<std::uint64_t>(static_cast<std::int64_t>(id)));
+        cydaw::base::Text error;
         const auto card = studio_.createDeviceFromSelection(*target->slot, ids, text("name").trim(), error);
         if (card == 0)
-            return fail(error.isNotEmpty() ? error : juce::String("nodeIds: the cards of an audio chain to make one device of"));
+            return fail(error.isNotEmpty() ? error : cydaw::base::Text("nodeIds: the cards of an audio chain to make one device of"));
         commitGraph(*target, true);
         auto result = graphSummary(*target);
         set(result, "nodeId", idOf(card));
@@ -4424,7 +4456,7 @@ juce::var Commands::onGraphDevices()
         return error;
     const auto wanted = text("name").trim();
     for (const auto& device : studio_.libraryDevices())
-        if (device.name.equalsIgnoreCase(wanted) || device.file.getFileNameWithoutExtension().equalsIgnoreCase(wanted)) {
+        if (device.name.equalsIgnoreCase(wanted.toRawUTF8()) || device.file.getFileNameWithoutExtension().equalsIgnoreCase(wanted.toRawUTF8())) {
             if (const auto inserted = studio_.insertLibraryDevice(track->ref(), device.file); inserted.failed())
                 return fail(inserted.getErrorMessage());
             const auto target = graphTarget(*track);
@@ -4433,16 +4465,16 @@ juce::var Commands::onGraphDevices()
     return fail("no device \"" + wanted + "\" in My devices; list_my_devices lists them");
 }
 
-juce::var Commands::workshopStatus()
+cydaw::base::Value Commands::workshopStatus()
 {
     const auto state = studio_.workshop();
     auto result = object();
     set(result, "open", state.open);
     // The devices open, a tab each, and the simulator.
-    juce::Array<juce::var> tabs;
+    cydaw::base::Array<cydaw::base::Value> tabs;
     for (const auto& tab : studio_.workshopTabs()) {
         auto entry = object();
-        set(entry, "id", static_cast<juce::int64>(tab.id));
+        set(entry, "id", static_cast<std::int64_t>(tab.id));
         set(entry, "name", tab.name);
         set(entry, "instrument", tab.instrument);
         set(entry, "unsaved", tab.unsaved);
@@ -4450,7 +4482,7 @@ juce::var Commands::workshopStatus()
         tabs.add(entry);
     }
     set(result, "tabs", tabs);
-    set(result, "activeTab", static_cast<juce::int64>(studio_.activeWorkshopTab()));
+    set(result, "activeTab", static_cast<std::int64_t>(studio_.activeWorkshopTab()));
     {
         const auto& settings = studio_.simulatorSettings();
         auto simulator = object();
@@ -4464,7 +4496,7 @@ juce::var Commands::workshopStatus()
         set(simulator, "pattern", settings.pattern);
         set(simulator, "rootNote", settings.rootNote);
         set(simulator, "outputDb", settings.outputDb);
-        set(simulator, "side", juce::StringArray { "same", "silence", "kick" }[std::clamp(settings.sideSource, 0, 2)]);
+        set(simulator, "side", cydaw::base::TextList { "same", "silence", "kick" }[std::clamp(settings.sideSource, 0, 2)]);
         // Its output before the master, as its meter shows it.
         set(simulator, "levelDb", studio_.simulatorLevelDb());
         set(result, "simulator", simulator);
@@ -4479,11 +4511,11 @@ juce::var Commands::workshopStatus()
         set(result, "inputChannels", input);
         set(result, "outputChannels", output);
     }
-    if (state.file != juce::File())
+    if (state.file != cydaw::base::File())
         set(result, "file", state.file.getFullPathName());
     if (state.track)
         set(result, "track", studio_.trackName(*state.track));
-    juce::StringArray trail;
+    cydaw::base::TextList trail;
     for (const auto& name : state.trail)
         trail.add(name);
     set(result, "trail", strings(trail));
@@ -4491,7 +4523,7 @@ juce::var Commands::workshopStatus()
         const auto info = root->graph().editorGraphInfo();
         set(result, "description", info.description);
         set(result, "author", info.author);
-        juce::Array<juce::var> parameters;
+        cydaw::base::Array<cydaw::base::Value> parameters;
         for (const auto& parameter : root->graph().editorGraphParameters()) {
             auto entry = object();
             set(entry, "key", parameter.binding);
@@ -4502,7 +4534,7 @@ juce::var Commands::workshopStatus()
             parameters.add(entry);
         }
         set(result, "parameters", parameters);
-        juce::StringArray programs;
+        cydaw::base::TextList programs;
         for (const auto& program : root->graph().editorPrograms())
             programs.add(program.name);
         set(result, "programs", strings(programs));
@@ -4519,7 +4551,7 @@ juce::var Commands::workshopStatus()
 // The device workshop: {action: status | new | open | open_track | link |
 // unlink | save | close | tab | close_tab | simulate | note | enter | leave |
 // info | programs | vst3_check | vst3_export | vst3_status}.
-juce::var Commands::onWorkshop()
+cydaw::base::Value Commands::onWorkshop()
 {
     const auto action = text("action").trim().toLowerCase();
     ui_.showWorkshop();
@@ -4536,10 +4568,10 @@ juce::var Commands::onWorkshop()
     }
     if (action == "open") {
         const auto wanted = text("name").trim();
-        juce::File file = has("file") ? fileFor(text("file")) : juce::File();
-        if (file == juce::File())
+        cydaw::base::File file = has("file") ? fileFor(text("file")) : cydaw::base::File();
+        if (file == cydaw::base::File())
             for (const auto& device : studio_.libraryDevices())
-                if (device.name.equalsIgnoreCase(wanted) || device.file.getFileNameWithoutExtension().equalsIgnoreCase(wanted))
+                if (device.name.equalsIgnoreCase(wanted.toRawUTF8()) || device.file.getFileNameWithoutExtension().equalsIgnoreCase(wanted.toRawUTF8()))
                     file = device.file;
         if (!file.existsAsFile())
             return fail("no device \"" + wanted + "\" in My devices; list_my_devices lists them");
@@ -4564,7 +4596,7 @@ juce::var Commands::onWorkshop()
         const auto id = static_cast<std::uint64_t>(number("id", 0.0));
         const auto tabs = studio_.workshopTabs();
         if (id != 0 && std::none_of(tabs.begin(), tabs.end(), [id](const auto& tab) { return tab.id == id; }))
-            return fail("no tab " + juce::String(static_cast<juce::int64>(id)) + "; workshop status lists them");
+            return fail("no tab " + cydaw::base::Text(static_cast<std::int64_t>(id)) + "; workshop status lists them");
         if (action == "tab")
             studio_.selectWorkshopTab(id);
         else
@@ -4575,7 +4607,7 @@ juce::var Commands::onWorkshop()
         // {play, source 0-7 | name, side (same | silence | kick), level, tone, sample, pattern 0-5 | name,
         //  root, velocity, output}
         auto settings = studio_.simulatorSettings();
-        const auto indexOf = [](const juce::String& name, const juce::StringArray& names, const int fallback) {
+        const auto indexOf = [](const cydaw::base::Text& name, const cydaw::base::TextList& names, const int fallback) {
             if (name.isEmpty())
                 return fallback;
             if (name.containsOnly("0123456789"))
@@ -4605,7 +4637,7 @@ juce::var Commands::onWorkshop()
         if (has("root"))
             settings.rootNote = static_cast<int>(number("root", settings.rootNote));
         if (has("velocity"))
-            settings.velocity = static_cast<float>(juce::jlimit(0.01, 1.0, number("velocity", settings.velocity)));
+            settings.velocity = static_cast<float>(cydaw::base::limit(0.01, 1.0, number("velocity", settings.velocity)));
         if (has("output"))
             settings.outputDb = static_cast<float>(number("output", settings.outputDb));
         if (const auto applied = studio_.setSimulatorSettings(settings); applied.failed())
@@ -4656,7 +4688,7 @@ juce::var Commands::onWorkshop()
         const auto state=graph.createVst3RuntimeState();
         if(state.isVoid()) {
             const auto runtime=graph.runtimeGraphExport();
-            return fail(runtime.compilationResult.failed()?runtime.compilationResult.getErrorMessage():juce::String("Graph is not ready for native export"));
+            return fail(runtime.compilationResult.failed()?runtime.compilationResult.getErrorMessage():cydaw::base::Text("Graph is not ready for native export"));
         }
         return ok(state);
     }
@@ -4664,11 +4696,11 @@ juce::var Commands::onWorkshop()
         UiState state;InterfaceEditor editor(studio_,state);
         editor.setDeviceLayout(flag("compact",false));
         if(has("type")) {
-            if(!editor.addInstrumentSection(*root,text("type"),text("panel")))return fail(editor.lastError().isNotEmpty()?editor.lastError():juce::String("unknown native instrument section"));
+            if(!editor.addInstrumentSection(*root,text("type"),text("panel")))return fail(editor.lastError().isNotEmpty()?editor.lastError():cydaw::base::Text("unknown native instrument section"));
             return ok(app::serialiseModuleInterface(graph.editorInterface()));
         }
         if(!editor.addInstrumentInterface(*root,static_cast<std::uint64_t>(number("nodeId",0)),!has("panel"),text("panel")))
-            return fail(editor.lastError().isNotEmpty()?editor.lastError():juce::String("no native instrument layout for this node or panel"));
+            return fail(editor.lastError().isNotEmpty()?editor.lastError():cydaw::base::Text("no native instrument layout for this node or panel"));
         return ok(app::serialiseModuleInterface(graph.editorInterface()));
     }
     if(action=="presentation") {
@@ -4693,12 +4725,12 @@ juce::var Commands::onWorkshop()
     }
     if(action=="promote_value") {
         std::uint64_t created{};
-        const auto mode=has("mode")?text("mode"):juce::String("input");
+        const auto mode=has("mode")?text("mode"):cydaw::base::Text("input");
         if(mode!="input" && mode!="variable") return fail("mode must be input or variable");
         const auto result=graph.editorPromoteValue(static_cast<std::uint64_t>(number("nodeId",0)),
             static_cast<std::uint64_t>(number("portId",0)),text("binding"),mode=="input",created);
         if(result.failed())return fail(result.getErrorMessage());
-        auto answer=object();set(answer,"nodeId",static_cast<juce::int64>(created));set(answer,"state",graph.serialise());
+        auto answer=object();set(answer,"nodeId",static_cast<std::int64_t>(created));set(answer,"state",graph.serialise());
         return ok(answer);
     }
     if(action=="remove_boundary") {
@@ -4748,7 +4780,7 @@ juce::var Commands::onWorkshop()
             return fail("no graph open");
         auto& presetGraph = presetSlot->graph();
         auto programs = presetGraph.editorPrograms();
-        const auto op = text("op").isNotEmpty() ? text("op") : juce::String("list");
+        const auto op = text("op").isNotEmpty() ? text("op") : cydaw::base::Text("list");
         const auto name = text("name").trim();
         const auto found = std::find_if(programs.begin(), programs.end(), [&name](const auto& program) { return program.name == name; });
         if (op == "add") {
@@ -4780,14 +4812,14 @@ juce::var Commands::onWorkshop()
             return fail("unknown op \"" + op + "\"");
         }
         auto result = object();
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& program : presetGraph.editorPrograms()) {
             auto entry = object();
             set(entry, "name", program.name);
             auto values = object();
             for (const auto& [key, value] : program.values)
                 if (auto* fields = values.getDynamicObject())
-                    fields->setProperty(juce::Identifier(key), value);
+                    fields->setProperty(cydaw::base::Identifier(key), value);
             set(entry, "values", values);
             list.add(entry);
         }
@@ -4800,7 +4832,7 @@ juce::var Commands::onWorkshop()
         if (!has("file") || text("file").trim().isEmpty())
             return fail("device_export needs file (.cydawdevice)");
         const auto file = fileFor(text("file")).withFileExtension("cydawdevice");
-        juce::StringArray dependencies;
+        cydaw::base::TextList dependencies;
         if (const auto saved = studio_.exportWorkshop(file, dependencies); saved.failed())
             return fail(saved.getErrorMessage());
         auto result = workshopStatus();
@@ -4809,7 +4841,7 @@ juce::var Commands::onWorkshop()
         return ok(result);
     }
     if (action == "save") {
-        juce::File written;
+        cydaw::base::File written;
         if (const auto saved = studio_.saveWorkshop(written, flag("asNew", false)); saved.failed())
             return fail(saved.getErrorMessage());
         auto result = workshopStatus();
@@ -4833,16 +4865,16 @@ juce::var Commands::onWorkshop()
         if(!builder)return fail("this interface cannot build");
         if(builder->running())return fail("a build is already running");
         std::vector<Vst3Build::Job> jobs;
-        juce::Array<juce::var> targets;
+        cydaw::base::Array<cydaw::base::Value> targets;
         for(const auto& p:*platforms)for(const auto& f:*formats) {
             const auto destination=fileFor(text("folder")).getChildFile(p.toString()).getChildFile(f.toString());
             const auto project=destination.getChildFile("projet");
             if(const auto made=graph.generateVst3Project(project,f.toString());made.failed())return fail(made.getErrorMessage());
-            jobs.push_back({project,destination,juce::String(identity.productName),f.toString(),p.toString()});
+            jobs.push_back({project,destination,cydaw::base::Text(identity.productName),f.toString(),p.toString()});
             auto target=object();set(target,"platform",p);set(target,"format",f);set(target,"project",project.getFullPathName());targets.add(target);
         }
         if(flag("build",false)) {
-            const auto tools=Vst3Build::findTools(has("sourceRoot")?fileFor(text("sourceRoot")):juce::File());
+            const auto tools=Vst3Build::findTools(has("sourceRoot")?fileFor(text("sourceRoot")):cydaw::base::File());
             if(!builder->startBatch(jobs,tools))return fail("could not start batch; check CMake/sourceRoot");
         }
         auto result=object();set(result,"targets",targets);return ok(result);
@@ -4863,16 +4895,16 @@ juce::var Commands::onWorkshop()
         const auto plan = graph.planVst3Export();
         auto result = object();
         const auto identity = graph.pluginExportIdentity();
-        set(result, "productName", juce::String(identity.productName));
-        set(result, "manufacturerCode", juce::String(identity.manufacturerCode));
-        set(result, "pluginCode", juce::String(identity.pluginCode));
-        juce::StringArray issues;
+        set(result, "productName", cydaw::base::Text(identity.productName));
+        set(result, "manufacturerCode", cydaw::base::Text(identity.manufacturerCode));
+        set(result, "pluginCode", cydaw::base::Text(identity.pluginCode));
+        cydaw::base::TextList issues;
         for (const auto& issue : plan.issues)
-            issues.add(juce::String(issue.message));
+            issues.add(cydaw::base::Text(issue.message));
         set(result, "issues", strings(issues));
         set(result, "ready", plan.plan.has_value() && plan.issues.empty());
         if (plan.plan) {
-            set(result, "category", juce::String(plan.plan->vst3Category));
+            set(result, "category", cydaw::base::Text(plan.plan->vst3Category));
             set(result, "parameters", static_cast<int>(plan.plan->parameters.size()));
             set(result, "buses", static_cast<int>(plan.plan->buses.size()));
         }
@@ -4880,11 +4912,11 @@ juce::var Commands::onWorkshop()
             return ok(result);
         // The project, into a folder given or Documents/CyDAW/Plugin Exports.
         auto folder = has("folder") ? fileFor(text("folder"))
-                                    : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                                    : cydaw::base::File::getSpecialLocation(cydaw::base::File::userDocumentsDirectory)
                                           .getChildFile("CyDAW")
                                           .getChildFile("Plugin Exports")
-                                          .getChildFile(juce::File::createLegalFileName(juce::String(identity.productName)));
-        const auto format = action == "clap_export" ? juce::String("CLAP") : action == "lv2_export" ? juce::String("LV2") : request_.getProperty("format", "VST3").toString().toUpperCase();
+                                          .getChildFile(cydaw::base::File::createLegalFileName(cydaw::base::Text(identity.productName)));
+        const auto format = action == "clap_export" ? cydaw::base::Text("CLAP") : action == "lv2_export" ? cydaw::base::Text("LV2") : request_.getProperty("format", "VST3").toString().toUpperCase();
         if (format != "VST3" && format != "CLAP" && format != "LV2") return fail("format is VST3, CLAP or LV2");
         const auto project = folder.getChildFile("projet");
         if (project.exists())
@@ -4897,10 +4929,10 @@ juce::var Commands::onWorkshop()
             auto* build = ui_.vst3Build();
             if (build == nullptr)
                 return fail("this interface cannot build");
-            const auto tools = Vst3Build::findTools(has("sourceRoot") ? fileFor(text("sourceRoot")) : juce::File());
+            const auto tools = Vst3Build::findTools(has("sourceRoot") ? fileFor(text("sourceRoot")) : cydaw::base::File());
             if (!tools.ready())
                 return fail("building needs CMake and CyDAW's sources (sourceRoot)");
-            if (!build->start(project, folder, juce::String(identity.productName), tools, format))
+            if (!build->start(project, folder, cydaw::base::Text(identity.productName), tools, format))
                 return fail("a build is already running");
             set(result, "building", true);
         }
@@ -4914,11 +4946,11 @@ juce::var Commands::onWorkshop()
             build->cancel();
         static constexpr const char* phases[] = { "idle", "configuring", "building", "done", "failed", "cancelled" };
         auto result = object();
-        set(result, "phase", juce::String(phases[static_cast<int>(build->phase())]));
+        set(result, "phase", cydaw::base::Text(phases[static_cast<int>(build->phase())]));
         set(result, "seconds", build->elapsedSeconds());
-        if (build->bundle() != juce::File())
+        if (build->bundle() != cydaw::base::File())
             set(result, "bundle", build->bundle().getFullPathName());
-        juce::Array<juce::var> targets;
+        cydaw::base::Array<cydaw::base::Value> targets;
         for(const auto& target:build->results()) {
             auto entry=object();set(entry,"platform",target.platform);set(entry,"format",target.format);
             set(entry,"file",target.file.getFullPathName());set(entry,"error",target.error);targets.add(entry);
@@ -4927,7 +4959,7 @@ juce::var Commands::onWorkshop()
         if (build->failure().isNotEmpty())
             set(result, "failure", build->failure());
         const auto log = build->log();
-        juce::StringArray tail;
+        cydaw::base::TextList tail;
         for (auto index = std::max(0, log.size() - std::clamp(static_cast<int>(number("logLines",25)),1,400)); index < log.size(); ++index)
             tail.add(log[index]);
         set(result, "log", strings(tail));
@@ -4936,7 +4968,7 @@ juce::var Commands::onWorkshop()
     return fail("unknown workshop action \"" + action + "\"");
 }
 
-juce::var Commands::onRemoveDevice()
+cydaw::base::Value Commands::onRemoveDevice()
 {
     std::optional<GraphTarget> target;
     if (auto error = targetOrFail(target); !error.isVoid())
@@ -4951,7 +4983,7 @@ juce::var Commands::onRemoveDevice()
     return ok(graphSummary(*target));
 }
 
-juce::var Commands::onModulate()
+cydaw::base::Value Commands::onModulate()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
@@ -5014,7 +5046,7 @@ juce::var Commands::onModulate()
     return ok(result);
 }
 
-juce::var Commands::onModulator()
+cydaw::base::Value Commands::onModulator()
 {
     // {track, action, ...}: the modulators of a track's cards (Modulators.h).
     //   add {nodeId, type}: one for the card nodeId ("lfo", "steps", "random",
@@ -5043,10 +5075,10 @@ juce::var Commands::onModulator()
         const auto* effect = engine::effectForType(found->typeKey.toStdString());
         return effect != nullptr && effect->control;
     };
-    const auto bindingOf = [this]() -> juce::String {
+    const auto bindingOf = [this]() -> cydaw::base::Text {
         auto binding = text("binding").trim();
         if (binding.isEmpty() && has("nodeId"))
-            binding = "node." + juce::String(static_cast<juce::int64>(number("nodeId", 0.0))) + "." + text("parameter").trim();
+            binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(number("nodeId", 0.0))) + "." + text("parameter").trim();
         return binding;
     };
     const auto describe = [&](const std::uint64_t modulator) {
@@ -5054,8 +5086,8 @@ juce::var Commands::onModulator()
         // As the graph is now (it may have just been made).
         const auto now = graph.editorNodes();
         const auto found = std::find_if(now.begin(), now.end(), [modulator](const auto& item) { return item.id == modulator; });
-        set(entry, "id", static_cast<juce::int64>(modulator));
-        set(entry, "owner", static_cast<juce::int64>(graph.editorModulatorOwner(modulator)));
+        set(entry, "id", static_cast<std::int64_t>(modulator));
+        set(entry, "owner", static_cast<std::int64_t>(graph.editorModulatorOwner(modulator)));
         if (found != now.end()) {
             set(entry, "type", found->typeKey);
             set(entry, "name", found->title);
@@ -5069,12 +5101,12 @@ juce::var Commands::onModulator()
         }
         if (const auto value = graph.editorControlValue(modulator))
             set(entry, "value", *value);
-        juce::Array<juce::var> moves;
+        cydaw::base::Array<cydaw::base::Value> moves;
         for (const auto& modulation : graph.editorModulations())
             if (modulation.source == modulator) {
                 auto move = object();
                 set(move, "binding", modulation.binding);
-                set(move, "nodeId", static_cast<juce::int64>(modulation.node));
+                set(move, "nodeId", static_cast<std::int64_t>(modulation.node));
                 set(move, "amount", modulation.amount);
                 set(move, "mode", modulation.mode == 1 ? "modulate" : "set");
                 moves.add(move);
@@ -5100,7 +5132,7 @@ juce::var Commands::onModulator()
                         "math, follower");
         const auto made = graph.editorAddModulator(nodeId, type);
         if (made == 0)
-            return fail("no card " + juce::String(static_cast<juce::int64>(nodeId)) + " to add it to");
+            return fail("no card " + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + " to add it to");
         commitGraph(*target, true);
         (void) ui_.showModulators(*target->track, nodeId, true, made);
         return ok(describe(made));
@@ -5111,7 +5143,7 @@ juce::var Commands::onModulator()
         return ok(object());
     }
     if (action == "list") {
-        juce::Array<juce::var> listed;
+        cydaw::base::Array<cydaw::base::Value> listed;
         for (const auto& node : nodes)
             if (isModulator(node.id) && (nodeId == 0 || graph.editorModulatorOwner(node.id) == nodeId))
                 listed.add(describe(node.id));
@@ -5120,11 +5152,11 @@ juce::var Commands::onModulator()
         return ok(result);
     }
     if (!isModulator(id) && !(action == "arm" && id == 0))
-        return fail("no modulator " + juce::String(static_cast<juce::int64>(id)) + " on that track; list gives them");
+        return fail("no modulator " + cydaw::base::Text(static_cast<std::int64_t>(id)) + " on that track; list gives them");
     if (action == "set") {
         const auto found = std::find_if(nodes.begin(), nodes.end(), [id](const auto& item) { return item.id == id; });
         const auto* effect = engine::effectForType(found->typeKey.toStdString());
-        juce::StringArray problems;
+        cydaw::base::TextList problems;
         if (const auto* settings = request_.getProperty("settings", {}).getDynamicObject())
             for (const auto& property : settings->getProperties()) {
                 const auto key = property.name.toString();
@@ -5152,7 +5184,7 @@ juce::var Commands::onModulator()
                     }
                     value = index;
                 }
-                const auto binding = "node." + juce::String(static_cast<juce::int64>(id)) + "." + juce::String(std::string(setting->suffix));
+                const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(id)) + "." + cydaw::base::Text(std::string(setting->suffix));
                 if (!graph.editorSetParameter(binding, value))
                     problems.add("\"" + key + "\" was refused");
             }
@@ -5189,7 +5221,7 @@ juce::var Commands::onModulator()
     return fail("action: add, set, modulate, unmodulate, remove, arm, column or list");
 }
 
-juce::var Commands::onContainer()
+cydaw::base::Value Commands::onContainer()
 {
     // {track, action, ...}: the containers of a track's chain (Containers.h).
     //   insert {type, before}: fx-chain, fx-layer, fx-selector, mid-side-split,
@@ -5218,17 +5250,17 @@ juce::var Commands::onContainer()
         if (!container)
             return entry;
         const auto nodes = graph.editorNodes();
-        set(entry, "head", static_cast<juce::int64>(container->head));
-        set(entry, "end", static_cast<juce::int64>(container->end));
-        set(entry, "blend", static_cast<juce::int64>(container->blend));
+        set(entry, "head", static_cast<std::int64_t>(container->head));
+        set(entry, "end", static_cast<std::int64_t>(container->end));
+        set(entry, "blend", static_cast<std::int64_t>(container->blend));
         set(entry, "postBranch", container->postBranch);
         set(entry, "type", container->typeKey);
-        juce::Array<juce::var> branches;
+        cydaw::base::Array<cydaw::base::Value> branches;
         for (const auto& cards : container->branches) {
-            juce::Array<juce::var> listed;
+            cydaw::base::Array<cydaw::base::Value> listed;
             for (const auto card : cards) {
                 auto item = object();
-                set(item, "id", static_cast<juce::int64>(card));
+                set(item, "id", static_cast<std::int64_t>(card));
                 if (const auto found = std::find_if(nodes.begin(), nodes.end(), [card](const auto& node) { return node.id == card; });
                     found != nodes.end()) {
                     set(item, "type", found->typeKey);
@@ -5239,7 +5271,7 @@ juce::var Commands::onContainer()
             branches.add(listed);
         }
         set(entry, "branches", branches);
-        juce::Array<juce::var> names;
+        cydaw::base::Array<cydaw::base::Value> names;
         for (int index = 0; index < static_cast<int>(container->branches.size()); ++index)
             names.add(graph.editorBranchName(id, index));
         set(entry, "names", names);
@@ -5253,7 +5285,7 @@ juce::var Commands::onContainer()
         return ok(describe(id));
     };
     if (action == "list") {
-        juce::Array<juce::var> listed;
+        cydaw::base::Array<cydaw::base::Value> listed;
         for (const auto& node : graph.editorNodes())
             if (graph.editorIsContainer(node.id))
                 listed.add(describe(node.id));
@@ -5284,7 +5316,7 @@ juce::var Commands::onContainer()
         return done(head, true);
     }
     if (!graph.editorIsContainer(head))
-        return fail("no container " + juce::String(static_cast<juce::int64>(head)) + " on that track; list gives them");
+        return fail("no container " + cydaw::base::Text(static_cast<std::int64_t>(head)) + " on that track; list gives them");
     if (action == "add_branch") {
         if (!graph.editorAddBranch(head))
             return fail("this container takes no more branches");
@@ -5336,7 +5368,7 @@ juce::var Commands::onContainer()
                 "open_instrument");
 }
 
-juce::var Commands::onDescribeNodeType()
+cydaw::base::Value Commands::onDescribeNodeType()
 {
     const auto description = catalogueGraph().describeNodeTypeForRemote(text("key").trim());
     if (description.isVoid())
@@ -5344,7 +5376,7 @@ juce::var Commands::onDescribeNodeType()
     return ok(description);
 }
 
-juce::var Commands::onNodes()
+cydaw::base::Value Commands::onNodes()
 {
     std::optional<GraphTarget> target;
     if (auto error = targetOrFail(target); !error.isVoid())
@@ -5358,9 +5390,9 @@ juce::var Commands::onNodes()
         return ok(description);
     }
     if (command_ == "add_node") {
-        const auto position = has("x") && has("y") ? juce::Point<float>(static_cast<float>(number("x", 0.5)),
+        const auto position = has("x") && has("y") ? cydaw::base::Point<float>(static_cast<float>(number("x", 0.5)),
                                                                         static_cast<float>(number("y", 0.5)))
-                                                   : juce::Point<float>(-1'000.0f, -1'000.0f);
+                                                   : cydaw::base::Point<float>(-1'000.0f, -1'000.0f);
         const auto id = graph.addNodeForRemote(text("key").trim(), position);
         if (id == 0)
             return fail("no node type \"" + text("key") + "\"; list_devices gives the keys");
@@ -5417,9 +5449,9 @@ juce::var Commands::onNodes()
         return ok(graphSummary(*target));
     }
     if (command_ == "set_node") {
-        std::optional<juce::Point<float>> position;
+        std::optional<cydaw::base::Point<float>> position;
         if (has("x") && has("y"))
-            position = juce::Point<float>(static_cast<float>(number("x", 0.0)), static_cast<float>(number("y", 0.0)));
+            position = cydaw::base::Point<float>(static_cast<float>(number("x", 0.0)), static_cast<float>(number("y", 0.0)));
         if (!graph.setNodePresentationForRemote(nodeId, text("title"), position))
             return fail("no card with that id");
         // Folded to its title in the device panel and the graph.
@@ -5432,7 +5464,7 @@ juce::var Commands::onNodes()
         return ok(graph.describeNodeForRemote(nodeId));
     }
     if (command_ == "set_node_parameter") {
-        const auto key = "node." + juce::String(static_cast<juce::int64>(nodeId)) + "." + text("parameter").trim();
+        const auto key = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + "." + text("parameter").trim();
         if (!has("value") || !graph.setGraphInterfaceParameter(key, number("value", 0.0)))
             return fail("no parameter \"" + text("parameter") + "\" on that card; describe_node_type lists them");
         commitGraph(*target, false);
@@ -5470,7 +5502,7 @@ juce::var Commands::onNodes()
         return ok(result);
     }
     // remove_comment
-    const auto commentId = idFrom(request_.getProperty("commentId", juce::var()));
+    const auto commentId = idFrom(request_.getProperty("commentId", cydaw::base::Value()));
     if (!graph.removeCommentForRemote(commentId))
         return fail("no comment with that id");
     commitGraph(*target, true);
@@ -5481,7 +5513,7 @@ juce::var Commands::onNodes()
 
 // ---- Audio clips and automation ------------------------------------------------------------------
 
-juce::var Commands::onClipLanes()
+cydaw::base::Value Commands::onClipLanes()
 {
     // clip_lanes {track, scene | clipId, event?, lanes?: {name: [[seconds, value], ...]}}:
     // an audio clip's automation lanes ("volume" dB, "pan" -1..1, a card's
@@ -5497,11 +5529,11 @@ juce::var Commands::onClipLanes()
     const auto index = track->index;
     const auto launcher = has("scene");
     const auto scene = static_cast<int>(number("scene", -1.0));
-    const auto clipId = idFrom(request_.getProperty("clipId", juce::var()));
-    std::map<juce::String, std::vector<Engine::AutomationPoint>> lanes;
+    const auto clipId = idFrom(request_.getProperty("clipId", cydaw::base::Value()));
+    std::map<cydaw::base::Text, std::vector<Engine::AutomationPoint>> lanes;
     if (has("event")) {
         // A sound's own lanes.
-        const auto eventId = idFrom(request_.getProperty("event", juce::var()));
+        const auto eventId = idFrom(request_.getProperty("event", cydaw::base::Value()));
         std::vector<Engine::AudioEvent> events;
         if (launcher) {
             const auto clip = engine_.launcherClip(index, scene);
@@ -5514,7 +5546,7 @@ juce::var Commands::onClipLanes()
         auto sound = std::find_if(events.begin(), events.end(), [eventId](const auto& e) { return e.id == eventId; });
         if (sound == events.end())
             return fail("no sound " + idOf(eventId).toString() + " in that clip (a clip of one sound gets its sounds when edited)");
-        if (const auto* given = request_.getProperty("lanes", juce::var()).getDynamicObject()) {
+        if (const auto* given = request_.getProperty("lanes", cydaw::base::Value()).getDynamicObject()) {
             for (const auto& property : given->getProperties()) {
                 std::vector<Engine::AutomationPoint> points;
                 std::uint64_t id = 1;
@@ -5555,7 +5587,7 @@ juce::var Commands::onClipLanes()
             return fail("no audio clip " + idOf(clipId).toString() + "; list_audio_clips gives them");
         lanes = found->lanes;
     }
-    if (const auto* given = request_.getProperty("lanes", juce::var()).getDynamicObject()) {
+    if (const auto* given = request_.getProperty("lanes", cydaw::base::Value()).getDynamicObject()) {
         for (const auto& property : given->getProperties()) {
             std::vector<Engine::AutomationPoint> points;
             std::uint64_t id = 1;
@@ -5577,16 +5609,16 @@ juce::var Commands::onClipLanes()
     auto result = object();
     auto shown = object();
     for (const auto& [name, points] : lanes) {
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& point : points)
-            list.add(juce::Array<juce::var> { point.timeSeconds, static_cast<double>(point.valueDb) });
+            list.add(cydaw::base::Array<cydaw::base::Value> { point.timeSeconds, static_cast<double>(point.valueDb) });
         set(shown, name.toRawUTF8(), list);
     }
     set(result, "lanes", shown);
     return ok(result);
 }
 
-juce::var Commands::onAudioClips()
+cydaw::base::Value Commands::onAudioClips()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -5626,13 +5658,13 @@ juce::var Commands::onAudioClips()
     if (command_ == "list_audio_clips")
         return ok(describeAudioClips(index));
     if (command_ == "add_audio_clip") {
-        const auto file = has("file") ? fileFor(text("file")) : juce::File {};
-        if (file != juce::File {} && !file.existsAsFile())
+        const auto file = has("file") ? fileFor(text("file")) : cydaw::base::File {};
+        if (file != cydaw::base::File {} && !file.existsAsFile())
             return fail("no audio file at " + file.getFullPathName());
         auto duration = number("duration", 0.0);
         if (duration <= 0.0) {
-            if (file != juce::File {}) {
-                const std::unique_ptr<juce::AudioFormatReader> reader(engine_.formatManager().createReaderFor(file));
+            if (file != cydaw::base::File {}) {
+                const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(engine_.formatManager().createReaderFor(file));
                 if (reader == nullptr)
                     return fail("the file could not be read as audio");
                 duration = static_cast<double>(reader->lengthInSamples) / std::max(1.0, reader->sampleRate);
@@ -5653,7 +5685,7 @@ juce::var Commands::onAudioClips()
         set(result, "clipId", idOf(clipId));
         return ok(result);
     }
-    const auto clipId = idFrom(request_.getProperty("clipId", juce::var()));
+    const auto clipId = idFrom(request_.getProperty("clipId", cydaw::base::Value()));
     if (clipId == 0)
         return fail("clipId is required; list_audio_clips gives them");
     if (command_ == "move_audio_clip") {
@@ -5675,7 +5707,7 @@ juce::var Commands::onAudioClips()
     return ok(result);
 }
 
-juce::var Commands::onEditAudioClip()
+cydaw::base::Value Commands::onEditAudioClip()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
@@ -5693,7 +5725,7 @@ juce::var Commands::onEditAudioClip()
         if (!kind)
             return fail("operation is split, crop or silence");
         std::vector<std::uint64_t> clipIds;
-        if (const auto* ids = request_.getProperty("clipIds", juce::var()).getArray())
+        if (const auto* ids = request_.getProperty("clipIds", cydaw::base::Value()).getArray())
             for (const auto& id : *ids)
                 clipIds.push_back(idFrom(id));
         if (clipIds.empty())
@@ -5705,7 +5737,7 @@ juce::var Commands::onEditAudioClip()
         studio_.markDirty();
         return ok(describeAudioClips(index));
     }
-    const auto clipId = idFrom(request_.getProperty("clipId", juce::var()));
+    const auto clipId = idFrom(request_.getProperty("clipId", cydaw::base::Value()));
     const auto clip = engine_.audioClip(index, clipId);
     if (!clip)
         return fail("no audio clip with that id; list_audio_clips gives them");
@@ -5745,7 +5777,7 @@ juce::var Commands::onEditAudioClip()
                                                : app::FadeCurve::linear;
         const auto edited = studio_.editAudioClip(track->ref(), clipId, request, std::max(0.0, number("start", clip->sourceOffsetSeconds)),
                                                   std::max(0.0, number("length", clip->sourceDurationSeconds)),
-                                                  juce::String::fromUTF8(kind->label));
+                                                  cydaw::base::Text::fromUTF8(kind->label));
         if (edited.failed())
             return fail(edited.getErrorMessage());
         return ok(describeAudioClips(index));
@@ -5765,7 +5797,7 @@ juce::var Commands::onEditAudioClip()
         if (has("version"))
             studio_.markDirty();
         const auto now = engine_.audioClip(index, clipId);
-        juce::Array<juce::var> versions;
+        cydaw::base::Array<cydaw::base::Value> versions;
         for (const auto& version : now->versions) {
             auto entry = object();
             set(entry, "label", version.label);
@@ -5787,7 +5819,7 @@ juce::var Commands::onEditAudioClip()
         // its own timeline (seconds from its start). A clip of one sound
         // lists that sound; changing it makes the clip a timeline of events.
         const auto action = text("action").trim().toLowerCase();
-        const auto eventId = idFrom(request_.getProperty("eventId", juce::var()));
+        const auto eventId = idFrom(request_.getProperty("eventId", cydaw::base::Value()));
         const auto events = engine_.audioClipEvents(index, clipId);
         const auto event = std::find_if(events.begin(), events.end(), [eventId](const auto& e) { return e.id == eventId; });
         const auto needsEvent = action == "move" || action == "trim" || action == "split" || action == "remove" || action == "duplicate"
@@ -5848,7 +5880,7 @@ juce::var Commands::onEditAudioClip()
                 auto all = engine_.audioClipEvents(index, clipId);
                 for (auto& item : all)
                     if (item.id == eventId)
-                        item.pitchSemitones = juce::jlimit(-48.0, 48.0, number("pitch", 0.0));
+                        item.pitchSemitones = cydaw::base::limit(-48.0, 48.0, number("pitch", 0.0));
                 if (const auto done = engine_.replaceAudioClipEvents(index, clipId, std::move(all)); done.failed())
                     return fail(done.getErrorMessage());
             }
@@ -5877,7 +5909,7 @@ juce::var Commands::onEditAudioClip()
         if (action.isNotEmpty() && action != "list")
             studio_.markDirty();
         const auto now = engine_.audioClip(index, clipId);
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& item : engine_.audioClipEvents(index, clipId)) {
             auto entry = object();
             set(entry, "id", idOf(item.id));
@@ -5935,7 +5967,7 @@ juce::var Commands::onEditAudioClip()
         if (action.isNotEmpty() && action != "list")
             studio_.markDirty();
         const auto now = engine_.audioClip(index, clipId);
-        juce::Array<juce::var> takes;
+        cydaw::base::Array<cydaw::base::Value> takes;
         for (const auto& take : now->takes) {
             auto entry = object();
             set(entry, "name", take.name);
@@ -5944,7 +5976,7 @@ juce::var Commands::onEditAudioClip()
             set(entry, "length", take.sourceLengthSeconds);
             takes.add(entry);
         }
-        juce::Array<juce::var> comp;
+        cydaw::base::Array<cydaw::base::Value> comp;
         for (const auto& part : now->comp) {
             auto entry = object();
             set(entry, "start", part.startSeconds);
@@ -6005,7 +6037,7 @@ juce::var Commands::onEditAudioClip()
     if (flag("clearMarkers", false))
         for (const auto& marker : clip->stretchMarkers)
             (void) engine_.removeAudioClipStretchMarker(index, clipId, marker.id);
-    if (const auto* markers = request_.getProperty("markers", juce::var()).getArray())
+    if (const auto* markers = request_.getProperty("markers", cydaw::base::Value()).getArray())
         for (const auto& marker : *markers)
             if (engine_.addAudioClipStretchMarker(index, clipId, static_cast<double>(marker.getProperty("source", 0.0)),
                                                   static_cast<double>(marker.getProperty("timeline", 0.0)))
@@ -6029,25 +6061,25 @@ juce::var Commands::onEditAudioClip()
     return ok(describeAudioClips(index));
 }
 
-juce::var Commands::onAutomation()
+cydaw::base::Value Commands::onAutomation()
 {
     std::optional<RemoteTrack> track;
-    if (auto error = trackOrFail(track); !error.isVoid())
+    if (auto error = trackOrFail(track, true); !error.isVoid())
         return error;
     // A plugin parameter as the target, on an audio track: "plugin" (its
     // index) and "parameter" (index or name).
     std::optional<std::pair<std::size_t, std::uint32_t>> pluginTarget;
-    juce::String pluginParameterName;
+    cydaw::base::Text pluginParameterName;
     if (has("plugin") && !track->midi) {
         const auto pluginIndex = static_cast<std::size_t>(number("plugin", 0.0));
         std::vector<app::IsolatedPluginHost::ParameterSnapshot> pluginParameters;
         if (engine_.refreshTrackPluginParameters(track->index, pluginIndex, pluginParameters).failed())
-            return fail("no plugin " + juce::String(static_cast<int>(pluginIndex)) + " on that track");
-        const auto spec = request_.getProperty("parameter", juce::var());
+            return fail("no plugin " + cydaw::base::Text(static_cast<int>(pluginIndex)) + " on that track");
+        const auto spec = request_.getProperty("parameter", cydaw::base::Value());
         for (const auto& parameter : pluginParameters)
             if ((spec.isInt() || spec.isDouble() || spec.isInt64())
                     ? parameter.index == static_cast<std::uint32_t>(static_cast<int>(spec))
-                    : parameter.name.equalsIgnoreCase(spec.toString().trim())) {
+                    : parameter.name.equalsIgnoreCase(spec.toString().trim().toRawUTF8())) {
                 pluginTarget = std::make_pair(pluginIndex, parameter.index);
                 pluginParameterName = parameter.name;
             }
@@ -6073,15 +6105,15 @@ juce::var Commands::onAutomation()
             studio_.setLanePoints(ref, key, {});
         auto added = 0;
         if (command_ == "add_automation") {
-            const auto* points = request_.getProperty("points", juce::var()).getArray();
+            const auto* points = request_.getProperty("points", cydaw::base::Value()).getArray();
             if (points == nullptr || points->isEmpty())
                 return fail("points must be a non-empty array of {time, value}");
             const auto low = std::min(parameter->minimum, parameter->maximum);
             const auto high = std::max(parameter->minimum, parameter->maximum);
-            std::vector<std::pair<std::uint64_t, juce::var>> shaped;
+            std::vector<std::pair<std::uint64_t, cydaw::base::Value>> shaped;
             for (const auto& point : *points) {
                 const auto id = studio_.addLanePoint(ref, key, std::max(0.0, numberOf(point, "time", 0.0)),
-                                                     static_cast<float>(juce::jlimit(low, high, numberOf(point, "value", parameter->value))));
+                                                     static_cast<float>(cydaw::base::limit(low, high, numberOf(point, "value", parameter->value))));
                 if (id != 0) {
                     ++added;
                     if (numberOf(point, "curve", 0.0) != 0.0)
@@ -6098,7 +6130,7 @@ juce::var Commands::onAutomation()
             studio_.setAutomationVisible(ref, true);
             studio_.markDirty();
         }
-        juce::Array<juce::var> entries;
+        cydaw::base::Array<cydaw::base::Value> entries;
         for (const auto& point : studio_.lanePoints(ref, key)) {
             auto entry = object();
             set(entry, "id", idOf(point.id));
@@ -6124,27 +6156,27 @@ juce::var Commands::onAutomation()
     }
     auto added = 0;
     if (command_ == "add_automation") {
-        const auto* points = request_.getProperty("points", juce::var()).getArray();
+        const auto* points = request_.getProperty("points", cydaw::base::Value()).getArray();
         if (points == nullptr || points->isEmpty())
             return fail("points must be a non-empty array of {time, valueDb}");
-        std::vector<std::pair<std::uint64_t, juce::var>> shaped;
+        std::vector<std::pair<std::uint64_t, cydaw::base::Value>> shaped;
         for (const auto& point : *points) {
             const auto time = std::max(0.0, numberOf(point, "time", 0.0));
             std::uint64_t id = 0;
             if (pluginTarget) {
                 id = engine_.addPluginAutomationPoint(
                     track->index, pluginTarget->first, pluginTarget->second, pluginParameterName, time,
-                    static_cast<float>(juce::jlimit(0.0, 1.0, numberOf(point, "value", 0.0))));
+                    static_cast<float>(cydaw::base::limit(0.0, 1.0, numberOf(point, "value", 0.0))));
             } else {
                 id = studio_.addAutomationPoint(
-                    ref, time, static_cast<float>(juce::jlimit(-60.0, 12.0, numberOf(point, "valueDb", 0.0))));
+                    ref, time, static_cast<float>(cydaw::base::limit(-60.0, 12.0, numberOf(point, "valueDb", 0.0))));
             }
             if (id != 0)
                 ++added;
             if (id != 0 && asksShape(point))
                 shaped.emplace_back(id, point);
         }
-        applyShapes(ref, pluginTarget ? Studio::pluginLaneName(pluginTarget->first, pluginTarget->second) : juce::String(), shaped);
+        applyShapes(ref, pluginTarget ? Studio::pluginLaneName(pluginTarget->first, pluginTarget->second) : cydaw::base::Text(), shaped);
     }
     if (command_ != "list_automation") {
         // The lane shows what was written.
@@ -6152,13 +6184,13 @@ juce::var Commands::onAutomation()
             studio_.rememberPluginParameterName(Studio::pluginLaneName(pluginTarget->first, pluginTarget->second),
                                                 pluginParameterName);
         studio_.setShownLane(ref, pluginTarget ? Studio::pluginLaneName(pluginTarget->first, pluginTarget->second)
-                                               : juce::String());
+                                               : cydaw::base::Text());
         studio_.setAutomationVisible(ref, true);
         studio_.markDirty();
     }
-    juce::var result;
+    cydaw::base::Value result;
     if (pluginTarget) {
-        juce::Array<juce::var> entries;
+        cydaw::base::Array<cydaw::base::Value> entries;
         for (const auto& point : engine_.pluginAutomationPoints(track->index, pluginTarget->first, pluginTarget->second)) {
             auto entry = object();
             set(entry, "id", idOf(point.id));
@@ -6173,7 +6205,7 @@ juce::var Commands::onAutomation()
     }
     if (command_ == "add_automation")
         set(result, "added", added);
-    const auto list = result.getProperty("points", juce::var());
+    const auto list = result.getProperty("points", cydaw::base::Value());
     set(result, "points", list.size());
     set(result, "list", list);
     return ok(result);
@@ -6181,7 +6213,7 @@ juce::var Commands::onAutomation()
 
 // ---- Launcher, arming, recording, history --------------------------------------------------------
 
-juce::var Commands::onLaunchScene()
+cydaw::base::Value Commands::onLaunchScene()
 {
     // launch_scene {scene}: as the launcher does it (an empty slot stops its
     // track unless its stop was taken off); {query:true} only reads what
@@ -6203,7 +6235,7 @@ juce::var Commands::onLaunchScene()
     auto result = object();
     set(result, "launched", launched);
     set(result, "playing", engine_.isPlaying());
-    juce::Array<juce::var> playing;
+    cydaw::base::Array<cydaw::base::Value> playing;
     for (const auto& track : studio_.tracks()) {
         auto entry = object();
         set(entry, "track", studio_.trackName(track));
@@ -6222,7 +6254,7 @@ juce::var Commands::onLaunchScene()
     return ok(result);
 }
 
-juce::var Commands::onVoiceLive()
+cydaw::base::Value Commands::onVoiceLive()
 {
     // voice_live {track}: what the track's newest voice plays now (a
     // Prisme's, a synth's of the family): the settings its own modulations
@@ -6237,20 +6269,20 @@ juce::var Commands::onVoiceLive()
     if (!playing)
         return ok(result);
     // The keys: the instrument card's model names its settings.
-    std::function<juce::String(int)> keyOf = [](const int index) { return juce::String(index); };
+    std::function<cydaw::base::Text(int)> keyOf = [](const int index) { return cydaw::base::Text(index); };
     if (const auto* slot = studio_.graphFor(track->ref())) {
         for (const auto& card : slot->graph().editorNodes()) {
             if (const auto synth = slot->graph().editorSynthValues(card.id); synth && synth->first != engine::synth::Model::none) {
                 const auto model = synth->first;
                 keyOf = [model](const int index) {
-                    return index < engine::synth::parameterCount(model) ? juce::String(engine::synth::parameter(model, index).key)
-                                                                         : juce::String(index);
+                    return index < engine::synth::parameterCount(model) ? cydaw::base::Text(engine::synth::parameter(model, index).key)
+                                                                         : cydaw::base::Text(index);
                 };
                 break;
             }
             if (slot->graph().editorPrismValues(card.id)) {
                 keyOf = [](const int index) {
-                    return index < engine::prism::parameterCount ? juce::String(engine::prism::parameter(index).key) : juce::String(index);
+                    return index < engine::prism::parameterCount ? cydaw::base::Text(engine::prism::parameter(index).key) : cydaw::base::Text(index);
                 };
                 break;
             }
@@ -6263,9 +6295,9 @@ juce::var Commands::onVoiceLive()
                 object->setProperty(keyOf(static_cast<int>(index)), live.values[index]);
     set(result, "modulated", moved);
     const auto numbers = [](const auto& values) {
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto value : values)
-            list.add(std::isfinite(value) ? juce::var(value) : juce::var());
+            list.add(std::isfinite(value) ? cydaw::base::Value(value) : cydaw::base::Value());
         return list;
     };
     set(result, "lfos", numbers(live.lfos));
@@ -6274,7 +6306,7 @@ juce::var Commands::onVoiceLive()
     return ok(result);
 }
 
-juce::var Commands::onLaunchClip()
+cydaw::base::Value Commands::onLaunchClip()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -6293,7 +6325,7 @@ juce::var Commands::onLaunchClip()
     return ok(result);
 }
 
-juce::var Commands::onSlotStop()
+cydaw::base::Value Commands::onSlotStop()
 {
     // slot_stop {track, scene, stops}: an empty slot's stop (a scene launched
     // stops the track there), read, or set with "stops".
@@ -6302,7 +6334,7 @@ juce::var Commands::onSlotStop()
         return error;
     const auto scene = static_cast<int>(number("scene", 0.0));
     if (scene < 0 || scene >= Engine::maximumLauncherScenes)
-        return fail("scene is 0 to " + juce::String(Engine::maximumLauncherScenes - 1));
+        return fail("scene is 0 to " + cydaw::base::Text(Engine::maximumLauncherScenes - 1));
     if (has("stops"))
         studio_.setSlotStops(track->ref(), scene, flag("stops", true));
     auto result = object();
@@ -6311,7 +6343,7 @@ juce::var Commands::onSlotStop()
     return ok(result);
 }
 
-juce::var Commands::onMasterClip()
+cydaw::base::Value Commands::onMasterClip()
 {
     // master_clip {scene, action}: the master's launcher clip of a scene,
     // its automation. action "set" (the default when anything is given to
@@ -6321,7 +6353,7 @@ juce::var Commands::onMasterClip()
     // "lanes" lists what a lane can automate. Without any: read.
     const auto scene = static_cast<int>(number("scene", 0.0));
     if (scene < 0 || scene >= Engine::maximumLauncherScenes)
-        return fail("scene is 0 to " + juce::String(Engine::maximumLauncherScenes - 1));
+        return fail("scene is 0 to " + cydaw::base::Text(Engine::maximumLauncherScenes - 1));
     auto action = text("action");
     if (action.isEmpty())
         action = has("name") || has("lengthBeats") || has("looping") || has("lane") ? "set" : "read";
@@ -6339,7 +6371,7 @@ juce::var Commands::onMasterClip()
             if (std::none_of(choices.begin(), choices.end(), [&lane](const auto& choice) { return choice.binding == lane; }))
                 return fail("no such lane (action lanes lists them): " + lane);
             std::vector<MasterClip::Point> points;
-            if (const auto* list = request_.getProperty("points", juce::var()).getArray())
+            if (const auto* list = request_.getProperty("points", cydaw::base::Value()).getArray())
                 for (const auto& entry : *list) {
                     if (const auto* pair = entry.getArray(); pair != nullptr && pair->size() >= 2)
                         points.push_back({ static_cast<double>((*pair)[0]), static_cast<float>(static_cast<double>((*pair)[1])) });
@@ -6356,7 +6388,7 @@ juce::var Commands::onMasterClip()
         studio_.removeMasterClip(scene);
     } else if (action == "launch") {
         if (!studio_.launchMasterClip(scene))
-            return fail("scene " + juce::String(scene) + " has no master clip");
+            return fail("scene " + cydaw::base::Text(scene) + " has no master clip");
     } else if (action == "stop") {
         studio_.stopMasterClip();
     } else if (action != "read" && action != "lanes") {
@@ -6369,13 +6401,13 @@ juce::var Commands::onMasterClip()
         set(result, "name", clip->name);
         set(result, "lengthBeats", clip->lengthBeats);
         set(result, "looping", clip->looping);
-        juce::Array<juce::var> lanes;
+        cydaw::base::Array<cydaw::base::Value> lanes;
         for (const auto& [binding, points] : clip->lanes) {
             auto lane = object();
             set(lane, "lane", binding);
-            juce::Array<juce::var> list;
+            cydaw::base::Array<cydaw::base::Value> list;
             for (const auto& point : points) {
-                juce::Array<juce::var> pair;
+                cydaw::base::Array<cydaw::base::Value> pair;
                 pair.add(point.beats);
                 pair.add(static_cast<double>(point.value));
                 list.add(pair);
@@ -6393,7 +6425,7 @@ juce::var Commands::onMasterClip()
     set(result, "masterGainDb", static_cast<double>(engine_.masterGainDb()));
     set(result, "masterClockSeconds", engine_.masterClockSeconds());
     if (action == "lanes") {
-        juce::Array<juce::var> choices;
+        cydaw::base::Array<cydaw::base::Value> choices;
         for (const auto& choice : studio_.masterLaneChoices()) {
             auto entry = object();
             set(entry, "lane", choice.binding);
@@ -6409,7 +6441,7 @@ juce::var Commands::onMasterClip()
     return ok(result);
 }
 
-juce::var Commands::onSetLaunchQuantization()
+cydaw::base::Value Commands::onSetLaunchQuantization()
 {
     using Quantization = Engine::LaunchQuantization;
     const auto value = text("value");
@@ -6428,7 +6460,7 @@ juce::var Commands::onSetLaunchQuantization()
     return ok(result);
 }
 
-juce::var Commands::onArm()
+cydaw::base::Value Commands::onArm()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
@@ -6447,7 +6479,7 @@ juce::var Commands::onArm()
     return ok(result);
 }
 
-juce::var Commands::onRecord()
+cydaw::base::Value Commands::onRecord()
 {
     const auto mode = text("mode");
     const auto action = text("action");
@@ -6503,7 +6535,7 @@ juce::var Commands::onRecord()
     return ok(result);
 }
 
-juce::var Commands::onUndoRedo()
+cydaw::base::Value Commands::onUndoRedo()
 {
     const auto scope = text("scope");
     const auto undo = command_ == "undo";
@@ -6534,17 +6566,17 @@ juce::var Commands::onUndoRedo()
 
 // ---- Plugins ------------------------------------------------------------------------------------
 
-juce::var Commands::onListPlugins()
+cydaw::base::Value Commands::onListPlugins()
 {
     auto folders=plugin_files::folders();
     if(has("folder"))folders.add(fileFor(text("folder")));
-    juce::Array<juce::var> entries;
-    juce::StringArray seen;
+    cydaw::base::Array<cydaw::base::Value> entries;
+    cydaw::base::TextList seen;
     for (const auto& folder : folders) {
         if (!folder.isDirectory())
             continue;
-        juce::Array<juce::File> found;
-        folder.findChildFiles(found, juce::File::findFilesAndDirectories, true, "*");
+        cydaw::base::Array<cydaw::base::File> found;
+        folder.findChildFiles(found, cydaw::base::File::findFilesAndDirectories, true, "*");
         for (const auto& plugin : found) {
             if (!plugin_files::candidate(plugin) || seen.contains(plugin.getFullPathName()))
                 continue;
@@ -6561,7 +6593,7 @@ juce::var Commands::onListPlugins()
     return ok(result);
 }
 
-juce::var Commands::onPlugins()
+cydaw::base::Value Commands::onPlugins()
 {
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
@@ -6585,11 +6617,11 @@ juce::var Commands::onPlugins()
     const auto info = engine_.trackPlugins(index);
     const auto pluginIndex = static_cast<std::size_t>(number("plugin", 0.0));
     if (pluginIndex >= info.size())
-        return fail("no plugin " + juce::String(static_cast<int>(pluginIndex)) + " on that track; status lists them");
+        return fail("no plugin " + cydaw::base::Text(static_cast<int>(pluginIndex)) + " on that track; status lists them");
     if(command_=="list_plugin_programs"||command_=="select_plugin_program") {
         if(command_=="select_plugin_program") {auto applied=engine_.setTrackPluginProgram(index,pluginIndex,int(number("program",0)));if(applied.failed())return fail(applied.getErrorMessage());studio_.markDirty();}
-        juce::StringArray names;int current{};auto listed=engine_.getTrackPluginPrograms(index,pluginIndex,names,current);if(listed.failed())return fail(listed.getErrorMessage());
-        auto result=object();juce::Array<juce::var> programs;for(const auto& name:names)programs.add(name);set(result,"programs",programs);set(result,"current",current);return ok(result);
+        cydaw::base::TextList names;int current{};auto listed=engine_.getTrackPluginPrograms(index,pluginIndex,names,current);if(listed.failed())return fail(listed.getErrorMessage());
+        auto result=object();cydaw::base::Array<cydaw::base::Value> programs;for(const auto& name:names)programs.add(name);set(result,"programs",programs);set(result,"current",current);return ok(result);
     }
     if (command_ == "remove_plugin") {
         studio_.removePlugin(track->ref(), pluginIndex);
@@ -6613,17 +6645,17 @@ juce::var Commands::onPlugins()
         refreshed.failed())
         return fail(refreshed.getErrorMessage());
     if (command_ == "set_plugin_parameter") {
-        const auto spec = request_.getProperty("parameter", juce::var());
+        const auto spec = request_.getProperty("parameter", cydaw::base::Value());
         std::optional<std::uint32_t> parameterIndex;
         if (spec.isInt() || spec.isInt64() || spec.isDouble())
             parameterIndex = static_cast<std::uint32_t>(static_cast<int>(spec));
         else
             for (const auto& parameter : pluginParameters)
-                if (parameter.name.equalsIgnoreCase(spec.toString().trim()))
+                if (parameter.name.equalsIgnoreCase(spec.toString().trim().toRawUTF8()))
                     parameterIndex = parameter.index;
         if (!parameterIndex)
             return fail("no parameter \"" + spec.toString() + "\"; list_plugin_parameters gives them");
-        const auto value = static_cast<float>(juce::jlimit(0.0, 1.0, number("value", 0.0)));
+        const auto value = static_cast<float>(cydaw::base::limit(0.0, 1.0, number("value", 0.0)));
         if (const auto applied = engine_.setTrackPluginParameter(index, pluginIndex, *parameterIndex, value);
             applied.failed())
             return fail(applied.getErrorMessage());
@@ -6640,7 +6672,7 @@ juce::var Commands::onPlugins()
             pins.push_back(static_cast<std::uint32_t>(static_cast<int>(value)));
         studio_.setPluginPins(track->ref(), pluginIndex, std::move(pins));
     }
-    juce::Array<juce::var> entries;
+    cydaw::base::Array<cydaw::base::Value> entries;
     for (const auto& parameter : pluginParameters) {
         auto entry = object();
         set(entry, "index", static_cast<int>(parameter.index));
@@ -6657,7 +6689,7 @@ juce::var Commands::onPlugins()
     set(result, "plugin", info[pluginIndex].name);
     set(result, "parameters", entries);
     if (const auto pins = studio_.pluginPins(track->ref(), pluginIndex)) {
-        juce::Array<juce::var> pinned;
+        cydaw::base::Array<cydaw::base::Value> pinned;
         for (const auto value : *pins)
             pinned.add(static_cast<int>(value));
         set(result, "pinned", pinned);
@@ -6667,7 +6699,7 @@ juce::var Commands::onPlugins()
 
 // ---- Buses and the audio device -----------------------------------------------------------------
 
-juce::var Commands::onListBuses()
+cydaw::base::Value Commands::onListBuses()
 {
     auto result = object();
     set(result, "buses", describeBuses());
@@ -6675,11 +6707,11 @@ juce::var Commands::onListBuses()
     return ok(result);
 }
 
-juce::var Commands::onBuses()
+cydaw::base::Value Commands::onBuses()
 {
-    const auto find = [this](const juce::String& spec) -> std::optional<app::VirtualAudioBus> {
+    const auto find = [this](const cydaw::base::Text& spec) -> std::optional<app::VirtualAudioBus> {
         for (const auto& bus : engine_.virtualBuses())
-            if (bus.name.equalsIgnoreCase(spec.trim()) || juce::String(static_cast<juce::int64>(bus.id)) == spec.trim())
+            if (bus.name.equalsIgnoreCase(spec.trim()) || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == spec.trim())
                 return bus;
         return std::nullopt;
     };
@@ -6707,14 +6739,14 @@ juce::var Commands::onBuses()
         if (has("name") && text("name").trim().isNotEmpty())
             updated.name = text("name").trim();
         if (has("channels"))
-            updated.channels = juce::jlimit(1, app::VirtualAudioBus::maximumChannels, static_cast<int>(number("channels", 2.0)));
+            updated.channels = cydaw::base::limit(1, app::VirtualAudioBus::maximumChannels, static_cast<int>(number("channels", 2.0)));
         if (has("format"))
             if (const auto channels = cydaw::engine::layoutChannels(text("format").trim().toLowerCase().toStdString()); channels > 0)
                 updated.channels = channels;
         // The sound card's channels, one per bus channel (from 0).
-        if (const auto* list = request_.getProperty("deviceChannels", juce::var()).getArray()) {
+        if (const auto* list = request_.getProperty("deviceChannels", cydaw::base::Value()).getArray()) {
             if (!has("channels") && !has("format"))
-                updated.channels = juce::jlimit(1, app::VirtualAudioBus::maximumChannels, list->size());
+                updated.channels = cydaw::base::limit(1, app::VirtualAudioBus::maximumChannels, list->size());
             for (int channel = 0; channel < std::min(list->size(), app::VirtualAudioBus::maximumChannels); ++channel)
                 updated.setDeviceChannel(channel, std::max(0, static_cast<int>((*list)[channel])));
         }
@@ -6729,7 +6761,7 @@ juce::var Commands::onBuses()
         if (has("destinationB"))
             updated.destinationChannelB = std::max(0, static_cast<int>(number("destinationB", 1.0)));
         if (has("gainDb"))
-            updated.gainDb = static_cast<float>(juce::jlimit(-60.0, 12.0, number("gainDb", 0.0)));
+            updated.gainDb = static_cast<float>(cydaw::base::limit(-60.0, 12.0, number("gainDb", 0.0)));
         if (has("muted"))
             updated.muted = flag("muted", false);
         if (has("monitor"))
@@ -6747,7 +6779,7 @@ juce::var Commands::onBuses()
     return ok(result);
 }
 
-juce::var Commands::onAudioSettings()
+cydaw::base::Value Commands::onAudioSettings()
 {
     auto& manager = engine_.deviceManager();
     if (command_ == "device_channels" && (has("inputs") || has("outputs"))) {
@@ -6791,18 +6823,27 @@ juce::var Commands::onAudioSettings()
     set(result, "sampleRate", setup.sampleRate);
     set(result, "bufferSize", setup.bufferSize);
     if (auto* device = manager.getCurrentAudioDevice()) {
-        juce::Array<juce::var> rates;
+        cydaw::base::Array<cydaw::base::Value> rates;
         for (const auto rate : device->getAvailableSampleRates())
             rates.add(rate);
-        juce::Array<juce::var> sizes;
+        cydaw::base::Array<cydaw::base::Value> sizes;
         for (const auto size : device->getAvailableBufferSizes())
             sizes.add(size);
         set(result, "availableSampleRates", rates);
         set(result, "availableBufferSizes", sizes);
+        set(result, "outputLatencySamples", device->getOutputLatencyInSamples());
+        set(result, "inputLatencySamples", device->getInputLatencyInSamples());
+        set(result, "actualBufferSize", device->getCurrentBufferSizeSamples());
+        if (const auto description = device->streamDescription()) {
+            set(result, "outputLatencyKnown", description->output.latency.valid);
+            set(result, "outputPeriodKnown", description->output.periodKnown);
+            set(result, "outputPeriodFrames", static_cast<std::int64_t>(description->output.periodFrames));
+            set(result, "outputPeriods", static_cast<int>(description->output.periods));
+        }
         set(result, "latencyMs", (device->getOutputLatencyInSamples() + device->getInputLatencyInSamples())
                                      / std::max(1.0, device->getCurrentSampleRate()) * 1000.0);
     }
-    juce::Array<juce::var> types;
+    cydaw::base::Array<cydaw::base::Value> types;
     for (auto* type : manager.getAvailableDeviceTypes()) {
         type->scanForDevices();
         auto entry = object();
@@ -6817,7 +6858,7 @@ juce::var Commands::onAudioSettings()
 
 // ---- The sample library ---------------------------------------------------------------------------
 
-juce::var Commands::onSamples()
+cydaw::base::Value Commands::onSamples()
 {
     // An automated session's library starts when it is asked about.
     studio_.ensureSamples();
@@ -6832,7 +6873,7 @@ juce::var Commands::onSamples()
         set(entry, "source", record.source);
         set(entry, "sourceTitle", library.sourceTitle(record));
         set(entry, "instrument", record.instrument);
-        set(entry, "family", record.category.isNotEmpty() ? app::SampleLibrary::familyOf(record.category) : juce::String("other"));
+        set(entry, "family", record.category.isNotEmpty() ? app::SampleLibrary::familyOf(record.category) : cydaw::base::Text("other"));
         set(entry, "length", record.length);
         set(entry, "sampleRate", record.sampleRate);
         set(entry, "channels", record.channels);
@@ -6863,7 +6904,7 @@ juce::var Commands::onSamples()
         set(result, "classified", progress.classified);
         set(result, "toClassify", progress.toClassify);
         set(result, "message", progress.message);
-        juce::StringArray folders;
+        cydaw::base::TextList folders;
         for (const auto& folder : library.folders())
             folders.add(folder.getFullPathName());
         set(result, "folders", strings(folders));
@@ -6875,18 +6916,18 @@ juce::var Commands::onSamples()
         set(result, "tags", strings(library.distinctTags()));
         set(result, "loaded", library.loaded());
         set(result, "includeBanks", library.includeBanks());
-        juce::StringArray banks;
+        cydaw::base::TextList banks;
         for (const auto& bank : library.banks())
             banks.add(bank.id);
         set(result, "banks", strings(banks));
         // How many in each category, family and source.
-        std::map<juce::String, int> categories, families, sources;
+        std::map<cydaw::base::Text, int> categories, families, sources;
         for (const auto& record : library.samples()) {
-            ++categories[record.category.isNotEmpty() ? record.category : juce::String("-")];
-            ++families[record.category.isNotEmpty() ? app::SampleLibrary::familyOf(record.category) : juce::String("other")];
-            ++sources[record.source.isNotEmpty() ? record.source : juce::String("folders")];
+            ++categories[record.category.isNotEmpty() ? record.category : cydaw::base::Text("-")];
+            ++families[record.category.isNotEmpty() ? app::SampleLibrary::familyOf(record.category) : cydaw::base::Text("other")];
+            ++sources[record.source.isNotEmpty() ? record.source : cydaw::base::Text("folders")];
         }
-        const auto counts = [](const std::map<juce::String, int>& map) {
+        const auto counts = [](const std::map<cydaw::base::Text, int>& map) {
             auto value = object();
             for (const auto& [key, count] : map)
                 set(value, key.toRawUTF8(), count);
@@ -6940,12 +6981,12 @@ juce::var Commands::onSamples()
         set(engineValue, "gpu", engine.gpu);
         set(engineValue, "error", engine.error);
         set(result, "engine", engineValue);
-        juce::ignoreUnused(models);
+        cydaw::base::ignoreUnused(models);
         return result;
     };
     const auto modelsOf = [&models, &semantic] {
         auto result = object();
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& model : models.models()) {
             auto entry = object();
             set(entry, "id", model.id);
@@ -6972,7 +7013,7 @@ juce::var Commands::onSamples()
         }
         set(result, "models", list);
         set(result, "catalogue", models.catalogueFile().getFullPathName());
-        juce::Array<juce::var> packages;
+        cydaw::base::Array<cydaw::base::Value> packages;
         for (const auto& package : models.enginePackages()) {
             auto entry = object();
             set(entry, "name", package.name);
@@ -6998,19 +7039,19 @@ juce::var Commands::onSamples()
         // licence is the person's to accept: an agent passes acceptLicence only
         // when the person said so, having read it.
         if (has("install")) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!models.install(text("install"), flag("acceptLicence", false), error))
                 return fail(error);
         }
         if (has("import")) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!models.importFrom(text("import"), fileFor(text("folder")), flag("acceptLicence", false), error))
                 return fail(error);
         }
         if (flag("cancel", false))
             models.cancel();
         if (has("remove")) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!models.remove(text("remove"), error))
                 return fail(error);
             semantic.modelsChanged();
@@ -7099,8 +7140,8 @@ juce::var Commands::onSamples()
         if (has("bpm"))
             library.setBpm(path, number("bpm", 0.0));
         if (has("tags")) {
-            juce::StringArray tags;
-            if (const auto* list = request_.getProperty("tags", juce::var()).getArray())
+            cydaw::base::TextList tags;
+            if (const auto* list = request_.getProperty("tags", cydaw::base::Value()).getArray())
                 for (const auto& tag : *list)
                     tags.add(tag.toString());
             else
@@ -7141,16 +7182,16 @@ juce::var Commands::onSamples()
         if (command_ == "select_sample") {
             if (record == nullptr)
                 return fail("no sample " + path + " in the library");
-            ui_.selectSample(juce::File(path));
+            ui_.selectSample(cydaw::base::File(path));
             return ok(describe(*record));
         }
         if (flag("stop", false)) {
             engine_.stopSamplePreview();
         } else {
-            if (!juce::File(path).existsAsFile())
+            if (!cydaw::base::File(path).existsAsFile())
                 return fail("no file at " + path);
             if (has("gainDb"))
-                engine_.setSamplePreviewGainDb(static_cast<float>(juce::jlimit(-60.0, 6.0, number("gainDb", -6.0))));
+                engine_.setSamplePreviewGainDb(static_cast<float>(cydaw::base::limit(-60.0, 6.0, number("gainDb", -6.0))));
             // atTempo: a loop with a tempo at the project's (as the library's switch).
             if (const auto started = studio_.auditionSample(path, std::max(0.0, number("start", 0.0)), flag("atTempo", false));
                 started.failed())
@@ -7179,7 +7220,7 @@ juce::var Commands::onSamples()
         const auto category = text("category").trim().toLowerCase();
         const auto family = text("family").trim().toLowerCase();
         const auto source = text("source").trim();
-        juce::Array<juce::var> entries;
+        cydaw::base::Array<cydaw::base::Value> entries;
         for (const auto& hit : answer.hits) {
             const auto* record = library.find(hit.path);
             if (record == nullptr)
@@ -7216,9 +7257,9 @@ juce::var Commands::onSamples()
         const auto minLength = number("minLength", 0.0);
         const auto maxLength = number("maxLength", 1.0e9);
         const auto limit = static_cast<int>(number("limit", 100.0));
-        juce::StringArray words;
+        cydaw::base::TextList words;
         words.addTokens(query, " ", "");
-        juce::Array<juce::var> entries;
+        cydaw::base::Array<cydaw::base::Value> entries;
         auto matched = 0;
         for (const auto& record : library.samples()) {
             if (category.isNotEmpty() && record.category != category)
@@ -7262,7 +7303,7 @@ juce::var Commands::onSamples()
 
 } // namespace
 
-juce::var handleRemoteCommand(Studio& studio, RemoteUi& ui, const juce::var& request)
+cydaw::base::Value handleRemoteCommand(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request)
 {
     return Commands(studio, ui, request).run();
 }

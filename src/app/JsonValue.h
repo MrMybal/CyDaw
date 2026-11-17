@@ -1,10 +1,10 @@
+#include <cydaw/base/Value.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
 
 namespace cydaw::app {
 
-// Copying and comparing the juce::var trees this application uses as its
+// Copying and comparing the cydaw::base::Value trees this application uses as its
 // document format. Both used to be done by going through JSON text, which is
 // the most expensive way to do either: every number formatted, the whole
 // string allocated, then parsed again. Measured on this project, a copy cost
@@ -15,12 +15,12 @@ namespace cydaw::app {
 // separate translation units and both need them; the same knowledge written
 // twice is how this codebase has gone wrong before.
 
-[[nodiscard]] inline juce::var cloneJsonValue(const juce::var& value)
+[[nodiscard]] inline cydaw::base::Value cloneJsonValue(const cydaw::base::Value& value)
 {
     if (value.isVoid() || value.isUndefined())
         return {};
     if (const auto* array = value.getArray()) {
-        juce::Array<juce::var> copy;
+        cydaw::base::Array<cydaw::base::Value> copy;
         copy.ensureStorageAllocated(array->size());
         for (const auto& element : *array)
             copy.add(cloneJsonValue(element));
@@ -30,23 +30,23 @@ namespace cydaw::app {
         // The property set copied whole, then each value cloned in place:
         // inserting the properties one by one searched the set for every
         // one of them, and a class library is thousands of properties.
-        auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject(*object));
+        auto copy = cydaw::base::Object::Ptr(new cydaw::base::Object(*object));
         auto& properties = copy->getProperties();
         for (int index = 0; index < properties.size(); ++index)
             if (auto* nested = properties.getVarPointerAt(index))
                 *nested = cloneJsonValue(*nested);
-        return juce::var(copy.get());
+        return cydaw::base::Value(copy.get());
     }
     // Numbers, strings and booleans are values already; copying one is what
     // returning it does.
     return value;
 }
 
-// Deep equality. juce::var's own operator== compares two objects by address,
+// Deep equality. cydaw::base::Value's own operator== compares two objects by address,
 // so two identical documents built separately never match; that is why the
 // edit history compared them as strings.
-[[nodiscard]] inline bool jsonValuesMatch(const juce::var& left,
-                                          const juce::var& right)
+[[nodiscard]] inline bool jsonValuesMatch(const cydaw::base::Value& left,
+                                          const cydaw::base::Value& right)
 {
     if (const auto* leftArray = left.getArray()) {
         const auto* rightArray = right.getArray();
@@ -80,7 +80,7 @@ namespace cydaw::app {
     }
     if (right.getDynamicObject() != nullptr)
         return false;
-    // Void and undefined are distinct to juce::var but mean the same absence
+    // Void and undefined are distinct to cydaw::base::Value but mean the same absence
     // here, and a document that round-tripped through JSON has already lost
     // the difference.
     if (left.isVoid() || left.isUndefined())

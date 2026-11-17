@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Empreinte, Givre
 // (SpaceDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -11,16 +12,16 @@ constexpr ImU32 kEmpreinteEarly = IM_COL32(255, 196, 120, 255);
 // Frost.
 constexpr ImU32 kGivreFrost = IM_COL32(176, 226, 255, 255);
 
-juce::String empreinteSpaceName(const int index)
+cydaw::base::Text empreinteSpaceName(const int index)
 {
     const auto& room = spacefxd::empreinteRooms[static_cast<std::size_t>(std::clamp(index, 0, spacefxd::empreinteSpaceCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? room.french : room.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? room.french : room.english);
 }
 
-juce::String empreinteSpaceHint(const int index)
+cydaw::base::Text empreinteSpaceHint(const int index)
 {
     const auto& room = spacefxd::empreinteRooms[static_cast<std::size_t>(std::clamp(index, 0, spacefxd::empreinteSpaceCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? room.frenchHint : room.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? room.frenchHint : room.englishHint);
 }
 
 // The card's response file: its name (a click loads another) and a cross,
@@ -35,9 +36,9 @@ float empreinteFileRow(const ImVec2 origin, const bool large, const ImU32 colour
     auto name = cardFile->name;
     const auto longest = large ? 34 : 16;
     if (name.length() > longest)
-        name = name.substring(0, longest - 1) + juce::String::fromUTF8("\xe2\x80\xa6");
+        name = name.substring(0, longest - 1) + cydaw::base::Text::fromUTF8("\xe2\x80\xa6");
     const auto loadLabel = ui::Ls("Charger\xe2\x80\xa6", "Load\xe2\x80\xa6");
-    const auto cross = juce::String::fromUTF8("\xc3\x97");
+    const auto cross = cydaw::base::Text::fromUTF8("\xc3\x97");
     const auto width = cardFile->name.isEmpty()
                            ? textSize(loadLabel.toRawUTF8(), fontScale).x + padding * 2.0f
                            : textSize(name.toRawUTF8(), fontScale).x + textSize(cross.toRawUTF8(), fontScale).x + padding * 4.0f + dp(2.0f);
@@ -440,7 +441,7 @@ bool spacefxLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& par
 // The values a card shows as knobs (pane indices).
 std::vector<int> spacefxCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     if (kind == PaneKind::empreinte)
         return { spacefxd::empreinteMix, spacefxd::empreintePredelay, spacefxd::empreinteTail, spacefxd::empreinteHighCut };
     if (kind == PaneKind::givre)
@@ -449,7 +450,7 @@ std::vector<int> spacefxCardFields(const PaneKind kind, std::vector<Param>& para
 }
 
 // A value as these effects show it; empty for none of theirs.
-juce::String spacefxFormat(const juce::String& binding, const double value)
+cydaw::base::Text spacefxFormat(const cydaw::base::Text& binding, const double value)
 {
     const auto onOff = [](const double v) { return v >= 0.5 ? ui::Ls("Actif", "On") : ui::Ls("Coupé", "Off"); };
     if (binding.contains("empreinte.")) {
@@ -461,13 +462,13 @@ juce::String spacefxFormat(const juce::String& binding, const double value)
         if (suffix == "mix" || suffix == "width" || suffix == "length")
             return percent(value);
         if (suffix == "predelay")
-            return value < 0.5 ? ui::Ls("Aucun", "None") : juce::String(juce::roundToInt(value)) + " ms";
+            return value < 0.5 ? ui::Ls("Aucun", "None") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " ms";
         if (suffix == "lowCut")
             return !spacefxd::empreinteLowCutApplied(static_cast<float>(value)) ? ui::Ls("Désactivé", "Off")
-                                                                                 : juce::String(juce::roundToInt(value)) + " Hz";
+                                                                                 : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
             return !spacefxd::empreinteHighCutApplied(static_cast<float>(value)) ? ui::Ls("Désactivé", "Off")
-                                                                                   : juce::String(value / 1'000.0, 1) + " kHz";
+                                                                                   : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
     }
     if (binding.contains("givre.")) {
@@ -476,19 +477,19 @@ juce::String spacefxFormat(const juce::String& binding, const double value)
             return onOff(value);
         if (suffix == "sync") {
             const auto* division = engine::noteDivisionFor(static_cast<float>(value));
-            return division == nullptr ? ui::Ls("Libre", "Free") : juce::String(std::string(division->name));
+            return division == nullptr ? ui::Ls("Libre", "Free") : cydaw::base::Text(std::string(division->name));
         }
         if (suffix == "blur") {
             const auto seconds = spacefxd::givreBlurSecondsOf(static_cast<float>(value));
-            return seconds < 1.0e-3 ? ui::Ls("Aucun", "None") : juce::String(seconds, seconds < 1.0 ? 2 : 1) + " s";
+            return seconds < 1.0e-3 ? ui::Ls("Aucun", "None") : cydaw::base::Text(seconds, seconds < 1.0 ? 2 : 1) + " s";
         }
         if (suffix == "smear") {
             const auto octaves = spacefxd::givreSmearOctavesOf(static_cast<float>(value));
-            return octaves < 1.0e-3 ? ui::Ls("Aucun", "None") : juce::String::fromUTF8("\xc2\xb1") + juce::String(octaves, 2) + " oct";
+            return octaves < 1.0e-3 ? ui::Ls("Aucun", "None") : cydaw::base::Text::fromUTF8("\xc2\xb1") + cydaw::base::Text(octaves, 2) + " oct";
         }
         if (suffix == "shift") {
             const auto integral = std::abs(value - std::round(value)) < 0.05;
-            return (value > 0.0 ? "+" : "") + juce::String(value, integral ? 0 : 1) + " st";
+            return (value > 0.0 ? "+" : "") + cydaw::base::Text(value, integral ? 0 : 1) + " st";
         }
         if (suffix == "tone")
             return std::abs(value) < 0.005 ? ui::Ls("Neutre", "Flat")
@@ -501,7 +502,7 @@ juce::String spacefxFormat(const juce::String& binding, const double value)
 }
 
 // A parameter of theirs that takes whole steps (a choice, a switch).
-bool spacefxStepped(const juce::String& binding)
+bool spacefxStepped(const cydaw::base::Text& binding)
 {
     for (const auto* suffix : { "empreinte.space", "empreinte.reverse", "givre.freeze", "givre.sync" })
         if (binding.endsWith(suffix))

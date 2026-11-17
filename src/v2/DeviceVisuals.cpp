@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Text.h>
 #include "DeviceVisuals.h"
 
 #include "StudioEffectsView.h"
@@ -375,46 +377,28 @@ const char* paneTitleOf(const Pane& pane)
 // binding of its first value), updated once a frame whichever view draws it.
 struct SpectrometerView {
     Spectrometer analysis;
+    std::vector<float> waterfall;
+    std::uint64_t waterfallRevision {};
     int frame { -1 };
 };
 
-SpectrometerView& spectrometerView(const juce::String& key)
+SpectrometerView& spectrometerView(const cydaw::base::Text& key)
 {
-    static std::map<juce::String, SpectrometerView> views;
+    static std::map<cydaw::base::Text, SpectrometerView> views;
     return views[key];
 }
 
-// From silence (0) to full scale (1): night blue, violet, magenta, orange,
-// pale yellow, as a waterfall's heat.
-ImU32 heatColour(const float t)
-{
-    static constexpr std::array<std::array<float, 3>, 6> stops { {
-        { 0.05f, 0.05f, 0.10f },
-        { 0.16f, 0.07f, 0.36f },
-        { 0.45f, 0.10f, 0.52f },
-        { 0.78f, 0.22f, 0.42f },
-        { 0.97f, 0.52f, 0.20f },
-        { 0.99f, 0.94f, 0.62f },
-    } };
-    const auto x = std::clamp(t, 0.0f, 1.0f) * static_cast<float>(stops.size() - 1);
-    const auto index = std::min(static_cast<int>(x), static_cast<int>(stops.size()) - 2);
-    const auto f = x - static_cast<float>(index);
-    const auto& a = stops[static_cast<std::size_t>(index)];
-    const auto& b = stops[static_cast<std::size_t>(index + 1)];
-    return ImGui::GetColorU32(ImVec4(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, 1.0f));
-}
-
 // "A#3" for a frequency.
-juce::String noteName(const float hz)
+cydaw::base::Text noteName(const float hz)
 {
     static const char* names[] { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     const auto note = static_cast<int>(std::lround(69.0 + 12.0 * std::log2(std::max(1.0f, hz) / 440.0)));
-    return juce::String(names[((note % 12) + 12) % 12]) + juce::String(note / 12 - 1);
+    return cydaw::base::Text(names[((note % 12) + 12) % 12]) + cydaw::base::Text(note / 12 - 1);
 }
 
-juce::String hertzText(const float hz)
+cydaw::base::Text hertzText(const float hz)
 {
-    return hz >= 1'000.0f ? juce::String(hz / 1'000.0f, hz >= 10'000.0f ? 1 : 2) + " kHz" : juce::String(juce::roundToInt(hz)) + " Hz";
+    return hz >= 1'000.0f ? cydaw::base::Text(hz / 1'000.0f, hz >= 10'000.0f ? 1 : 2) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(hz)) + " Hz";
 }
 
 bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pane, const ImU32 colour, const Live& live,
@@ -433,7 +417,7 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
     read(3, settings.holdSeconds);
     read(4, settings.historySeconds);
     const auto* first = parameterAt(parameters, pane, 0);
-    auto& view = spectrometerView(first != nullptr ? first->binding : juce::String("spectrometer"));
+    auto& view = spectrometerView(first != nullptr ? first->binding : cydaw::base::Text("spectrometer"));
     if (view.frame != ImGui::GetFrameCount()) {
         view.frame = ImGui::GetFrameCount();
         view.analysis.update(live.afterFrame, ImGui::GetTime(), settings);
@@ -452,7 +436,7 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
         const auto y = yOfDb(curvePlot, db, ceilingDb, floorDb);
         list->AddLine(ImVec2(curvePlot.min.x, y), ImVec2(curvePlot.max.x, y), db == 0.0f ? p.gridStrong : p.grid);
         smallText(list, ImVec2(curvePlot.min.x + dp(2.0f), y - ImGui::GetFontSize() * 0.66f), p.textFaint,
-                  juce::String(juce::roundToInt(db)).toRawUTF8(), 0.62f);
+                  cydaw::base::Text(cydaw::base::roundToInt(db)).toRawUTF8(), 0.62f);
     }
     std::vector<ImVec2> levels;
     std::vector<ImVec2> peaks;
@@ -474,40 +458,34 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
                               dp(1.0f));
     }
 
-    // The waterfall: the spectrum over the last seconds, the newest on top,
-    // drawn at the size of the pixels it has (cells of one colour merged).
-    list->AddRectFilled(fallPlot.min, fallPlot.max, heatColour(0.0f));
-    const auto rows = std::clamp(static_cast<int>(fallPlot.height() / dp(2.0f)), 1, Spectrometer::rowCount);
-    const auto columns = std::clamp(static_cast<int>(fallPlot.width() / dp(2.5f)), 1, Spectrometer::binCount);
-    const auto cellWidth = fallPlot.width() / static_cast<float>(columns);
-    const auto cellHeight = fallPlot.height() / static_cast<float>(rows);
-    const auto range = std::max(1.0f, ceilingDb - floorDb);
-    for (auto row = 0; row < rows; ++row) {
-        const auto* values = analysis.row(row * Spectrometer::rowCount / rows);
-        const auto y = fallPlot.min.y + cellHeight * static_cast<float>(row);
-        auto runStart = 0;
-        auto runLevel = -1;
-        for (auto column = 0; column <= columns; ++column) {
-            auto level = -1;
-            if (column < columns) {
-                const auto from = column * Spectrometer::binCount / columns;
-                const auto to = std::max(from + 1, (column + 1) * Spectrometer::binCount / columns);
-                auto db = -1'000.0f;
-                for (auto bin = from; bin < to; ++bin)
-                    db = std::max(db, values[bin]);
-                level = std::clamp(static_cast<int>((db - floorDb) / range * 40.0f), 0, 40);
-            }
-            if (level != runLevel) {
-                if (runLevel > 0)
-                    list->AddRectFilled(ImVec2(fallPlot.min.x + cellWidth * static_cast<float>(runStart), y),
-                                        ImVec2(fallPlot.min.x + cellWidth * static_cast<float>(column), y + cellHeight + 0.5f),
-                                        heatColour(static_cast<float>(runLevel) / 40.0f));
-                runStart = column;
-                runLevel = level;
-            }
-        }
+    // Chronological matrix for CyUI. Repack only when the host inserts a row,
+    // not once per panel/render. No analysis is performed by the widget.
+    if (view.waterfall.empty() || view.waterfallRevision != analysis.historyRevision()) {
+        view.waterfall.resize(Spectrometer::rowCount * Spectrometer::binCount);
+        for (int age = 0; age < Spectrometer::rowCount; ++age)
+            std::copy_n(analysis.row(age), Spectrometer::binCount,
+                        view.waterfall.data() + (Spectrometer::rowCount - 1 - age) * Spectrometer::binCount);
+        view.waterfallRevision = analysis.historyRevision();
     }
-    const auto seconds = juce::String(juce::roundToInt(settings.historySeconds)) + " s";
+    const cyui::SpectrogramData data {view.waterfall, Spectrometer::rowCount, Spectrometer::binCount,
+                                     {-settings.historySeconds, 0}, {20, 20000}, true};
+    cyui::PlotState waterfallView {{{-settings.historySeconds, 0}, false}, {{20, 20000}, true}};
+    cyui::SpectrogramOptions options;
+    options.intensity = {floorDb, ceilingDb};
+    options.orientation = cyui::SpectrogramOrientation::timeVertical;
+    options.navigation = false; // existing history/peak controls keep ownership
+    options.axes = false;
+    options.maxCells = 16384;
+    options.legend = large;
+    options.ramp.style = cyui::RampStyle::intensity;
+    const auto cursor = ImGui::GetCursorScreenPos();
+    ImGui::SetCursorScreenPos(fallPlot.min);
+    const auto waterfallResult = cyui::spectrogram("##spectrometerHistory", waterfallView, data,
+                      ImVec2(std::max(1.0f, fallPlot.width()), std::max(1.0f, fallPlot.height())), options);
+    ImGui::SetCursorScreenPos(cursor);
+    if (waterfallResult.hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        view.analysis.clearPeaks();
+    const auto seconds = cydaw::base::Text(cydaw::base::roundToInt(settings.historySeconds)) + " s";
     smallText(list, ImVec2(fallPlot.max.x - smallTextSize(seconds.toRawUTF8(), 0.62f).x - dp(3.0f), fallPlot.max.y - ImGui::GetFontSize() * 0.72f),
               theme::alpha(p.text, 0.7f), seconds.toRawUTF8(), 0.62f);
 
@@ -518,14 +496,14 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
     // click lets the held peaks go.
     const auto mouse = ImGui::GetIO().MousePos;
     if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)
-        && (curvePlot.contains(mouse) || fallPlot.contains(mouse))) {
+        && curvePlot.contains(mouse)) {
         const auto hz = hzOfX(curvePlot, mouse.x);
         const auto bin = std::clamp(static_cast<int>(std::lround(std::log(hz / 20.0f) / std::log(1'000.0f)
                                                                  * static_cast<float>(Spectrometer::binCount - 1))),
                                     0, Spectrometer::binCount - 1);
         list->AddLine(ImVec2(mouse.x, curvePlot.min.y), ImVec2(mouse.x, fallPlot.max.y), theme::alpha(p.text, 0.35f));
         const auto text = hertzText(hz) + "  " + noteName(hz) + "  "
-                          + juce::String(analysis.levels()[static_cast<std::size_t>(bin)], 1) + " dB";
+                          + cydaw::base::Text(analysis.levels()[static_cast<std::size_t>(bin)], 1) + " dB";
         const auto size = smallTextSize(text.toRawUTF8(), 0.7f);
         auto x = mouse.x + dp(6.0f);
         if (x + size.x > curvePlot.max.x - dp(2.0f))
@@ -554,14 +532,19 @@ bool spectrumPlot(const Plot& bounds, ImU32 colour, const Live& live)
             prepared.push_back({Spectrum::frequencyOfBin(float(bin)), Spectrum::floorDb +
                 signals[channel]->levels()[std::size_t(bin)] * (Spectrum::ceilingDb - Spectrum::floorDb)});
         series.push_back({std::uint64_t(channel + 1), channel ? L("après", "after") : L("avant", "before"),
-                          prepared, cyui::PlotStyle::line, channel});
+                          prepared, channel ? cyui::PlotStyle::area : cyui::PlotStyle::line, channel});
+        if (channel) {
+            series.back().baseline = Spectrum::floorDb;
+            series.back().gradient = true;
+            series.back().fillAlpha = .3f;
+        }
     }
     cyui::PlotState view {{{20, 20000}, true}, {{Spectrum::floorDb, Spectrum::ceilingDb}, false}};
     cyui::PlotOptions options;
     options.navigation = false;
     options.axes = bounds.width() > dp(210);
     options.legend = live.before && live.after && bounds.width() > dp(180);
-    options.formatX = [](double hz) { return hz >= 1000 ? juce::String(hz / 1000, 1).toStdString() + "k" : juce::String(int(hz)).toStdString(); };
+    options.formatX = [](double hz) { return hz >= 1000 ? cydaw::base::Text(hz / 1000, 1).toStdString() + "k" : cydaw::base::Text(int(hz)).toStdString(); };
     const auto cursor = ImGui::GetCursorScreenPos();
     ImGui::SetCursorScreenPos(bounds.min);
     cyui::spectrum("##signalSpectrum", view, series, ImVec2(bounds.width(), bounds.height()), options);
@@ -640,7 +623,7 @@ bool filterPlot(const Plot& plot, Param* cutoff, Param* resonance, const bool hi
     handle(list, point, colour, interaction.hovered || interaction.active);
     if (interaction.hovered || interaction.active)
         ImGui::SetTooltip("%s%s", formatValue(*cutoff, cutoff->value).toRawUTF8(),
-                          resonance != nullptr ? (juce::String::fromUTF8(" · Q ") + juce::String(resonance->value, 2)).toRawUTF8() : "");
+                          resonance != nullptr ? (cydaw::base::Text::fromUTF8(" · Q ") + cydaw::base::Text(resonance->value, 2)).toRawUTF8() : "");
     return changed;
 }
 
@@ -1127,7 +1110,7 @@ bool wavetablePlot(const Plot& plot, Param* position, Param* level, const ImU32 
     return changed;
 }
 
-juce::String noteValue(const double milliseconds, const double tempo)
+cydaw::base::Text noteValue(const double milliseconds, const double tempo)
 {
     const auto beat = 60'000.0 / std::max(20.0, tempo);
     struct Division {
@@ -1225,7 +1208,7 @@ bool delayPlot(const Plot& plot, Param* time, Param* feedback, Param* mix, const
     }
     auto label = formatValue(*time, effectiveTime);
     if (division != nullptr)
-        label << "  " << juce::String(std::string(division->name));
+        label << "  " << cydaw::base::Text(std::string(division->name));
     else if (const auto note = noteValue(effectiveTime, live.tempo); note.isNotEmpty())
         label << "  " << note;
     const auto size = smallTextSize(label.toRawUTF8(), 0.8f);
@@ -1496,7 +1479,7 @@ bool gatePlot(const Plot& plot, Param* threshold, Param* range, const ImU32 colo
         changed |= apply(*range, range->value - interaction.delta.y / std::max(1.0f, transfer.height()) * 80.0, set);
     if (interaction.hovered || interaction.active)
         ImGui::SetTooltip("%s%s", formatValue(*threshold, threshold->value).toRawUTF8(),
-                          range != nullptr ? (juce::String::fromUTF8(" · ") + formatValue(*range, range->value)).toRawUTF8() : "");
+                          range != nullptr ? (cydaw::base::Text::fromUTF8(" · ") + formatValue(*range, range->value)).toRawUTF8() : "");
     historyPanel(list, history, t, colour, live);
     return changed;
 }
@@ -1596,7 +1579,7 @@ bool multiFilterPlot(const Plot& plot, Param* mode, Param* cutoff, Param* resona
            interaction.hovered || interaction.active);
     if (interaction.hovered || interaction.active)
         ImGui::SetTooltip("%s%s", formatValue(*cutoff, cutoff->value).toRawUTF8(),
-                          resonance != nullptr ? (juce::String::fromUTF8(" · Q ") + juce::String(resonance->value, 2)).toRawUTF8() : "");
+                          resonance != nullptr ? (cydaw::base::Text::fromUTF8(" · Q ") + cydaw::base::Text(resonance->value, 2)).toRawUTF8() : "");
     return changed;
 }
 
@@ -1957,14 +1940,14 @@ const char* slopeName(const int slope)
 }
 
 // The note nearest a frequency: "A4", "C#2 +12 ct".
-juce::String noteOf(const double hz)
+cydaw::base::Text noteOf(const double hz)
 {
     static const char* names[] { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     const auto midi = 69.0 + 12.0 * std::log2(std::max(hz, 1.0) / 440.0);
     const auto nearest = static_cast<int>(std::lround(midi));
     const auto cents = static_cast<int>(std::lround((midi - nearest) * 100.0));
-    auto text = juce::String(names[((nearest % 12) + 12) % 12])
-                + juce::String(static_cast<int>(std::floor(nearest / 12.0)) - 1);
+    auto text = cydaw::base::Text(names[((nearest % 12) + 12) % 12])
+                + cydaw::base::Text(static_cast<int>(std::floor(nearest / 12.0)) - 1);
     if (cents != 0)
         text << (cents > 0 ? " +" : " ") << cents << " ct";
     return text;
@@ -1972,7 +1955,7 @@ juce::String noteOf(const double hz)
 
 // Which of a band's values a binding is ("node.4.eqpro.b3Gain" → gain),
 // or -1.
-int eqProValueOf(const juce::String& binding)
+int eqProValueOf(const cydaw::base::Text& binding)
 {
     const auto at = binding.lastIndexOf("eqpro.b");
     if (at < 0)
@@ -1987,7 +1970,7 @@ int eqProValueOf(const juce::String& binding)
 
 // Which of a band's dynamics a binding is ("node.4.eqpro.b3Range" →
 // range), or -1.
-int eqProDynamicOf(const juce::String& binding)
+int eqProDynamicOf(const cydaw::base::Text& binding)
 {
     const auto at = binding.lastIndexOf("eqpro.b");
     if (at < 0)
@@ -2066,7 +2049,7 @@ struct Eq {
     // The band heard alone (0 none, n band n), while a listen is held.
     Param* listen {};
     // The start the device's bindings share, which names its view.
-    juce::String key;
+    cydaw::base::Text key;
 
     [[nodiscard]] bool valid() const
     {
@@ -2117,9 +2100,9 @@ struct EqView {
     float menuDb {};
 };
 
-EqView& eqView(const juce::String& key)
+EqView& eqView(const cydaw::base::Text& key)
 {
-    static std::map<juce::String, EqView> views;
+    static std::map<cydaw::base::Text, EqView> views;
     return views[key];
 }
 
@@ -2712,25 +2695,25 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
     // What is under the mouse; the band heard alone, while it is.
     if (listening >= 0) {
         const auto& band = eq.bands[static_cast<std::size_t>(listening)];
-        auto text = ui::Ls("Bande ", "Band ") + juce::String(listening + 1) + ui::Ls(" seule", " alone") + "\n"
+        auto text = ui::Ls("Bande ", "Band ") + cydaw::base::Text(listening + 1) + ui::Ls(" seule", " alone") + "\n"
                     + formatValue(*band.frequency, band.frequency->value) + "   " + noteOf(band.frequency->value) + "\nQ "
-                    + juce::String(band.q->value, 2) + "\n"
+                    + cydaw::base::Text(band.q->value, 2) + "\n"
                     + ui::Ls("Glisser : la fréquence \xc2\xb7 molette : la largeur", "Drag: the frequency \xc2\xb7 wheel: the width");
         ImGui::SetTooltip("%s", text.toRawUTF8());
     } else if (const auto shown = grabbed >= 0 ? grabbed : hit; shown >= 0 && !ImGui::IsPopupOpen("##eqMenu")) {
         const auto& band = eq.bands[static_cast<std::size_t>(shown)];
-        auto text = ui::Ls("Bande ", "Band ") + juce::String(shown + 1) + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String::fromUTF8(shapeName(band.shape()));
+        auto text = ui::Ls("Bande ", "Band ") + cydaw::base::Text(shown + 1) + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + cydaw::base::Text::fromUTF8(shapeName(band.shape()));
         text << "\n" << formatValue(*band.frequency, band.frequency->value) << "   " << noteOf(band.frequency->value);
         if (band.hasGain())
             text << "\n" << formatValue(*band.gain, band.gain->value);
-        text << "\nQ " << juce::String(band.q->value, 2);
+        text << "\nQ " << cydaw::base::Text(band.q->value, 2);
         if (band.isCut())
             text << "   " << slopeName(band.slopeIndex());
         if (band.isDynamic()) {
             char dynamics[96];
             std::snprintf(dynamics, sizeof(dynamics), "%s %+.1f dB \xc2\xb7 %s %.1f dB", L("Dynamique : plage", "Dynamic: range"),
                           band.range->value, L("seuil", "threshold"), band.threshold->value);
-            text << "\n" << juce::String::fromUTF8(dynamics);
+            text << "\n" << cydaw::base::Text::fromUTF8(dynamics);
         }
         ImGui::SetTooltip("%s", text.toRawUTF8());
     } else if (const auto ranged = rangeGrabbed >= 0 ? rangeGrabbed : diamondHit; ranged >= 0 && !ImGui::IsPopupOpen("##eqMenu")) {
@@ -2748,7 +2731,7 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
         const auto hz = hzOfX(plot, interaction.mouse.x);
         char db[24];
         std::snprintf(db, sizeof(db), "%+.1f dB", static_cast<double>(dbAt(interaction.mouse.y)));
-        const auto readout = formatValue(*eq.bands[0].frequency, hz) + "  " + noteOf(hz) + "  " + juce::String(db);
+        const auto readout = formatValue(*eq.bands[0].frequency, hz) + "  " + noteOf(hz) + "  " + cydaw::base::Text(db);
         const auto size = smallTextSize(readout.toRawUTF8(), 0.72f);
         smallText(list, ImVec2(plot.max.x - size.x - dp(8.0f), plot.min.y + dp(5.0f)), p.textDim, readout.toRawUTF8(), 0.72f);
     }
@@ -2841,7 +2824,7 @@ bool eqDynamicsRow(const ImVec2 origin, const float width, Eq& eq, const int ind
         }
         ImGui::EndDisabled();
         ImGui::PopID();
-        const auto text = dynamic ? formatValue(parameter, parameter.value) : juce::String::fromUTF8("\xe2\x80\x94");
+        const auto text = dynamic ? formatValue(parameter, parameter.value) : cydaw::base::Text::fromUTF8("\xe2\x80\x94");
         const auto size = smallTextSize(text.toRawUTF8(), 0.78f);
         smallText(list, ImVec2(x + (dp(58.0f) - size.x) * 0.5f, top + dp(46.0f) + ImGui::GetFontSize() * 0.95f),
                   dynamic ? p.text : p.textFaint, text.toRawUTF8(), 0.78f);
@@ -2888,8 +2871,8 @@ bool eqDynamicsRow(const ImVec2 origin, const float width, Eq& eq, const int ind
         float peak { -120.0f };
         double when {};
     };
-    static std::map<juce::String, Heard> heard;
-    auto& recent = heard[eq.key + juce::String(index)];
+    static std::map<cydaw::base::Text, Heard> heard;
+    auto& recent = heard[eq.key + cydaw::base::Text(index)];
     const auto now = ImGui::GetTime();
     if (level > recent.peak || now - recent.when > 4.0) {
         recent.peak = level;
@@ -2941,9 +2924,9 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
             view.selected = index;
         }
         if (hovered) {
-            auto tip = ui::Ls("Bande ", "Band ") + juce::String(index + 1);
+            auto tip = ui::Ls("Bande ", "Band ") + cydaw::base::Text(index + 1);
             if (band.on())
-                tip << juce::String::fromUTF8(" \xc2\xb7 ") << juce::String::fromUTF8(shapeName(band.shape())) << juce::String::fromUTF8(" \xc2\xb7 ")
+                tip << cydaw::base::Text::fromUTF8(" \xc2\xb7 ") << cydaw::base::Text::fromUTF8(shapeName(band.shape())) << cydaw::base::Text::fromUTF8(" \xc2\xb7 ")
                     << formatValue(*band.frequency, band.frequency->value);
             else
                 tip << ui::Ls(" (coupée) : double-clic pour l'activer", " (off): double-click to switch it on");
@@ -2973,7 +2956,7 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
     x += static_cast<float>(engine::eqProBands) * (chip + chipGap) + dp(22.0f);
 
     // A knob's value (line 0) and what follows it (1), centred under it.
-    const auto valueUnder = [&](const float left, const float knobWidth, const juce::String& text, const int line) {
+    const auto valueUnder = [&](const float left, const float knobWidth, const cydaw::base::Text& text, const int line) {
         const auto top = y + dp(46.0f) + ImGui::GetFontSize() * (0.95f + 0.85f * static_cast<float>(line));
         const auto size = smallTextSize(text.toRawUTF8(), 0.78f);
         smallText(list, ImVec2(left + (knobWidth - size.x) * 0.5f, top), line == 0 ? p.text : p.textDim, text.toRawUTF8(), 0.78f);
@@ -3049,7 +3032,7 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
             ImGui::EndDisabled();
             ImGui::PopID();
             // The value under the name, always; a click on it types it in.
-            valueUnder(x, dp(58.0f), enabled ? formatValue(parameter, parameter.value) : juce::String::fromUTF8("\xe2\x80\x94"), 0);
+            valueUnder(x, dp(58.0f), enabled ? formatValue(parameter, parameter.value) : cydaw::base::Text::fromUTF8("\xe2\x80\x94"), 0);
             if (enabled) {
                 ImGui::PushID(label);
                 changed |= typedValue("##typed", parameter, ImVec2(x, y + dp(46.0f) + ImGui::GetFontSize() * 0.95f),
@@ -3417,11 +3400,11 @@ void openParameterMenu(const Param& parameter)
 
 namespace {
 
-// A number with that many decimals; juce::String(value, 0) would print
+// A number with that many decimals; cydaw::base::Text(value, 0) would print
 // them all.
-juce::String fixed(const double value, const int decimals)
+cydaw::base::Text fixed(const double value, const int decimals)
 {
-    return decimals <= 0 ? juce::String(juce::roundToInt(value)) : juce::String(value, decimals);
+    return decimals <= 0 ? cydaw::base::Text(cydaw::base::roundToInt(value)) : cydaw::base::Text(value, decimals);
 }
 
 } // namespace
@@ -3440,13 +3423,13 @@ bool typedValue(const char* id, Param& parameter, const ImVec2 min, const ImVec2
     return false;
 }
 
-juce::String formatValue(const Param& parameter, const double value)
+cydaw::base::Text formatValue(const Param& parameter, const double value)
 {
     if (auto studio = studioFormat(parameter, value); studio.isNotEmpty())
         return studio;
     if (parameter.binding.endsWith(".sync")) {
         if (const auto* division = engine::noteDivisionFor(static_cast<float>(value)))
-            return juce::String(std::string(division->name));
+            return cydaw::base::Text(std::string(division->name));
         return ui::Ls("Libre", "Free");
     }
     // A voice allocator's playing: three words, as the card says them.
@@ -3458,52 +3441,52 @@ juce::String formatValue(const Param& parameter, const double value)
         static const char* modesFr[] { "Passe-bas", "Passe-haut", "Passe-bande", "Réjecteur" };
         static const char* modesEn[] { "Low-pass", "High-pass", "Band-pass", "Notch" };
         const auto mode = std::clamp(static_cast<int>(std::round(value)), 0, 3);
-        return juce::String::fromUTF8(ui::french() ? modesFr[mode] : modesEn[mode]);
+        return cydaw::base::Text::fromUTF8(ui::french() ? modesFr[mode] : modesEn[mode]);
     }
     switch (eqProValueOf(parameter.binding)) {
     case static_cast<int>(engine::EqProValue::enabled): return (value >= 0.5 ? ui::Ls("Active", "On") : ui::Ls("Coupée", "Off"));
     case static_cast<int>(engine::EqProValue::type):
-        return juce::String::fromUTF8(shapeName(static_cast<engine::EqBandType>(
+        return cydaw::base::Text::fromUTF8(shapeName(static_cast<engine::EqBandType>(
             std::clamp(static_cast<int>(std::lround(value)), 0, engine::eqBandTypeCount - 1))));
     case static_cast<int>(engine::EqProValue::slope): return slopeName(static_cast<int>(std::lround(value)));
-    case static_cast<int>(engine::EqProValue::q): return "Q " + juce::String(value, 2);
+    case static_cast<int>(engine::EqProValue::q): return "Q " + cydaw::base::Text(value, 2);
     default: break;
     }
     switch (eqProDynamicOf(parameter.binding)) {
     case static_cast<int>(engine::EqProDynamic::on): return (value >= 0.5 ? ui::Ls("Active", "On") : ui::Ls("Coupée", "Off"));
-    case static_cast<int>(engine::EqProDynamic::detector): return value >= 0.5 ? juce::String("Sidechain") : ui::Ls("Sa bande", "Its band");
+    case static_cast<int>(engine::EqProDynamic::detector): return value >= 0.5 ? cydaw::base::Text("Sidechain") : ui::Ls("Sa bande", "Its band");
     default: break;
     }
     if (parameter.binding.endsWith("crusher.bits"))
-        return juce::String(value, 1) + " bits";
+        return cydaw::base::Text(value, 1) + " bits";
     if (parameter.binding.endsWith("crusher.downsample"))
-        return juce::String::fromUTF8("\xc3\x97") + juce::String(value, 1);
+        return cydaw::base::Text::fromUTF8("\xc3\x97") + cydaw::base::Text(value, 1);
     if (parameter.binding.endsWith("polyOscillator.waveform") || parameter.binding.endsWith("lfo.shape")
         || parameter.binding.endsWith("tremolo.shape")) {
         static const char* namesFr[] { "Sinus", "Triangle", "Scie", "Carré" };
         static const char* namesEn[] { "Sine", "Triangle", "Saw", "Square" };
         const auto shape = std::clamp(static_cast<int>(std::round(value)), 0, 3);
-        return juce::String::fromUTF8(ui::french() ? namesFr[shape] : namesEn[shape]);
+        return cydaw::base::Text::fromUTF8(ui::french() ? namesFr[shape] : namesEn[shape]);
     }
     const auto& unit = parameter.unit;
     if (unit == "Hz")
-        return value >= 1'000.0 ? juce::String(value / 1'000.0, value >= 10'000.0 ? 1 : 2) + " kHz"
+        return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, value >= 10'000.0 ? 1 : 2) + " kHz"
                                 : fixed(value, value >= 100.0 ? 0 : 1) + " Hz";
     if (unit == "ms")
-        return value >= 1'000.0 ? juce::String(value / 1'000.0, 2) + " s" : fixed(value, value >= 100.0 ? 0 : 1) + " ms";
+        return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 2) + " s" : fixed(value, value >= 100.0 ? 0 : 1) + " ms";
     if (unit == "s")
-        return value < 1.0 ? fixed(value * 1'000.0, 0) + " ms" : juce::String(value, 2) + " s";
+        return value < 1.0 ? fixed(value * 1'000.0, 0) + " ms" : cydaw::base::Text(value, 2) + " s";
     if (unit == "dB")
-        return juce::String(value, 1) + " dB";
+        return cydaw::base::Text(value, 1) + " dB";
     if (unit == ":1")
-        return juce::String(value, 1) + ":1";
+        return cydaw::base::Text(value, 1) + ":1";
     if (unit == "Q")
-        return "Q " + juce::String(value, 2);
+        return "Q " + cydaw::base::Text(value, 2);
     if (unit.isEmpty() && parameter.minimum >= 0.0 && parameter.maximum <= 1.0 + 1.0e-9 && parameter.maximum > 0.0)
-        return juce::String(juce::roundToInt(value * 100.0)) + " %";
+        return cydaw::base::Text(cydaw::base::roundToInt(value * 100.0)) + " %";
     if (unit.isNotEmpty())
-        return juce::String(value, 2) + " " + unit;
-    return juce::String(value, 2);
+        return cydaw::base::Text(value, 2) + " " + unit;
+    return cydaw::base::Text(value, 2);
 }
 
 bool valueField(const char* id, Param& parameter, const float width, const ImU32 colour, const Setter& set)
@@ -3588,21 +3571,21 @@ bool valueField(const char* id, Param& parameter, const float width, const ImU32
 
 // ---- Choosing the displays ---------------------------------------------------------------------
 
-Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal, const bool instrument, const juce::String& typeKey)
+Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal, const bool instrument, const cydaw::base::Text& typeKey)
 {
     Surface surface;
     // node.2.node.19004.envelope.attack → prefix "node.2.node.19004.",
     // suffix "envelope.attack".
     struct Group {
-        juce::String prefix;
-        std::map<juce::String, int> bySuffix;
+        cydaw::base::Text prefix;
+        std::map<cydaw::base::Text, int> bySuffix;
     };
     std::vector<Group> groups;
     for (auto index = 0; index < static_cast<int>(parameters.size()); ++index) {
         const auto& binding = parameters[static_cast<std::size_t>(index)].binding;
         const auto last = binding.lastIndexOfChar('.');
         const auto previous = last > 0 ? binding.substring(0, last).lastIndexOfChar('.') : -1;
-        const auto prefix = previous >= 0 ? binding.substring(0, previous + 1) : juce::String();
+        const auto prefix = previous >= 0 ? binding.substring(0, previous + 1) : cydaw::base::Text();
         const auto suffix = previous >= 0 ? binding.substring(previous + 1) : binding;
         auto group = std::find_if(groups.begin(), groups.end(), [&prefix](const Group& g) { return g.prefix == prefix; });
         if (group == groups.end()) {
@@ -3636,10 +3619,10 @@ Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal,
         if (const auto position = find(group, "wavetable.position"); position >= 0)
             surface.panes.push_back({ PaneKind::wavetable, { take(position), take(find(group, "wavetable.level")) }, 0 });
         for (const char* filter : { "lowpass", "voiceFilter" }) {
-            const auto cutoff = find(group, (juce::String(filter) + ".cutoff").toRawUTF8());
+            const auto cutoff = find(group, (cydaw::base::Text(filter) + ".cutoff").toRawUTF8());
             if (cutoff >= 0)
                 surface.panes.push_back(
-                    { PaneKind::filter, { take(cutoff), take(find(group, (juce::String(filter) + ".resonance").toRawUTF8())) }, 0 });
+                    { PaneKind::filter, { take(cutoff), take(find(group, (cydaw::base::Text(filter) + ".resonance").toRawUTF8())) }, 0 });
         }
         if (const auto cutoff = find(group, "highpass.cutoff"); cutoff >= 0)
             surface.panes.push_back({ PaneKind::filter, { take(cutoff), -1 }, 1 });
@@ -3691,7 +3674,7 @@ Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal,
                                       0 });
         static const char* sweeps[] { "chorus", "flanger", "phaser" };
         for (auto variant = 0; variant < 3; ++variant) {
-            const juce::String name(sweeps[variant]);
+            const cydaw::base::Text name(sweeps[variant]);
             if (const auto rate = find(group, (name + ".rate").toRawUTF8()); rate >= 0) {
                 const auto third = find(group, (name + (variant == 2 ? ".frequency" : ".delay")).toRawUTF8());
                 const auto fourth = find(group, (name + (variant == 0 ? ".width" : ".feedback")).toRawUTF8());
@@ -3796,13 +3779,13 @@ Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal,
             static const char* values[] { "Enabled", "Type", "Frequency", "Gain", "Q", "Slope" };
             for (auto band = 1; band <= engine::eqProBands; ++band)
                 for (const auto* value : values)
-                    pane.parameters.push_back(take(find(group, ("eqpro.b" + juce::String(band) + value).toRawUTF8())));
+                    pane.parameters.push_back(take(find(group, ("eqpro.b" + cydaw::base::Text(band) + value).toRawUTF8())));
             pane.parameters.push_back(take(find(group, "eqpro.output")));
             pane.parameters.push_back(take(find(group, "eqpro.listen")));
             static const char* dynamics[] { "Dynamic", "Range", "Threshold", "Attack", "Release", "Detector" };
             for (auto band = 1; band <= engine::eqProBands; ++band)
                 for (const auto* value : dynamics)
-                    pane.parameters.push_back(take(find(group, ("eqpro.b" + juce::String(band) + value).toRawUTF8())));
+                    pane.parameters.push_back(take(find(group, ("eqpro.b" + cydaw::base::Text(band) + value).toRawUTF8())));
             surface.panes.push_back(std::move(pane));
         }
         if (const auto floor = find(group, "spectrometer.floor"); floor >= 0)
@@ -4193,7 +4176,7 @@ bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, 
             if (eqBand >= 0 && slot != engine::eqProBands * engine::eqProValuesPerBand) {
                 // A band's field: its own colour, "Gain" for "Bande 3 · Gain".
                 auto shown = *parameter;
-                shown.label = parameter->label.fromLastOccurrenceOf(juce::String::fromUTF8("\xc2\xb7 "), false, false);
+                shown.label = parameter->label.contains(cydaw::base::Text::fromUTF8("\xc2\xb7 ")) ? parameter->label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false) : parameter->label;
                 if (valueField("##value", shown, width, kBandColours[eqBand], set)) {
                     parameter->value = shown.value;
                     changed = true;
@@ -4292,7 +4275,8 @@ bool nativeLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 
         for (std::size_t at = shown; at-- > 0;) {
             const auto& parameter = parameters[static_cast<std::size_t>(main[at])];
             const auto value = formatValue(parameter, parameter.value);
-            const auto label = parameter.label.fromLastOccurrenceOf(juce::String::fromUTF8("\xc2\xb7 "), false, false);
+            const auto label = parameter.label.contains(cydaw::base::Text::fromUTF8("\xc2\xb7 "))
+                ? parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false) : parameter.label;
             const auto valueSize = smallTextSize(value.toRawUTF8(), 1.0f);
             const auto labelSize = smallTextSize(label.toRawUTF8(), 0.6f);
             const auto width = std::max(valueSize.x, labelSize.x);
@@ -4351,7 +4335,7 @@ bool drawOverview(const char* id, const std::vector<Pane>& panes, std::vector<Pa
     std::vector<ControlGroup> groups;
     std::vector<int> taken;
     const auto add = [&](const char* title, const std::vector<int>& indices) {
-        ControlGroup group { juce::String::fromUTF8(title), {} };
+        ControlGroup group { cydaw::base::Text::fromUTF8(title), {} };
         for (const auto index : indices)
             if (index >= 0 && index < static_cast<int>(parameters.size()) && std::find(taken.begin(), taken.end(), index) == taken.end()) {
                 group.indices.push_back(index);

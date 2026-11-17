@@ -1,3 +1,8 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "RemoteCommands.h"
@@ -6,7 +11,6 @@
 
 #include <cydaw/engine/SynthFamily.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <functional>
 #include <memory>
@@ -65,7 +69,7 @@ public:
     // Draws one frame.
     void frame();
     // Files dropped from the system, at a point of the window.
-    void filesDropped(const juce::StringArray& files, float x, float y);
+    void filesDropped(const cydaw::base::TextList& files, float x, float y);
 
     // Asks the application to quit (menu, shortcut, window close); it asks
     // askBeforeQuit() first when there are unsaved changes.
@@ -75,20 +79,20 @@ public:
     // "Save the changes?" before quitting.
     void askBeforeQuit();
     // The window's title changed (project name, unsaved changes).
-    std::function<void(const juce::String&)> onTitle;
+    std::function<void(const cydaw::base::Text&)> onTitle;
 
-    [[nodiscard]] juce::File layoutFile() const;
+    [[nodiscard]] cydaw::base::File layoutFile() const;
     void resetLayout();
     // Automated sessions (probes, the MCP check) read the user's layout but
     // never write it.
     void setLayoutSaving(bool enabled) noexcept { layoutSaving_ = enabled; }
-    void notify(const juce::String& message, bool error = false);
+    void notify(const cydaw::base::Text& message, bool error = false);
     // Sound matching: the notes to analyse, a model to load, and the result
     // followed from frame to frame.
     // `kind`: "auto" (what the companion finds best), "string" (a plucked
     // string), "partials" (the partials measured) or "synth" (a patch of
     // Opale or Quartz, found by CyDAW itself).
-    void chooseSoundToRecreate(const juce::String& kind = "auto");
+    void chooseSoundToRecreate(const cydaw::base::Text& kind = "auto");
     bool refineRecreated_ {};
     void chooseSoundModel();
     // The sampler: a new track from samples, from an SFZ; a factory instrument.
@@ -101,22 +105,26 @@ public:
     // A new MIDI track playing Batterie (the first kit), its window open.
     void newBatterieTrack();
     void chooseSamplerInstrument();
-    void addFactoryInstrument(const juce::String& key, bool model = false);
+    void addFactoryInstrument(const cydaw::base::Text& key, bool model = false);
     void drawFactoryInstrumentsMenu();
-    void loadSoundModelFile(const juce::File& file);
+    void loadSoundModelFile(const cydaw::base::File& file);
     void followSoundMatching();
     bool soundMatchingRunning_ {};
     // Probes: a panel in front (1 arrangement, 2 launcher, 3 devices, 4 graph,
     // 5 mixer, 6 editor) and the n-th track selected.
     void showPanel(int panel, int trackIndex);
     void showAudioSettings() { showAudioSettings_ = true; }
-    bool showDialog(const juce::String& name) override
+    bool showDialog(const cydaw::base::Text& name) override
     {
         if (name == "manual") { openManual(); return true; }
         if (name == "transport-sync")
             showTransportSync_ = true;
         else if (name == "audio")
             showAudioSettings_ = true;
+        else if (name == "controllers" || name == "midi-inputs")
+            openControllerInputs();
+        else if (name == "computer-keyboard")
+            openControllerInputs(true);
         else if (name == "soundcard")
             showAudioSettings_ = showSoundCard_ = true;
         else if (name == "companion")
@@ -163,9 +171,9 @@ public:
 
     // File commands, also used by the command line.
     void newProject();
-    void openProject(const juce::File& file);
+    void openProject(const cydaw::base::File& file);
     // At once, the interface waiting (the command line: what follows needs it open).
-    void openProjectNow(const juce::File& file);
+    void openProjectNow(const cydaw::base::File& file);
     void chooseOpenProject();
     void save();
     void chooseSaveAs();
@@ -176,34 +184,36 @@ public:
     // ---- Control port (RemoteCommands) ----------------------------------------------
     void showView(int view) override;
     [[nodiscard]] int currentView() const override { return currentView_; }
-    bool snapshot(const juce::File& png) override;
+    bool snapshot(const cydaw::base::File& png) override;
     void sessionReplaced() override;
-    bool openProjectInSteps(const juce::File& file) override;
+    bool openProjectInSteps(const cydaw::base::File& file) override;
     // A project of another software, imported in steps (its bar shown), its
     // summary at the end.
-    bool importProjectInSteps(const juce::File& file) override;
+    bool importProjectInSteps(const cydaw::base::File& file) override;
     bool importing_ {};
     void tracksChanged() override;
     void requestQuit() override;
     [[nodiscard]] std::optional<TrackRef> selectedTrack() const override { return state_.selectedTrack; }
     void selectTrack(const TrackRef& track) override { state_.selectTrack(track); }
-    void selectSample(const juce::File& file) override;
-    void browseSamples(const juce::String& query, bool semantic, const juce::String& family, const juce::String& category,
-                       const juce::String& source) override;
-    juce::var library(const juce::String& command, const juce::var& request) override;
-    juce::var midiInputs(const juce::String& command, const juce::var& request) override;
-    juce::var themes(const juce::var& request) override;
-    juce::var jsfx(const juce::var&) override;
-    juce::var manual(const juce::var&) override;
-    void openManual(const juce::String& topic = {}, const juce::String& section = {});
-    juce::var transportSync(const juce::var& request) override;
-    juce::var controllers(const juce::var& request) override;
-    juce::var dj(const juce::var& request) override;
-    juce::var foundry(const juce::var& request) override;
-    juce::var processing(const juce::var& request) override;
+    void selectSample(const cydaw::base::File& file) override;
+    void browseSamples(const cydaw::base::Text& query, bool semantic, const cydaw::base::Text& family, const cydaw::base::Text& category,
+                       const cydaw::base::Text& source) override;
+    cydaw::base::Value library(const cydaw::base::Text& command, const cydaw::base::Value& request) override;
+    cydaw::base::Value midiInputs(const cydaw::base::Text& command, const cydaw::base::Value& request) override;
+    cydaw::base::Value themes(const cydaw::base::Value& request) override;
+    cydaw::base::Value jsfx(const cydaw::base::Value&) override;
+    cydaw::base::Value manual(const cydaw::base::Value&) override;
+    void openManual(const cydaw::base::Text& topic = {}, const cydaw::base::Text& section = {});
+    cydaw::base::Value transportSync(const cydaw::base::Value& request) override;
+    cydaw::base::Value controllers(const cydaw::base::Value& request) override;
+    cydaw::base::Value dj(const cydaw::base::Value& request) override;
+    cydaw::base::Value foundry(const cydaw::base::Value& request) override;
+    cydaw::base::Value processing(const cydaw::base::Value& request) override;
     bool openProcessing(const TrackRef& track, std::uint64_t clipId) override;
-    juce::var cinema(const juce::var& request) override;
-    juce::String appMode(const juce::String& mode) override;
+    cydaw::base::Value cinema(const cydaw::base::Value& request) override;
+    cydaw::base::Text appMode(const cydaw::base::Text& mode) override;
+    cydaw::base::Array<cydaw::base::File> modeTemplateFiles() const override;
+    cydaw::base::Text loadModeTemplate(const cydaw::base::File& file) override;
     bool showDeviceEditor(std::uint64_t nodeId, int pane, bool detached = false) override;
     void showWorkshop() override { state_.bringToFront = Panel::workshop; }
     void showDeviceCatalogue() override { state_.openDeviceCatalogue = true; }
@@ -290,16 +300,16 @@ public:
         return true;
     }
     Vst3Build* vst3Build() override { return vst3Build_.get(); }
-    juce::String injectInput(const juce::var& events) override;
+    cydaw::base::Text injectInput(const cydaw::base::Value& events) override;
     // The scripted mouse, between the system's input and the frame.
     void applyScriptedInput();
     // A scripted key pressed, let go on the next event.
     int pendingKeyUp_ {};
     // Named layouts, in CyDAW/Layouts beside the current one.
-    [[nodiscard]] juce::StringArray layoutNames() const override;
-    juce::Result saveLayoutAs(const juce::String& name) override;
-    juce::Result loadLayout(const juce::String& name) override;
-    bool deleteLayout(const juce::String& name) override;
+    [[nodiscard]] cydaw::base::TextList layoutNames() const override;
+    cydaw::base::Result saveLayoutAs(const cydaw::base::Text& name) override;
+    cydaw::base::Result loadLayout(const cydaw::base::Text& name) override;
+    bool deleteLayout(const cydaw::base::Text& name) override;
     // Between frames: a layout asked for is put in place (Dear ImGui reads
     // a layout only outside a frame), then the scripted mouse.
     void beforeNewFrame();
@@ -335,27 +345,22 @@ private:
     void redo();
     void toggleRecording();
     void drawAudioSettings();
-    // The audio settings' MIDI tab: the devices, the computer's keyboard.
-    void drawMidiInputs();
-    void openMidiInputs()
-    {
-        showAudioSettings_ = true;
-        selectMidiTab_ = true;
-    }
+    // One entry point for physical inputs, virtual controllers and keyboard.
+    void openControllerInputs(bool keyboard = false);
     // Its device tab: driver, devices, rate, buffer.
     void drawAudioDevice();
     // Options › Compagnon Python: which Python, what it has, and setting up
     // its own environment (numpy, PyTorch CPU or CUDA) on a click.
     void drawCompanionWindow();
     bool showCompanion_ {};
-    juce::String nvidiaGpu_;
+    cydaw::base::Text nvidiaGpu_;
     bool companionInfoAsked_ {};
     // The components whose licences were ticked as accepted (this opening only).
-    juce::StringArray companionAccepted_;
+    cydaw::base::TextList companionAccepted_;
     char companionPython_[512] {};
     void drawLayoutNamePrompt();
-    [[nodiscard]] juce::File layoutsFolder() const;
-    [[nodiscard]] juce::File namedLayoutFile(const juce::String& name) const;
+    [[nodiscard]] cydaw::base::File layoutsFolder() const;
+    [[nodiscard]] cydaw::base::File namedLayoutFile(const cydaw::base::Text& name) const;
 
     Studio& studio_;
     ImGuiHost& host_;
@@ -404,7 +409,7 @@ private:
     std::unique_ptr<LibraryWindow> library_;
     std::unique_ptr<InspectorView> inspector_;
     std::unique_ptr<LauncherView> launcher_;
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 
     bool inspectorVisible_ { true };
     bool browserVisible_ { true };
@@ -414,34 +419,29 @@ private:
     bool showAbout_ {};
     // A project opening in steps (Studio::startOpeningProject): its window
     // takes the place of the panels until it is open.
-    juce::File opening_;
+    cydaw::base::File opening_;
     void continueOpening();
     void drawOpening();
-    void projectOpened(const juce::File& file, const juce::Result& result);
+    void projectOpened(const cydaw::base::File& file, const cydaw::base::Result& result);
     // The logo, at about `pixels` wide (0 until the graphics device exists).
     [[nodiscard]] unsigned long long logo(float pixels);
     bool showWarnings_ {};
     bool showAudioSettings_ {};
-    bool selectMidiTab_ {};
-    bool selectMidiTabNow_ {};
     // The computer's keys as a MIDI keyboard.
     std::unique_ptr<ComputerKeyboard> computerKeyboard_;
     // The colour themes.
     std::unique_ptr<ThemesView> themes_;
-    // The MIDI devices, asked again now and then (asking is slow).
-    juce::Array<juce::MidiDeviceInfo> midiDevices_;
-    double midiDevicesTime_ { -100.0 };
     // The audio settings open on the card's inputs and outputs.
     bool showSoundCard_ {};
     bool selectSoundCardTab_ {};
     bool recoveryChecked_ {};
-    juce::String recoveryWhen_;
-    juce::StringArray dialogLines_;
-    juce::String dialogTitle_;
+    cydaw::base::Text recoveryWhen_;
+    cydaw::base::TextList dialogLines_;
+    cydaw::base::Text dialogTitle_;
     double lastLayoutSave_ {};
     int focusFrames_ {};
     std::optional<TrackRef> liveTrack_;
-    juce::String title_;
+    cydaw::base::Text title_;
     int currentView_ { 1 };
     // A panel to take out of the dock into a window of its own, and for how
     // many more frames to insist (the dock places windows a frame late).
@@ -450,7 +450,7 @@ private:
     bool layoutSaving_ { true };
     // A layout to load before the next frame, and the name being typed for
     // one to save.
-    juce::String pendingLayout_;
+    cydaw::base::Text pendingLayout_;
     bool askLayoutName_ {};
     char layoutName_[64] {};
     Panel lastFocused_ { Panel::arrangement };
@@ -465,7 +465,7 @@ private:
     bool scriptedMouse_ {};
     float scriptedX_ {};
     float scriptedY_ {};
-    juce::var scriptedEvent_;
+    cydaw::base::Value scriptedEvent_;
     bool scriptedShift_ {};
 };
 

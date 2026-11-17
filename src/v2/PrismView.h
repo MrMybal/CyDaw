@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #pragma once
 
 #include "PresetMenu.h"
@@ -27,7 +28,7 @@ public:
 
     // The card's pane: as wide as this.
     [[nodiscard]] static float paneWidth();
-    void drawPane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
+    void drawPane(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
                   ImU32 colour);
     // `detached`: in a window of its own out of the studio's, as a plug-in's.
     // `here`: inside the studio's window, wherever it was last left (on a
@@ -45,7 +46,7 @@ private:
     // The card being drawn, for the helpers below.
     struct Card {
         TrackRef track;
-        app::NodeGraphComponent* graph {};
+        app::GraphDocument* graph {};
         std::uint64_t nodeId {};
         engine::prism::PrismValues values {};
         // The oscillators' own tables (imported waves), when it has any.
@@ -65,7 +66,7 @@ private:
     // The table an oscillator plays: its own, else the factory one named.
     [[nodiscard]] engine::prism::WavetableRef tableOf(int osc) const;
     void chooseTableFile(int osc);
-    [[nodiscard]] bool bind(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId);
+    [[nodiscard]] bool bind(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId);
     [[nodiscard]] float value(int index) const;
     void set(int index, float value);
     // A knob on a parameter, its name under it (its value while touched).
@@ -121,7 +122,7 @@ private:
     // The window to put back in the studio's window on its next frame.
     std::string placeHere_;
     float drawnLastValue_ {};
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 };
 
 } // namespace cydaw::v2

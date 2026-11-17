@@ -3,3 +3,13 @@
 *.cysound filter=lfs diff=lfs merge=lfs -text
 *.cydaw filter=lfs diff=lfs merge=lfs -text
 *.wav filter=lfs diff=lfs merge=lfs -text
+
+# Preserve upstream bytes: these sources carry recorded SHA-256 provenance.
+third_party/asio-sdk/** -text -whitespace
+third_party/portaudio-asio/** -text -whitespace
+
+third_party/nlohmann/** -text -whitespace
+
+third_party/pugixml/** -text -whitespace
+
+third_party/miniz/** -text -whitespace

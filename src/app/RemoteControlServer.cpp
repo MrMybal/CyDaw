@@ -1,6 +1,11 @@
+#include <iostream>
+#include <cydaw/base/Socket.h>
+#include <cydaw/base/EventLoop.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
 #include "RemoteControlServer.h"
 
-#include <juce_events/juce_events.h>
+
 
 #include <atomic>
 #include <memory>
@@ -9,18 +14,18 @@
 namespace cydaw::app {
 
 namespace {
-juce::String failure(const juce::String& message)
+cydaw::base::Text failure(const cydaw::base::Text& message)
 {
-    auto* object = new juce::DynamicObject();
+    auto* object = new cydaw::base::Object();
     object->setProperty("ok", false);
     object->setProperty("error", message);
-    return juce::JSON::toString(juce::var(object), true);
+    return cydaw::base::JSON::toString(cydaw::base::Value(object), true);
 }
 } // namespace
 
 RemoteControlServer::RemoteControlServer(const int port, Handler handler,
-                                         juce::String token)
-    : juce::Thread("CyDAW remote control"),
+                                         cydaw::base::Text token)
+    : cydaw::base::Thread("CyDAW remote control"),
       port_(port),
       handler_(std::move(handler)),
       token_(std::move(token))
@@ -30,11 +35,11 @@ RemoteControlServer::RemoteControlServer(const int port, Handler handler,
     listening_ = listener_.createListener(port_, "127.0.0.1");
     if (listening_)
         startThread();
-    juce::Logger::writeToLog(
+    std::clog << (
         listening_ ? "remote control: listening on 127.0.0.1:"
-                         + juce::String(port_)
-                   : "remote control: port " + juce::String(port_)
-                         + " is not available");
+                         + cydaw::base::Text(port_)
+                   : "remote control: port " + cydaw::base::Text(port_)
+                         + " is not available") << "\n";
 }
 
 RemoteControlServer::~RemoteControlServer()
@@ -47,7 +52,7 @@ RemoteControlServer::~RemoteControlServer()
 void RemoteControlServer::run()
 {
     while (!threadShouldExit()) {
-        std::unique_ptr<juce::StreamingSocket> client(
+        std::unique_ptr<cydaw::base::StreamingSocket> client(
             listener_.waitForNextConnection());
         if (client == nullptr) {
             if (threadShouldExit())
@@ -59,7 +64,7 @@ void RemoteControlServer::run()
     }
 }
 
-void RemoteControlServer::serve(juce::StreamingSocket& client)
+void RemoteControlServer::serve(cydaw::base::StreamingSocket& client)
 {
     std::string buffer;
     // A connection starts with a JSON object. One that starts otherwise (a web
@@ -82,7 +87,7 @@ void RemoteControlServer::serve(juce::StreamingSocket& client)
             const auto newline = buffer.find('\n');
             if (newline == std::string::npos)
                 break;
-            const auto line = juce::String::fromUTF8(
+            const auto line = cydaw::base::Text::fromUTF8(
                 buffer.data(), static_cast<int>(newline));
             buffer.erase(0, newline + 1);
             if (line.trim().isEmpty())
@@ -98,27 +103,27 @@ void RemoteControlServer::serve(juce::StreamingSocket& client)
     }
 }
 
-juce::String RemoteControlServer::respond(const juce::String& line) const
+cydaw::base::Text RemoteControlServer::respond(const cydaw::base::Text& line) const
 {
-    const auto request = juce::JSON::parse(line);
+    const auto request = cydaw::base::JSON::parse(line);
     if (request.getDynamicObject() == nullptr)
         return failure("the request is not a JSON object");
     if (!handler_)
         return failure("no handler");
     if (token_.isNotEmpty()
-        && request.getProperty("token", juce::var()).toString() != token_)
+        && request.getProperty("token", cydaw::base::Value()).toString() != token_)
         return failure("the request carries no valid token");
     // Answered on the message thread; the socket thread waits, and gives
     // up rather than hang on a modal dialog.
     struct Pending {
-        juce::var response;
-        juce::WaitableEvent done;
+        cydaw::base::Value response;
+        cydaw::base::WaitableEvent done;
         // Given up on (too late, or CyDAW closing): not run when its turn
         // comes, so a client trying again does not have it done twice.
         std::atomic<bool> abandoned { false };
     };
     auto pending = std::make_shared<Pending>();
-    juce::MessageManager::callAsync([pending, request, handler = handler_] {
+    cydaw::base::EventLoop::post([pending, request, handler = handler_] {
         if (pending->abandoned.load())
             return;
         pending->response = handler(request);
@@ -135,7 +140,11 @@ juce::String RemoteControlServer::respond(const juce::String& line) const
     if (auto* object = pending->response.getDynamicObject();
         object != nullptr && request.hasProperty("id"))
         object->setProperty("id", request["id"]);
-    return juce::JSON::toString(pending->response, true);
+    const auto encoded = cydaw::base::JSON::toString(pending->response, true);
+    if (encoded.isNotEmpty()) return encoded;
+    cydaw::base::MemoryOutputStream diagnostic;
+    const auto result = cydaw::base::JSON::writeToStream(diagnostic, pending->response, true);
+    return failure("The response could not be encoded: " + result.getErrorMessage());
 }
 
 } // namespace cydaw::app

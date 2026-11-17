@@ -1,6 +1,11 @@
+#include <cydaw/base/Thread.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SamplerMapFile.h"
 
-#include <juce_audio_formats/juce_audio_formats.h>
+#include <cydaw/base/Character.h>
+#include <cydsp/core/AudioBuffer.h>
 
 #include <algorithm>
 #include <array>
@@ -35,80 +40,80 @@ std::mutex& factoryLock()
     return lock;
 }
 
-juce::File& factoryOverride()
+cydaw::base::File& factoryOverride()
 {
-    static juce::File folder;
+    static cydaw::base::File folder;
     return folder;
 }
 
-juce::File& banksOverride()
+cydaw::base::File& banksOverride()
 {
-    static juce::File folder;
+    static cydaw::base::File folder;
     return folder;
 }
 
 } // namespace
 
-juce::File factoryContentFolder()
+cydaw::base::File factoryContentFolder()
 {
     {
         const std::scoped_lock lock(factoryLock());
         if (factoryOverride().isDirectory())
             return factoryOverride();
     }
-    const auto beside = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+    const auto beside = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
                             .getParentDirectory()
                             .getChildFile("Factory");
     if (beside.isDirectory())
         return beside;
 #ifdef CYDAW_FACTORY_CONTENT_DIR
-    if (const juce::File source(juce::String::fromUTF8(CYDAW_FACTORY_CONTENT_DIR)); source.isDirectory())
+    if (const cydaw::base::File source(cydaw::base::Text::fromUTF8(CYDAW_FACTORY_CONTENT_DIR)); source.isDirectory())
         return source;
 #endif
     return beside;
 }
 
-void setFactoryContentFolder(const juce::File& folder)
+void setFactoryContentFolder(const cydaw::base::File& folder)
 {
     const std::scoped_lock lock(factoryLock());
     factoryOverride() = folder;
 }
 
-juce::File banksFolder()
+cydaw::base::File banksFolder()
 {
     {
         const std::scoped_lock lock(factoryLock());
-        if (banksOverride() != juce::File {})
+        if (banksOverride() != cydaw::base::File {})
             return banksOverride();
     }
-    if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_BANKS_DIR", {}); other.isNotEmpty())
-        return juce::File(other);
-   #if JUCE_WINDOWS
-    const auto base = juce::File::getSpecialLocation(juce::File::windowsLocalAppData);
+    if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_BANKS_DIR", {}); other.isNotEmpty())
+        return cydaw::base::File(other);
+   #if defined(_WIN32)
+    const auto base = cydaw::base::File::getSpecialLocation(cydaw::base::File::windowsLocalAppData);
    #else
-    const auto base = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
+    const auto base = cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory);
    #endif
     return base.getChildFile("CyDAW").getChildFile("Banks");
 }
 
-void setBanksFolder(const juce::File& folder)
+void setBanksFolder(const cydaw::base::File& folder)
 {
     const std::scoped_lock lock(factoryLock());
     banksOverride() = folder;
 }
 
-juce::File resolveSamplePath(const juce::String& stored)
+cydaw::base::File resolveSamplePath(const cydaw::base::Text& stored)
 {
     if (stored.startsWith(factoryPrefix))
-        return factoryContentFolder().getChildFile(stored.substring(juce::String(factoryPrefix).length()));
+        return factoryContentFolder().getChildFile(stored.substring(cydaw::base::Text(factoryPrefix).length()));
     if (stored.startsWith(bankPrefix))
-        return banksFolder().getChildFile(stored.substring(juce::String(bankPrefix).length()));
-    if (juce::File::isAbsolutePath(stored))
-        return juce::File(stored);
+        return banksFolder().getChildFile(stored.substring(cydaw::base::Text(bankPrefix).length()));
+    if (cydaw::base::File::isAbsolutePath(stored))
+        return cydaw::base::File(stored);
     return factoryContentFolder().getChildFile(stored);
 }
 
-juce::String storedSamplePath(const juce::File& file)
+cydaw::base::Text storedSamplePath(const cydaw::base::File& file)
 {
     const auto factory = factoryContentFolder();
     if (factory.isDirectory() && file.isAChildOf(factory))
@@ -118,18 +123,18 @@ juce::String storedSamplePath(const juce::File& file)
     return file.getFullPathName();
 }
 
-juce::String bankOfSamplePath(const juce::String& stored)
+cydaw::base::Text bankOfSamplePath(const cydaw::base::Text& stored)
 {
     if (!stored.startsWith(bankPrefix))
         return {};
-    return stored.substring(juce::String(bankPrefix).length()).upToFirstOccurrenceOf("/", false, false);
+    return stored.substring(cydaw::base::Text(bankPrefix).length()).upToFirstOccurrenceOf("/", false, false);
 }
 
-juce::String pathInBank(const juce::String& stored)
+cydaw::base::Text pathInBank(const cydaw::base::Text& stored)
 {
     if (!stored.startsWith(bankPrefix))
         return {};
-    return stored.substring(juce::String(bankPrefix).length()).fromFirstOccurrenceOf("/", false, false);
+    return stored.substring(cydaw::base::Text(bankPrefix).length()).fromFirstOccurrenceOf("/", false, false);
 }
 
 // ---- Older maps --------------------------------------------------------------------------
@@ -139,28 +144,28 @@ namespace {
 // Factory/Instruments/legacy.json, read once per factory folder:
 //   { "factory:Instruments/Kawai Grand/C4_2.flac":
 //       { "file": "bank:vcsl/…/C4_v2.wav", "offset": 1234, "frames": 98765, "endFade": 2880 }, … }
-juce::var legacyFactoryFiles()
+cydaw::base::Value legacyFactoryFiles()
 {
     static std::mutex lock;
-    static juce::File read;
-    static juce::var table;
+    static cydaw::base::File read;
+    static cydaw::base::Value table;
     const auto file = factoryContentFolder().getChildFile("Instruments").getChildFile("legacy.json");
     const std::scoped_lock hold(lock);
     if (file != read) {
         read = file;
-        table = juce::JSON::parse(file.loadFileAsString());
+        table = cydaw::base::JSON::parse(file.loadFileAsString());
     }
     return table;
 }
 
 } // namespace
 
-juce::var upgradedSamplerMap(const juce::var& json)
+cydaw::base::Value upgradedSamplerMap(const cydaw::base::Value& json)
 {
     const auto* zones = json.getProperty("zones", {}).getArray();
     if (zones == nullptr)
         return json;
-    const auto stale = [](const juce::var& zone) {
+    const auto stale = [](const cydaw::base::Value& zone) {
         const auto file = zone.getProperty("file", {}).toString();
         return file.startsWith(factoryPrefix) && !resolveSamplePath(file).existsAsFile();
     };
@@ -169,29 +174,29 @@ juce::var upgradedSamplerMap(const juce::var& json)
     const auto table = legacyFactoryFiles();
     if (!table.isObject())
         return json;
-    auto copy = juce::JSON::parse(juce::JSON::toString(json, true));
+    auto copy = cydaw::base::JSON::parse(cydaw::base::JSON::toString(json, true));
     if (auto* list = copy.getProperty("zones", {}).getArray())
         for (auto& zone : *list) {
             auto* object = zone.getDynamicObject();
             if (object == nullptr || !stale(zone))
                 continue;
-            const auto entry = table.getProperty(juce::Identifier(zone.getProperty("file", {}).toString()), {});
+            const auto entry = table.getProperty(cydaw::base::Identifier(zone.getProperty("file", {}).toString()), {});
             if (!entry.isObject())
                 continue;
             // Frames of the cut file are frames of the recording, `offset` later.
-            const auto offset = static_cast<juce::int64>(entry.getProperty("offset", 0));
-            const auto frames = static_cast<juce::int64>(entry.getProperty("frames", 0));
-            const auto start = static_cast<juce::int64>(zone.getProperty("start", 0));
-            const auto end = static_cast<juce::int64>(zone.getProperty("end", -1));
+            const auto offset = static_cast<cydaw::base::int64>(entry.getProperty("offset", 0));
+            const auto frames = static_cast<cydaw::base::int64>(entry.getProperty("frames", 0));
+            const auto start = static_cast<cydaw::base::int64>(zone.getProperty("start", 0));
+            const auto end = static_cast<cydaw::base::int64>(zone.getProperty("end", -1));
             object->setProperty("file", entry.getProperty("file", {}));
             object->setProperty("start", offset + start);
             object->setProperty("end", offset + (end >= 0 ? std::min(end, frames) : frames));
             if (!object->hasProperty("endFade"))
                 object->setProperty("endFade", entry.getProperty("endFade", 0));
             if (const auto* loop = zone.getProperty("loop", {}).getArray(); loop != nullptr && loop->size() == 2) {
-                juce::Array<juce::var> moved;
-                moved.add(offset + static_cast<juce::int64>((*loop)[0]));
-                moved.add(offset + static_cast<juce::int64>((*loop)[1]));
+                cydaw::base::Array<cydaw::base::Value> moved;
+                moved.add(offset + static_cast<cydaw::base::int64>((*loop)[0]));
+                moved.add(offset + static_cast<cydaw::base::int64>((*loop)[1]));
                 object->setProperty("loop", moved);
             }
         }
@@ -212,7 +217,7 @@ constexpr int streamCount = 320;
 
 [[nodiscard]] bool streamingAllowed()
 {
-    static const auto allowed = juce::SystemStats::getEnvironmentVariable("CYDAW_SAMPLE_STREAMING", "1") != "0";
+    static const auto allowed = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_SAMPLE_STREAMING", "1") != "0";
     return allowed;
 }
 
@@ -220,34 +225,34 @@ constexpr int streamCount = 320;
 
 // `first` below 0: the whole file. Else, a recording long enough past
 // `first` keeps only its head in memory (from `first`, through `until`).
-bool decodeSampleWindow(const juce::File& file, SampleData& data, juce::String& error, const juce::int64 first,
-                        const juce::int64 until)
+bool decodeSampleWindow(const cydaw::base::File& file, SampleData& data, cydaw::base::Text& error, const cydaw::base::int64 first,
+                        const cydaw::base::int64 until)
 {
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr) {
         error = "cannot read " + file.getFullPathName();
         return false;
     }
     const auto channels = std::clamp(static_cast<int>(reader->numChannels), 1, 2);
     // Twenty minutes is more than a sample; past it, the rest is left out.
-    const auto limit = static_cast<juce::int64>(reader->sampleRate * 60.0 * 20.0);
-    const auto frames = std::min<juce::int64>(reader->lengthInSamples, limit);
+    const auto limit = static_cast<cydaw::base::int64>(reader->sampleRate * 60.0 * 20.0);
+    const auto frames = std::min<cydaw::base::int64>(reader->lengthInSamples, limit);
     if (frames <= 0 || reader->sampleRate <= 0.0) {
         error = "empty " + file.getFullPathName();
         return false;
     }
     // Long past where it starts: its head only.
-    juce::int64 from = 0;
+    cydaw::base::int64 from = 0;
     auto to = frames;
     auto streamed = false;
     if (first >= 0 && streamingAllowed()) {
-        const auto head = static_cast<juce::int64>(reader->sampleRate * headSeconds);
+        const auto head = static_cast<cydaw::base::int64>(reader->sampleRate * headSeconds);
         const auto kept = std::max(first + head, until + 64);
-        if (frames - kept > static_cast<juce::int64>(reader->sampleRate * streamedPast)) {
-            from = std::clamp<juce::int64>(first - 64, 0, frames);
-            to = std::clamp<juce::int64>(kept, from + 1, frames);
+        if (frames - kept > static_cast<cydaw::base::int64>(reader->sampleRate * streamedPast)) {
+            from = std::clamp<cydaw::base::int64>(first - 64, 0, frames);
+            to = std::clamp<cydaw::base::int64>(kept, from + 1, frames);
             streamed = true;
             cydaw::engine::SampleStreams::instance().reserve(streamCount);
         }
@@ -255,17 +260,17 @@ bool decodeSampleWindow(const juce::File& file, SampleData& data, juce::String& 
     const auto count = to - from;
     std::vector<float> decoded(static_cast<std::size_t>(count) * static_cast<std::size_t>(channels));
     constexpr int chunk = 1 << 16;
-    juce::AudioBuffer<float> buffer(channels, chunk);
+    cydsp::AudioBuffer<float> buffer;if(buffer.resize(channels,chunk)!=cydsp::Status::ok){error="Cannot allocate sample decode buffer";return false;}
     auto peak = 0.0f;
-    for (juce::int64 done = 0; done < count; done += chunk) {
-        const auto part = static_cast<int>(std::min<juce::int64>(chunk, count - done));
-        buffer.clear();
-        if (!reader->read(&buffer, 0, part, from + done, true, channels > 1)) {
+    for (cydaw::base::int64 done = 0; done < count; done += chunk) {
+        const auto part = static_cast<int>(std::min<cydaw::base::int64>(chunk, count - done));
+        for(std::size_t channel=0;channel<buffer.block().channels();++channel)std::fill(buffer.block().channel(channel).begin(),buffer.block().channel(channel).end(),0.f);
+        if (!reader->read(buffer.block().channelData(), channels, from + done, part)) {
             error = "cannot decode " + file.getFullPathName();
             return false;
         }
         for (int channel = 0; channel < channels; ++channel) {
-            const auto* source = buffer.getReadPointer(channel);
+            const auto* source = buffer.block().channel(channel).data();
             for (int frame = 0; frame < part; ++frame) {
                 const auto value = std::isfinite(source[frame]) ? source[frame] : 0.0f;
                 decoded[static_cast<std::size_t>(done + frame) * static_cast<std::size_t>(channels)
@@ -295,7 +300,7 @@ bool decodeSampleWindow(const juce::File& file, SampleData& data, juce::String& 
     return true;
 }
 
-bool decodeSampleFile(const juce::File& file, SampleData& data, juce::String& error)
+bool decodeSampleFile(const cydaw::base::File& file, SampleData& data, cydaw::base::Text& error)
 {
     return decodeSampleWindow(file, data, error, -1, -1);
 }
@@ -305,32 +310,32 @@ bool decodeSampleFile(const juce::File& file, SampleData& data, juce::String& er
 // Several threads decode at once (a piano is dozens of files): the queue is
 // shared, a file is taken by one of them.
 struct SampleStore::Impl final {
-    struct Worker final : juce::Thread {
-        Worker(Impl& owner, const int index) : juce::Thread("cydaw-sample-loader-" + juce::String(index)), owner_(owner) {}
+    struct Worker final : cydaw::base::Thread {
+        Worker(Impl& owner, const int index) : cydaw::base::Thread("cydaw-sample-loader-" + cydaw::base::Text(index)), owner_(owner) {}
         void run() override { owner_.work(*this); }
         Impl& owner_;
     };
 
     // A file to decode, and the part of it a zone needs in memory.
     struct Job {
-        juce::File file;
+        cydaw::base::File file;
         std::weak_ptr<SampleData> data;
-        juce::int64 first { -1 };
-        juce::int64 until { -1 };
+        cydaw::base::int64 first { -1 };
+        cydaw::base::int64 until { -1 };
     };
 
     // Fills the rings of the lanes playing past a head, from the disk.
-    struct Streamer final : juce::Thread {
-        Streamer() : juce::Thread("cydaw-sample-streamer") {}
+    struct Streamer final : cydaw::base::Thread {
+        Streamer() : cydaw::base::Thread("cydaw-sample-streamer") {}
         void run() override;
     };
 
     Impl()
     {
-        const auto count = juce::jlimit(1, 6, juce::SystemStats::getNumCpus() / 2);
+        const auto count = cydaw::base::jlimit(1, 6, cydaw::base::SystemStats::getNumCpus() / 2);
         for (int index = 0; index < count; ++index) {
             workers.push_back(std::make_unique<Worker>(*this, index));
-            workers.back()->startThread(juce::Thread::Priority::low);
+            workers.back()->startThread(cydaw::base::Thread::Priority::low);
         }
     }
 
@@ -347,13 +352,13 @@ struct SampleStore::Impl final {
 
     void startStreamer()
     {
-        std::call_once(streamerStarted, [this] { streamer.startThread(juce::Thread::Priority::high); });
+        std::call_once(streamerStarted, [this] { streamer.startThread(cydaw::base::Thread::Priority::high); });
     }
 
-    SampleDataRef acquire(const juce::File& file, const bool deferred, const juce::int64 first, const juce::int64 until)
+    SampleDataRef acquire(const cydaw::base::File& file, const bool deferred, const cydaw::base::int64 first, const cydaw::base::int64 until)
     {
-        auto key = file.getFullPathName() + "|" + juce::String(file.getLastModificationTime().toMilliseconds())
-                   + "|" + juce::String(file.getSize());
+        auto key = file.getFullPathName() + "|" + cydaw::base::Text(file.getLastModificationTime().toMilliseconds())
+                   + "|" + cydaw::base::Text(file.getSize());
         // A long recording keeps the part its zone starts with: one per part.
         if (first >= 0)
             key << "|" << first << "|" << until;
@@ -409,7 +414,7 @@ struct SampleStore::Impl final {
             wake.signal();
     }
 
-    void work(juce::Thread& thread)
+    void work(cydaw::base::Thread& thread)
     {
         while (!thread.threadShouldExit()) {
             Job job;
@@ -437,7 +442,7 @@ struct SampleStore::Impl final {
                 wake.wait(20);
                 continue;
             }
-            juce::String error;
+            cydaw::base::Text error;
             if (decodeSampleWindow(job.file, *next, error, job.first, job.until)) {
                 if (next->streamed)
                     startStreamer();
@@ -449,12 +454,12 @@ struct SampleStore::Impl final {
     }
 
     std::mutex lock;
-    std::map<juce::String, std::weak_ptr<SampleData>> cache;
+    std::map<cydaw::base::Text, std::weak_ptr<SampleData>> cache;
     std::deque<Job> queue;
     // Deferred, not asked for yet.
     std::vector<Job> sleeping;
     std::uint32_t requestsSeen {};
-    juce::WaitableEvent wake;
+    cydaw::base::WaitableEvent wake;
     std::vector<std::unique_ptr<Worker>> workers;
     Streamer streamer;
     std::once_flag streamerStarted;
@@ -467,33 +472,33 @@ void SampleStore::Impl::Streamer::run()
 {
     using cydaw::engine::SampleStream;
     constexpr int chunk = 2'048;
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     auto& pool = cydaw::engine::SampleStreams::instance();
-    std::vector<std::unique_ptr<juce::AudioFormatReader>> readers;
-    juce::AudioBuffer<float> buffer(2, chunk);
-    const auto fill = [&buffer](SampleStream& stream, juce::AudioFormatReader& reader) {
+    std::vector<std::unique_ptr<cydaw::audio::AudioFormatReader>> readers;
+    cydsp::AudioBuffer<float> buffer;if(buffer.resize(2,chunk)!=cydsp::Status::ok)return;
+    const auto fill = [&buffer](SampleStream& stream, cydaw::audio::AudioFormatReader& reader) {
         const auto frames = stream.sample != nullptr ? stream.sample->frames : 0;
         const auto read = stream.reading.load(std::memory_order_acquire);
-        juce::int64 first {};
+        cydaw::base::int64 first {};
         int count {};
         if (stream.direction > 0) {
             first = stream.high.load(std::memory_order_relaxed);
-            const auto limit = std::min<juce::int64>(frames, read + SampleStream::capacity - SampleStream::margin);
-            count = static_cast<int>(std::min<juce::int64>(chunk, limit - first));
+            const auto limit = std::min<cydaw::base::int64>(frames, read + SampleStream::capacity - SampleStream::margin);
+            count = static_cast<int>(std::min<cydaw::base::int64>(chunk, limit - first));
         } else {
             const auto low = stream.low.load(std::memory_order_relaxed);
-            const auto limit = std::max<juce::int64>(0, read - SampleStream::capacity + SampleStream::margin);
-            count = static_cast<int>(std::min<juce::int64>(chunk, low - limit));
+            const auto limit = std::max<cydaw::base::int64>(0, read - SampleStream::capacity + SampleStream::margin);
+            count = static_cast<int>(std::min<cydaw::base::int64>(chunk, low - limit));
             first = low - count;
         }
         if (count <= 0)
             return false;
-        buffer.clear();
-        if (!reader.read(&buffer, 0, count, first, true, true))
+        for(std::size_t channel=0;channel<buffer.block().channels();++channel)std::fill(buffer.block().channel(channel).begin(),buffer.block().channel(channel).end(),0.f);
+        if (!reader.read(buffer.block().channelData(), 2, first, count))
             return false;
-        const auto* left = buffer.getReadPointer(0);
-        const auto* right = reader.numChannels > 1 ? buffer.getReadPointer(1) : left;
+        const auto* left = buffer.block().channel(0).data();
+        const auto* right = reader.numChannels > 1 ? buffer.block().channel(1).data() : left;
         const auto toShort = [](const float value) {
             return static_cast<std::int16_t>(std::lround(std::clamp(std::isfinite(value) ? value : 0.0f, -1.0f, 1.0f) * 32'767.0f));
         };
@@ -526,7 +531,7 @@ void SampleStore::Impl::Streamer::run()
             auto& reader = readers[static_cast<std::size_t>(index)];
             auto state = stream.state.load(std::memory_order_acquire);
             if (state == SampleStream::wanted) {
-                reader.reset(stream.sample != nullptr ? formats.createReaderFor(juce::File(juce::String::fromUTF8(stream.sample->path.c_str())))
+                reader.reset(stream.sample != nullptr ? formats.createReaderFor(cydaw::base::File(cydaw::base::Text::fromUTF8(stream.sample->path.c_str())))
                                                       : nullptr);
                 // Not readable: said so, an offline render does not wait for it.
                 stream.unreadable.store(reader == nullptr, std::memory_order_release);
@@ -549,23 +554,14 @@ void SampleStore::Impl::Streamer::run()
     }
 }
 
-JUCE_IMPLEMENT_SINGLETON(SampleStore)
+namespace {std::mutex sampleStoreMutex;std::unique_ptr<SampleStore> sampleStoreOwner;}
+SampleStore& SampleStore::instance(){std::lock_guard lock(sampleStoreMutex);if(!sampleStoreOwner)sampleStoreOwner.reset(new SampleStore);return *sampleStoreOwner;}
+void SampleStore::shutdown(){std::unique_ptr<SampleStore> retired;{std::lock_guard lock(sampleStoreMutex);retired=std::move(sampleStoreOwner);}retired.reset();}
+SampleStore::SampleStore():impl_(std::make_unique<Impl>()){}
+SampleStore::~SampleStore()=default;
 
-SampleStore& SampleStore::instance()
-{
-    return *getInstance();
-}
-
-SampleStore::SampleStore() : impl_(std::make_unique<Impl>()) {}
-
-SampleStore::~SampleStore()
-{
-    impl_.reset();
-    clearSingletonInstance();
-}
-
-SampleDataRef SampleStore::acquire(const juce::File& file, const bool deferred, const juce::int64 first,
-                                   const juce::int64 until)
+SampleDataRef SampleStore::acquire(const cydaw::base::File& file, const bool deferred, const cydaw::base::int64 first,
+                                   const cydaw::base::int64 until)
 {
     return impl_->acquire(file, deferred, first, until);
 }
@@ -586,7 +582,7 @@ void SampleStore::want(const SamplerMap& map, const cydaw::engine::SamplerCues& 
 
 bool SampleStore::waitUntilReady(const SamplerMap& map, const int timeoutMs)
 {
-    const auto deadline = juce::Time::getMillisecondCounterHiRes() + timeoutMs;
+    const auto deadline = cydaw::base::Time::getMillisecondCounterHiRes() + timeoutMs;
     for (;;) {
         auto pending = false;
         for (const auto& zone : map.zones)
@@ -597,9 +593,9 @@ bool SampleStore::waitUntilReady(const SamplerMap& map, const int timeoutMs)
             return std::ranges::all_of(map.zones, [](const SamplerZone& zone) {
                 return zone.sample != nullptr && (zone.sample->asleep() || zone.sample->ready.load(std::memory_order_acquire));
             });
-        if (juce::Time::getMillisecondCounterHiRes() > deadline)
+        if (cydaw::base::Time::getMillisecondCounterHiRes() > deadline)
             return false;
-        juce::Thread::sleep(5);
+        cydaw::base::Thread::sleep(5);
     }
 }
 
@@ -611,7 +607,7 @@ SampleStore::Stats SampleStore::stats()
         if (const auto data = weak.lock()) {
             if (data->ready.load(std::memory_order_acquire)) {
                 ++stats.loaded;
-                stats.bytes += static_cast<juce::int64>(data->pcm.size() * sizeof(std::int16_t));
+                stats.bytes += static_cast<cydaw::base::int64>(data->pcm.size() * sizeof(std::int16_t));
             } else if (data->failed.load(std::memory_order_acquire)) {
                 ++stats.failed;
             } else if (data->asleep()) {
@@ -627,7 +623,7 @@ SampleStore::Stats SampleStore::stats()
 
 // ---- Names and pitch ------------------------------------------------------------------------
 
-int noteFromName(const juce::String& name)
+int noteFromName(const cydaw::base::Text& name)
 {
     static constexpr int pitchClass[] = { 9, 11, 0, 2, 4, 5, 7 }; // A..G
     const auto text = name.toStdString();
@@ -670,7 +666,7 @@ int noteFromName(const juce::String& name)
         }
     }
     // A MIDI number standing on its own: "_60_", "-72.".
-    juce::StringArray tokens;
+    cydaw::base::TextList tokens;
     tokens.addTokens(name, "_- .()[]", "");
     for (const auto& token : tokens)
         if (token.containsOnly("0123456789") && token.length() >= 2 && token.length() <= 3) {
@@ -799,17 +795,17 @@ double detectSamplePitch(const SampleData& data)
 
 namespace {
 
-int intOf(const juce::var& value, const int fallback)
+int intOf(const cydaw::base::Value& value, const int fallback)
 {
     return value.isVoid() || value.isUndefined() ? fallback : static_cast<int>(value);
 }
 
-juce::int64 int64Of(const juce::var& value, const juce::int64 fallback)
+cydaw::base::int64 int64Of(const cydaw::base::Value& value, const cydaw::base::int64 fallback)
 {
-    return value.isVoid() || value.isUndefined() ? fallback : static_cast<juce::int64>(value);
+    return value.isVoid() || value.isUndefined() ? fallback : static_cast<cydaw::base::int64>(value);
 }
 
-float floatOf(const juce::var& value, const float fallback)
+float floatOf(const cydaw::base::Value& value, const float fallback)
 {
     if (value.isVoid() || value.isUndefined())
         return fallback;
@@ -817,39 +813,39 @@ float floatOf(const juce::var& value, const float fallback)
     return std::isfinite(number) ? number : fallback;
 }
 
-std::pair<int, int> pairOf(const juce::var& value, const std::pair<int, int> fallback)
+std::pair<int, int> pairOf(const cydaw::base::Value& value, const std::pair<int, int> fallback)
 {
     if (const auto* list = value.getArray(); list != nullptr && list->size() == 2)
         return { static_cast<int>((*list)[0]), static_cast<int>((*list)[1]) };
     return fallback;
 }
 
-std::pair<juce::int64, juce::int64> pair64Of(const juce::var& value, const std::pair<juce::int64, juce::int64> fallback)
+std::pair<cydaw::base::int64, cydaw::base::int64> pair64Of(const cydaw::base::Value& value, const std::pair<cydaw::base::int64, cydaw::base::int64> fallback)
 {
     if (const auto* list = value.getArray(); list != nullptr && list->size() == 2)
-        return { static_cast<juce::int64>((*list)[0]), static_cast<juce::int64>((*list)[1]) };
+        return { static_cast<cydaw::base::int64>((*list)[0]), static_cast<cydaw::base::int64>((*list)[1]) };
     return fallback;
 }
 
-juce::var pairVar(const juce::int64 first, const juce::int64 second)
+cydaw::base::Value pairVar(const cydaw::base::int64 first, const cydaw::base::int64 second)
 {
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     list.add(first);
     list.add(second);
     return list;
 }
 
-juce::String noteName(const int note)
+cydaw::base::Text noteName(const int note)
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    return juce::String(names[((note % 12) + 12) % 12]) + juce::String(note / 12 - 1);
+    return cydaw::base::Text(names[((note % 12) + 12) % 12]) + cydaw::base::Text(note / 12 - 1);
 }
 
 // A controller's rule on a zone, as stored: {"cc": 70, "level": 100} (one
 // amount) or {"cc": 4, "range": [0, 63]} (two), and "curve" when it follows
 // one of the map's.
 struct RuleSpec {
-    juce::String kind;
+    cydaw::base::Text kind;
     int controller {};
     float a {};
     float b {};
@@ -867,14 +863,14 @@ constexpr std::array<std::pair<const char*, cydaw::engine::SamplerRuleKind>, 8> 
     { "offset", cydaw::engine::SamplerRuleKind::offset },
 } };
 
-[[nodiscard]] bool twoAmounts(const juce::String& kind)
+[[nodiscard]] bool twoAmounts(const cydaw::base::Text& kind)
 {
     return kind == "range" || kind == "fadeIn" || kind == "fadeOut";
 }
 
 // One zone of the JSON, as edited and stored.
 struct ZoneSpec {
-    juce::String file;
+    cydaw::base::Text file;
     int root { 60 };
     int lowKey {};
     int highKey { 127 };
@@ -883,10 +879,10 @@ struct ZoneSpec {
     float tune {};
     float gain {};
     float pan {};
-    juce::int64 start {};
-    juce::int64 end { -1 };
-    juce::int64 loopStart { -1 };
-    juce::int64 loopEnd { -1 };
+    cydaw::base::int64 start {};
+    cydaw::base::int64 end { -1 };
+    cydaw::base::int64 loopStart { -1 };
+    cydaw::base::int64 loopEnd { -1 };
     int loopCrossfade {};
     int endFade {};
     int sequenceLength { 1 };
@@ -894,13 +890,13 @@ struct ZoneSpec {
     int group {};
     int offBy {};
     // "release", "first", "legato"; empty: a key pressed.
-    juce::String trigger;
+    cydaw::base::Text trigger;
     float releaseDecay {};
     int keyswitch { -1 };
     std::vector<RuleSpec> rules;
 };
 
-ZoneSpec zoneFromVar(const juce::var& value)
+ZoneSpec zoneFromVar(const cydaw::base::Value& value)
 {
     ZoneSpec zone;
     zone.file = value.getProperty("file", {}).toString();
@@ -914,7 +910,7 @@ ZoneSpec zoneFromVar(const juce::var& value)
     zone.tune = std::clamp(floatOf(value.getProperty("tune", {}), 0.0f), -2'400.0f, 2'400.0f);
     zone.gain = std::clamp(floatOf(value.getProperty("gain", {}), 0.0f), -96.0f, 24.0f);
     zone.pan = std::clamp(floatOf(value.getProperty("pan", {}), 0.0f), -1.0f, 1.0f);
-    zone.start = std::max<juce::int64>(0, int64Of(value.getProperty("start", {}), 0));
+    zone.start = std::max<cydaw::base::int64>(0, int64Of(value.getProperty("start", {}), 0));
     zone.end = int64Of(value.getProperty("end", {}), -1);
     const auto loop = pair64Of(value.getProperty("loop", {}), { -1, -1 });
     zone.loopStart = loop.first;
@@ -958,9 +954,9 @@ ZoneSpec zoneFromVar(const juce::var& value)
     return zone;
 }
 
-juce::var zoneToVar(const ZoneSpec& zone)
+cydaw::base::Value zoneToVar(const ZoneSpec& zone)
 {
-    auto* value = new juce::DynamicObject();
+    auto* value = new cydaw::base::Object();
     value->setProperty("file", zone.file);
     value->setProperty("root", zone.root);
     value->setProperty("keys", pairVar(zone.lowKey, zone.highKey));
@@ -995,28 +991,28 @@ juce::var zoneToVar(const ZoneSpec& zone)
     if (zone.keyswitch >= 0)
         value->setProperty("keyswitch", zone.keyswitch);
     if (!zone.rules.empty()) {
-        juce::Array<juce::var> rules;
+        cydaw::base::Array<cydaw::base::Value> rules;
         for (const auto& rule : zone.rules) {
-            auto* item = new juce::DynamicObject();
+            auto* item = new cydaw::base::Object();
             item->setProperty("cc", rule.controller);
             if (twoAmounts(rule.kind)) {
-                juce::Array<juce::var> amounts;
+                cydaw::base::Array<cydaw::base::Value> amounts;
                 amounts.add(rule.a);
                 amounts.add(rule.b);
-                item->setProperty(juce::Identifier(rule.kind), amounts);
+                item->setProperty(cydaw::base::Identifier(rule.kind), amounts);
             } else {
-                item->setProperty(juce::Identifier(rule.kind), rule.a);
+                item->setProperty(cydaw::base::Identifier(rule.kind), rule.a);
             }
             if (rule.curve >= 0)
                 item->setProperty("curve", rule.curve);
-            rules.add(juce::var(item));
+            rules.add(cydaw::base::Value(item));
         }
         value->setProperty("rules", rules);
     }
-    return juce::var(value);
+    return cydaw::base::Value(value);
 }
 
-std::vector<ZoneSpec> zonesOf(const juce::var& json)
+std::vector<ZoneSpec> zonesOf(const cydaw::base::Value& json)
 {
     std::vector<ZoneSpec> zones;
     if (const auto* list = json.getProperty("zones", {}).getArray())
@@ -1033,14 +1029,14 @@ std::vector<ZoneSpec> zonesOf(const juce::var& json)
 constexpr std::array<const char*, 5> mapExtras { "controllers", "controls", "curves", "keyswitches", "whole" };
 
 // `from`: the map whose extras it keeps (an SFZ read: its own).
-juce::var mapVar(const juce::String& name, const std::vector<ZoneSpec>& zones, const juce::var& settings,
-                 const juce::var& from = {})
+cydaw::base::Value mapVar(const cydaw::base::Text& name, const std::vector<ZoneSpec>& zones, const cydaw::base::Value& settings,
+                 const cydaw::base::Value& from = {})
 {
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "cydaw-sampler");
     root->setProperty("version", 1);
     root->setProperty("name", name);
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& zone : zones)
         list.add(zoneToVar(zone));
     root->setProperty("zones", list);
@@ -1049,7 +1045,7 @@ juce::var mapVar(const juce::String& name, const std::vector<ZoneSpec>& zones, c
     for (const auto* extra : mapExtras)
         if (const auto value = from.getProperty(extra, {}); !value.isVoid())
             root->setProperty(extra, value);
-    return juce::var(root);
+    return cydaw::base::Value(root);
 }
 
 // Each root's keys: from just above the midpoint with the root below to the
@@ -1071,14 +1067,14 @@ void spreadKeys(std::vector<ZoneSpec>& zones)
 
 // The layer a name says: "v2", "vl3", "vel1", "dyn2", "layer4", or a
 // dynamic ("pp" 2 … "ff" 7); -1 when it says none.
-int layerFromName(const juce::String& name)
+int layerFromName(const cydaw::base::Text& name)
 {
-    juce::StringArray tokens;
+    cydaw::base::TextList tokens;
     tokens.addTokens(name.toLowerCase(), "_- .()[]", "");
     for (const auto& token : tokens)
         for (const auto* prefix : { "vl", "vel", "dyn", "layer", "v" })
             if (token.startsWith(prefix)) {
-                const auto rest = token.substring(juce::String(prefix).length());
+                const auto rest = token.substring(cydaw::base::Text(prefix).length());
                 if (rest.isNotEmpty() && rest.containsOnly("0123456789"))
                     return rest.getIntValue();
             }
@@ -1092,9 +1088,9 @@ int layerFromName(const juce::String& name)
     return -1;
 }
 
-int roundRobinFromName(const juce::String& name)
+int roundRobinFromName(const cydaw::base::Text& name)
 {
-    juce::StringArray tokens;
+    cydaw::base::TextList tokens;
     tokens.addTokens(name.toLowerCase(), "_- .()[]", "");
     for (const auto& token : tokens)
         if (token.startsWith("rr") && token.length() > 2 && token.substring(2).containsOnly("0123456789"))
@@ -1103,7 +1099,7 @@ int roundRobinFromName(const juce::String& name)
 }
 
 struct Candidate {
-    juce::File file;
+    cydaw::base::File file;
     SampleDataRef data;
     int root { -1 };
     int layer { -1 };
@@ -1112,7 +1108,7 @@ struct Candidate {
 };
 
 // New zones for files, with everything a file and its name say.
-std::vector<ZoneSpec> zonesForFiles(const juce::Array<juce::File>& files, std::vector<ZoneSpec> existing,
+std::vector<ZoneSpec> zonesForFiles(const cydaw::base::Array<cydaw::base::File>& files, std::vector<ZoneSpec> existing,
                                     bool& unpitched)
 {
     std::vector<Candidate> candidates;
@@ -1246,7 +1242,7 @@ std::vector<ZoneSpec> zonesForFiles(const juce::Array<juce::File>& files, std::v
 
 } // namespace
 
-SamplerMapRef samplerMapFromVar(const juce::var& json, juce::String& error)
+SamplerMapRef samplerMapFromVar(const cydaw::base::Value& json, cydaw::base::Text& error)
 {
     if (json.getProperty("format", {}).toString() != "cydaw-sampler") {
         error = "not a cydaw-sampler map";
@@ -1254,7 +1250,7 @@ SamplerMapRef samplerMapFromVar(const juce::var& json, juce::String& error)
     }
     auto map = std::make_shared<SamplerMap>();
     map->name = json.getProperty("name", {}).toString().toStdString();
-    std::vector<juce::String> files;
+    std::vector<cydaw::base::Text> files;
     for (const auto& spec : zonesOf(json)) {
         if (spec.file.isEmpty())
             continue;
@@ -1359,11 +1355,11 @@ SamplerMapRef samplerMapFromVar(const juce::var& json, juce::String& error)
     return map;
 }
 
-juce::var loadSamplerMapFile(const juce::File& file, juce::String& error)
+cydaw::base::Value loadSamplerMapFile(const cydaw::base::File& file, cydaw::base::Text& error)
 {
     if (file.hasFileExtension("sfz"))
         return samplerMapFromSfz(file, error);
-    const auto json = juce::JSON::parse(file.loadFileAsString());
+    const auto json = cydaw::base::JSON::parse(file.loadFileAsString());
     if (json.getProperty("format", {}).toString() != "cydaw-sampler") {
         error = "not a cydaw-sampler map: " + file.getFullPathName();
         return {};
@@ -1371,14 +1367,14 @@ juce::var loadSamplerMapFile(const juce::File& file, juce::String& error)
     // Relative files are the map's neighbours.
     std::vector<ZoneSpec> zones = zonesOf(json);
     for (auto& zone : zones)
-        if (!zone.file.startsWith(factoryPrefix) && !zone.file.startsWith(bankPrefix) && !juce::File::isAbsolutePath(zone.file))
+        if (!zone.file.startsWith(factoryPrefix) && !zone.file.startsWith(bankPrefix) && !cydaw::base::File::isAbsolutePath(zone.file))
             zone.file = storedSamplePath(file.getParentDirectory().getChildFile(zone.file));
     error.clear();
     return mapVar(json.getProperty("name", file.getFileNameWithoutExtension()).toString(), zones,
                   json.getProperty("settings", {}), json);
 }
 
-juce::String describeSamplerMap(const juce::var& json)
+cydaw::base::Text describeSamplerMap(const cydaw::base::Value& json)
 {
     const auto zones = zonesOf(json);
     if (zones.empty())
@@ -1396,37 +1392,37 @@ juce::String describeSamplerMap(const juce::var& json)
     std::size_t layerCount = 0;
     for (const auto& [root, ranges] : layers)
         layerCount = std::max(layerCount, ranges.size());
-    const auto dot = juce::String::fromUTF8(" \xc2\xb7 ");
-    return json.getProperty("name", {}).toString() + dot + juce::String(static_cast<int>(zones.size()))
-           + (zones.size() > 1 ? " zones" : " zone") + dot + noteName(low) + juce::String::fromUTF8("\xe2\x80\x93")
-           + noteName(high) + dot + juce::String(static_cast<int>(layerCount))
+    const auto dot = cydaw::base::Text::fromUTF8(" \xc2\xb7 ");
+    return json.getProperty("name", {}).toString() + dot + cydaw::base::Text(static_cast<int>(zones.size()))
+           + (zones.size() > 1 ? " zones" : " zone") + dot + noteName(low) + cydaw::base::Text::fromUTF8("\xe2\x80\x93")
+           + noteName(high) + dot + cydaw::base::Text(static_cast<int>(layerCount))
            + (layerCount > 1 ? " layers" : " layer");
 }
 
-juce::var samplerMapFromFiles(const juce::Array<juce::File>& files, const juce::String& name)
+cydaw::base::Value samplerMapFromFiles(const cydaw::base::Array<cydaw::base::File>& files, const cydaw::base::Text& name)
 {
     auto unpitched = false;
     const auto zones = zonesForFiles(files, {}, unpitched);
-    juce::var settings;
+    cydaw::base::Value settings;
     if (unpitched) {
         // Drums: each plays to its end at its own pitch.
-        auto* values = new juce::DynamicObject();
+        auto* values = new cydaw::base::Object();
         values->setProperty("one-shot", 1);
         values->setProperty("key-track", 0);
-        settings = juce::var(values);
+        settings = cydaw::base::Value(values);
     }
     return mapVar(name, zones, settings);
 }
 
-juce::var simpleSamplerMap(const juce::File& file)
+cydaw::base::Value simpleSamplerMap(const cydaw::base::File& file)
 {
-    auto json = samplerMapFromFiles(juce::Array<juce::File> { file }, file.getFileNameWithoutExtension());
+    auto json = samplerMapFromFiles(cydaw::base::Array<cydaw::base::File> { file }, file.getFileNameWithoutExtension());
     const auto unpitched = static_cast<int>(json.getProperty("settings", {}).getProperty("key-track", 1)) == 0;
     if (auto* zones = json.getProperty("zones", {}).getArray(); zones != nullptr && !zones->isEmpty()) {
         zones->removeRange(1, zones->size() - 1);
         if (auto* zone = zones->getReference(0).getDynamicObject()) {
-            zone->setProperty("keys", juce::Array<juce::var> { 0, 127 });
-            zone->setProperty("velocities", juce::Array<juce::var> { 1, 127 });
+            zone->setProperty("keys", cydaw::base::Array<cydaw::base::Value> { 0, 127 });
+            zone->setProperty("velocities", cydaw::base::Array<cydaw::base::Value> { 1, 127 });
             if (unpitched)
                 zone->setProperty("root", 60);
         }
@@ -1439,14 +1435,14 @@ juce::var simpleSamplerMap(const juce::File& file)
     return json;
 }
 
-juce::var withFilesAdded(const juce::var& json, const juce::Array<juce::File>& files)
+cydaw::base::Value withFilesAdded(const cydaw::base::Value& json, const cydaw::base::Array<cydaw::base::File>& files)
 {
     auto unpitched = false;
     auto zones = zonesForFiles(files, zonesOf(json), unpitched);
     return mapVar(json.getProperty("name", {}).toString(), zones, json.getProperty("settings", {}), json);
 }
 
-juce::var withKeysSpread(const juce::var& json)
+cydaw::base::Value withKeysSpread(const cydaw::base::Value& json)
 {
     auto zones = zonesOf(json);
     std::vector<ZoneSpec> spread;
@@ -1461,21 +1457,21 @@ juce::var withKeysSpread(const juce::var& json)
 namespace {
 
 // The text with its #include files in place and its #define names replaced.
-juce::String expandSfz(const juce::File& file, const juce::File& root, std::map<juce::String, juce::String>& defines,
+cydaw::base::Text expandSfz(const cydaw::base::File& file, const cydaw::base::File& root, std::map<cydaw::base::Text, cydaw::base::Text>& defines,
                        int depth, int& includes)
 {
     if (depth > 16 || !file.existsAsFile())
         return {};
-    juce::StringArray lines;
+    cydaw::base::TextList lines;
     lines.addLines(file.loadFileAsString());
-    juce::String out;
+    cydaw::base::Text out;
     for (auto line : lines) {
         // Comments: // to the end of the line (block comments are rare).
         if (const auto comment = line.indexOf("//"); comment >= 0)
             line = line.substring(0, comment);
         const auto trimmed = line.trim();
         if (trimmed.startsWith("#define")) {
-            juce::StringArray parts;
+            cydaw::base::TextList parts;
             parts.addTokens(trimmed.substring(7).trim(), " \t", "");
             parts.removeEmptyStrings();
             if (parts.size() >= 2)
@@ -1491,7 +1487,7 @@ juce::String expandSfz(const juce::File& file, const juce::File& root, std::map<
             continue;
         }
         // Longest names first, so "$A10" is not read as "$A1" then "0".
-        std::vector<std::pair<juce::String, juce::String>> ordered(defines.begin(), defines.end());
+        std::vector<std::pair<cydaw::base::Text, cydaw::base::Text>> ordered(defines.begin(), defines.end());
         std::ranges::sort(ordered, [](const auto& a, const auto& b) { return a.first.length() > b.first.length(); });
         for (const auto& [name, value] : ordered)
             line = line.replace(name, value);
@@ -1500,14 +1496,14 @@ juce::String expandSfz(const juce::File& file, const juce::File& root, std::map<
     return out;
 }
 
-using Opcodes = std::map<juce::String, juce::String>;
+using Opcodes = std::map<cydaw::base::Text, cydaw::base::Text>;
 
 // The SFZ's headers and their opcodes, in order. An opcode's value runs to
 // the next opcode, header or line end (a sample's path may hold spaces).
-std::vector<std::pair<juce::String, Opcodes>> parseSfz(const juce::String& text)
+std::vector<std::pair<cydaw::base::Text, Opcodes>> parseSfz(const cydaw::base::Text& text)
 {
-    std::vector<std::pair<juce::String, Opcodes>> sections;
-    juce::StringArray lines;
+    std::vector<std::pair<cydaw::base::Text, Opcodes>> sections;
+    cydaw::base::TextList lines;
     lines.addLines(text);
     for (const auto& rawLine : lines) {
         auto line = rawLine;
@@ -1535,9 +1531,9 @@ std::vector<std::pair<juce::String, Opcodes>> parseSfz(const juce::String& text)
                     end = at;
                     break;
                 }
-                if (at > 0 && juce::CharacterFunctions::isWhitespace(rest[at - 1])) {
+                if (at > 0 && cydaw::base::CharacterFunctions::isWhitespace(rest[at - 1])) {
                     auto scan = at;
-                    while (scan < rest.length() && (juce::CharacterFunctions::isLetterOrDigit(rest[scan]) || rest[scan] == '_'))
+                    while (scan < rest.length() && (cydaw::base::CharacterFunctions::isLetterOrDigit(rest[scan]) || rest[scan] == '_'))
                         ++scan;
                     if (scan > at && scan < rest.length() && rest[scan] == '=') {
                         end = at;
@@ -1554,7 +1550,7 @@ std::vector<std::pair<juce::String, Opcodes>> parseSfz(const juce::String& text)
     return sections;
 }
 
-int sfzNote(const juce::String& value, const int fallback)
+int sfzNote(const cydaw::base::Text& value, const int fallback)
 {
     const auto text = value.trim();
     if (text.isEmpty())
@@ -1568,24 +1564,24 @@ int sfzNote(const juce::String& value, const int fallback)
 
 } // namespace
 
-juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const std::map<int, double>& given)
+cydaw::base::Value samplerMapFromSfz(const cydaw::base::File& file, cydaw::base::Text& error, const std::map<int, double>& given)
 {
     if (!file.existsAsFile()) {
         error = "no file " + file.getFullPathName();
         return {};
     }
-    std::map<juce::String, juce::String> defines;
+    std::map<cydaw::base::Text, cydaw::base::Text> defines;
     auto includes = 1'024;
     const auto sections = parseSfz(expandSfz(file, file.getParentDirectory(), defines, 0, includes));
     // What the instrument opens with: its controllers' starting values
     // (set_ccN; MIDI's own otherwise), their names, its curves, its
     // keyswitches.
     std::map<int, double> controllers;
-    std::map<int, juce::String> labels;
+    std::map<int, cydaw::base::Text> labels;
     std::map<int, std::array<float, 128>> curves;
-    juce::String defaultSwitch;
+    cydaw::base::Text defaultSwitch;
     std::set<int> switchKeys;
-    std::map<int, juce::String> switchLabels;
+    std::map<int, cydaw::base::Text> switchLabels;
     for (const auto& [header, opcodes] : sections) {
         if (header == "curve") {
             // Points given at some controller values, straight lines between
@@ -1626,8 +1622,8 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         controllers[number] = value;
     // A region's curves: the SFZ's numbers, made the map's (0: straight, no curve).
     std::vector<int> usedCurves;
-    const auto curveOf = [&](const Opcodes& merged, const juce::String& opcode, const int controller) {
-        const auto found = merged.find(opcode + juce::String(controller));
+    const auto curveOf = [&](const Opcodes& merged, const cydaw::base::Text& opcode, const int controller) {
+        const auto found = merged.find(opcode + cydaw::base::Text(controller));
         if (found == merged.end())
             return -1;
         const auto index = found->second.getIntValue();
@@ -1654,7 +1650,7 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         usedCurves.push_back(index);
         return static_cast<int>(usedCurves.size()) - 1;
     };
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     Opcodes control;
     Opcodes global;
     Opcodes master;
@@ -1692,7 +1688,7 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
                 merged[key] = value;
         const auto get = [&merged](const char* key) {
             const auto found = merged.find(key);
-            return found != merged.end() ? found->second : juce::String();
+            return found != merged.end() ? found->second : cydaw::base::Text();
         };
         // When it sounds: a key pressed (alone or over another), or let go.
         // A keyswitch held, or pressed just before, is not played.
@@ -1801,7 +1797,7 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         if (sample.isEmpty() || sample.startsWithChar('*'))
             continue;
         const auto defaultPath = control.contains("default_path")
-                                     ? control.at("default_path").replaceCharacter('\\', '/') : juce::String();
+                                     ? control.at("default_path").replaceCharacter('\\', '/') : cydaw::base::Text();
         // Where the SFZ says, else without a $name no #define gave, else in
         // ../Samples: a mapping written to be included by another.
         auto sampleFile = file.getParentDirectory().getChildFile(defaultPath + sample);
@@ -1855,7 +1851,7 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         zone.tune = static_cast<float>(get("tune").getDoubleValue() + 100.0 * get("transpose").getDoubleValue());
         zone.gain = static_cast<float>(get("volume").getDoubleValue() + extraDb);
         zone.pan = static_cast<float>(std::clamp(get("pan").getDoubleValue() / 100.0, -1.0, 1.0));
-        zone.start = std::max<juce::int64>(0, get("offset").getLargeIntValue());
+        zone.start = std::max<cydaw::base::int64>(0, get("offset").getLargeIntValue());
         if (get("end").isNotEmpty())
             zone.end = get("end").getLargeIntValue();
         const auto loopMode = get("loop_mode").isNotEmpty() ? get("loop_mode") : get("loopmode");
@@ -1873,8 +1869,8 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
             // The loop the file carries (a WAV's sampler chunk), from its
             // header alone: nothing decoded for it.
             if (formats.getNumKnownFormats() == 0)
-                formats.registerBasicFormats();
-            if (const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(sampleFile)); reader != nullptr) {
+                cydaw::integration::registerCyAudioCoreReaders(formats);
+            if (const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(sampleFile)); reader != nullptr) {
                 const auto start = reader->metadataValues.getValue("Loop0Start", "-1").getLargeIntValue();
                 const auto end = reader->metadataValues.getValue("Loop0End", "-1").getLargeIntValue();
                 if (start >= 0 && end > start && end <= reader->lengthInSamples) {
@@ -1905,37 +1901,37 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         error = "no playable region in " + file.getFullPathName();
         return {};
     }
-    juce::var settings;
+    cydaw::base::Value settings;
     if (regions > 0 && oneShots == regions) {
-        auto* values = new juce::DynamicObject();
+        auto* values = new cydaw::base::Object();
         values->setProperty("one-shot", 1);
-        settings = juce::var(values);
+        settings = cydaw::base::Value(values);
     }
     // What the map carries beyond its zones.
-    auto* extras = new juce::DynamicObject();
-    const juce::var extrasVar(extras);
+    auto* extras = new cydaw::base::Object();
+    const cydaw::base::Value extrasVar(extras);
     if (!controllers.empty()) {
-        auto* starts = new juce::DynamicObject();
+        auto* starts = new cydaw::base::Object();
         for (const auto& [number, value] : controllers)
             if (number >= 0 && number < 128)
-                starts->setProperty(juce::Identifier(juce::String(number)), std::clamp(value, 0.0, 127.0));
-        extras->setProperty("controllers", juce::var(starts));
+                starts->setProperty(cydaw::base::Identifier(cydaw::base::Text(number)), std::clamp(value, 0.0, 127.0));
+        extras->setProperty("controllers", cydaw::base::Value(starts));
     }
     // The controls a card shows: those the zones read, by their numbers
     // (an SFZ numbers a piece's together), named as the SFZ names them.
-    juce::Array<juce::var> controls;
+    cydaw::base::Array<cydaw::base::Value> controls;
     for (const auto number : readControllers) {
-        auto* item = new juce::DynamicObject();
+        auto* item = new cydaw::base::Object();
         item->setProperty("cc", number);
-        item->setProperty("label", labels.contains(number) ? labels[number] : "CC " + juce::String(number));
-        controls.add(juce::var(item));
+        item->setProperty("label", labels.contains(number) ? labels[number] : "CC " + cydaw::base::Text(number));
+        controls.add(cydaw::base::Value(item));
     }
     if (!controls.isEmpty())
         extras->setProperty("controls", controls);
     if (!usedCurves.empty()) {
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto index : usedCurves) {
-            juce::Array<juce::var> values;
+            cydaw::base::Array<cydaw::base::Value> values;
             for (const auto value : curves[index])
                 values.add(value);
             list.add(values);
@@ -1943,28 +1939,28 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         extras->setProperty("curves", list);
     }
     if (!switchKeys.empty()) {
-        auto* keyswitches = new juce::DynamicObject();
-        juce::Array<juce::var> keys;
+        auto* keyswitches = new cydaw::base::Object();
+        cydaw::base::Array<cydaw::base::Value> keys;
         for (const auto key : switchKeys)
             keys.add(key);
         keyswitches->setProperty("keys", keys);
         const auto start = defaultSwitch.isNotEmpty() ? sfzNote(defaultSwitch, -1) : -1;
         keyswitches->setProperty("start", switchKeys.contains(start) ? start : *switchKeys.begin());
         if (!switchLabels.empty()) {
-            auto* names = new juce::DynamicObject();
+            auto* names = new cydaw::base::Object();
             for (const auto& [key, label] : switchLabels)
-                names->setProperty(juce::Identifier(juce::String(key)), label);
-            keyswitches->setProperty("labels", juce::var(names));
+                names->setProperty(cydaw::base::Identifier(cydaw::base::Text(key)), label);
+            keyswitches->setProperty("labels", cydaw::base::Value(names));
         }
-        extras->setProperty("keyswitches", juce::var(keyswitches));
+        extras->setProperty("keyswitches", cydaw::base::Value(keyswitches));
     }
     error.clear();
     return mapVar(file.getFileNameWithoutExtension(), zones, settings, extrasVar);
 }
 
-juce::String samplerMapToSfz(const juce::var& json, const juce::File& sfzFile)
+cydaw::base::Text samplerMapToSfz(const cydaw::base::Value& json, const cydaw::base::File& sfzFile)
 {
-    juce::String out;
+    cydaw::base::Text out;
     out << "// " << json.getProperty("name", {}).toString() << " - written by CyDAW\n";
     // Its controllers' names and starting values, its keyswitches, its curves.
     const auto* starts = json.getProperty("controllers", {}).getDynamicObject();
@@ -1978,7 +1974,7 @@ juce::String samplerMapToSfz(const juce::var& json, const juce::File& sfzFile)
                     << item.getProperty("label", {}).toString() << "\n";
         if (starts != nullptr)
             for (const auto& [name, value] : starts->getProperties())
-                out << "set_cc" << name.toString() << "=" << juce::String(static_cast<double>(value), 2) << "\n";
+                out << "set_cc" << name.toString() << "=" << cydaw::base::Text(static_cast<double>(value), 2) << "\n";
     }
     if (const auto* curves = json.getProperty("curves", {}).getArray())
         for (int index = 0; index < curves->size(); ++index) {
@@ -1986,7 +1982,7 @@ juce::String samplerMapToSfz(const juce::var& json, const juce::File& sfzFile)
             out << "<curve> curve_index=" << (index + 10) << "\n";
             if (const auto* values = (*curves)[index].getArray())
                 for (int at = 0; at < values->size(); ++at)
-                    out << "v" << juce::String(at).paddedLeft('0', 3) << "=" << juce::String(static_cast<double>((*values)[at]), 4)
+                    out << "v" << cydaw::base::Text(at).paddedLeft('0', 3) << "=" << cydaw::base::Text(static_cast<double>((*values)[at]), 4)
                         << (at % 8 == 7 ? "\n" : " ");
             out << "\n";
         }
@@ -2005,11 +2001,11 @@ juce::String samplerMapToSfz(const juce::var& json, const juce::File& sfzFile)
         out << " pitch_keycenter=" << zone.root << " lokey=" << zone.lowKey << " hikey=" << zone.highKey
             << " lovel=" << zone.lowVelocity << " hivel=" << zone.highVelocity;
         if (zone.tune != 0.0f)
-            out << " tune=" << juce::String(zone.tune, 1);
+            out << " tune=" << cydaw::base::Text(zone.tune, 1);
         if (zone.gain != 0.0f)
-            out << " volume=" << juce::String(zone.gain, 2);
+            out << " volume=" << cydaw::base::Text(zone.gain, 2);
         if (zone.pan != 0.0f)
-            out << " pan=" << juce::String(zone.pan * 100.0f, 1);
+            out << " pan=" << cydaw::base::Text(zone.pan * 100.0f, 1);
         if (zone.start > 0)
             out << " offset=" << zone.start;
         if (zone.end >= 0)
@@ -2025,17 +2021,17 @@ juce::String samplerMapToSfz(const juce::var& json, const juce::File& sfzFile)
         if (zone.trigger.isNotEmpty())
             out << " trigger=" << zone.trigger;
         if (zone.releaseDecay > 0.0f)
-            out << " rt_decay=" << juce::String(zone.releaseDecay, 2);
+            out << " rt_decay=" << cydaw::base::Text(zone.releaseDecay, 2);
         if (zone.keyswitch >= 0)
             out << " sw_last=" << zone.keyswitch;
         for (const auto& rule : zone.rules) {
-            const auto cc = juce::String(rule.controller);
+            const auto cc = cydaw::base::Text(rule.controller);
             if (rule.kind == "range")
-                out << " locc" << cc << "=" << juce::String(rule.a, 0) << " hicc" << cc << "=" << juce::String(rule.b, 0);
+                out << " locc" << cc << "=" << cydaw::base::Text(rule.a, 0) << " hicc" << cc << "=" << cydaw::base::Text(rule.b, 0);
             else if (rule.kind == "fadeIn")
-                out << " xfin_locc" << cc << "=" << juce::String(rule.a, 0) << " xfin_hicc" << cc << "=" << juce::String(rule.b, 0);
+                out << " xfin_locc" << cc << "=" << cydaw::base::Text(rule.a, 0) << " xfin_hicc" << cc << "=" << cydaw::base::Text(rule.b, 0);
             else if (rule.kind == "fadeOut")
-                out << " xfout_locc" << cc << "=" << juce::String(rule.a, 0) << " xfout_hicc" << cc << "=" << juce::String(rule.b, 0);
+                out << " xfout_locc" << cc << "=" << cydaw::base::Text(rule.a, 0) << " xfout_hicc" << cc << "=" << cydaw::base::Text(rule.b, 0);
             else {
                 const auto opcode = rule.kind == "level"    ? "amplitude"
                                     : rule.kind == "volume" ? "volume"
@@ -2043,7 +2039,7 @@ juce::String samplerMapToSfz(const juce::var& json, const juce::File& sfzFile)
                                     : rule.kind == "tune"   ? "tune"
                                                             : "offset";
                 const auto amount = rule.kind == "pan" ? rule.a * 100.0f : rule.a;
-                out << " " << opcode << "_oncc" << cc << "=" << juce::String(amount, 2);
+                out << " " << opcode << "_oncc" << cc << "=" << cydaw::base::Text(amount, 2);
                 if (rule.curve >= 0)
                     out << " " << opcode << "_curvecc" << cc << "=" << (rule.curve + 10);
             }

@@ -90,14 +90,17 @@ public:
     [[nodiscard]] double position() const noexcept { return position_; }
     // Elsewhere at once (crossfaded when playing).
     void jump(double frame) noexcept;
+    // Stop/CUE return: hold the exact position and fade the last output to silence.
+    // Prepared/audio-owner operation; ordinary jumps retain their speed ramp.
+    void stopAt(double frame) noexcept;
     // Played over and over between two frames; cleared, it plays on.
     void setLoop(double start, double end) noexcept;
     void clearLoop() noexcept;
     [[nodiscard]] bool looping() const noexcept { return loopEnd_ > loopStart_; }
     [[nodiscard]] double loopStart() const noexcept { return loopStart_; }
     [[nodiscard]] double loopEnd() const noexcept { return loopEnd_; }
-    // `count` frames at `speed` (1 normal, 0 held, negative backwards),
-    // reached from the last block's speed across this one. `keylock`: the
+    // `count` frames at `speed` (1 normal, 0 silent/held, negative backwards),
+    // nonzero speeds reached from the last block's speed across this one. `keylock`: the
     // pitch kept (forward between 0.3 and 3 times; otherwise read).
     void render(float* left, float* right, int count, double speed, bool keylock) noexcept;
 
@@ -118,6 +121,9 @@ private:
     double step_ { 1.0 };       // track frames per output frame at speed 1
     double position_ {};
     double lastSpeed_ {};
+    std::array<float, 2> lastOutput_ {}, stopFrom_ {};
+    int stopFadeLeft_ {};
+    bool stoppedAt_ {};
     double loopStart_ {};
     double loopEnd_ {};
     // A jump while reading directly: the old place fades out under the new.

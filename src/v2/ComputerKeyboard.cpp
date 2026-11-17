@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Text.h>
 #include "ComputerKeyboard.h"
 
 #include "Studio.h"
@@ -6,7 +8,7 @@
 
 #include <algorithm>
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
  #ifndef WIN32_LEAN_AND_MEAN
   #define WIN32_LEAN_AND_MEAN
  #endif
@@ -58,12 +60,12 @@ ImGuiKey keyOfCharacter(const char character)
 // the Windows backend reads them.
 ImGuiKey keyOfPlace(const Place& place, std::string& label)
 {
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     const auto layout = GetKeyboardLayout(0);
     const auto code = MapVirtualKeyExW(static_cast<UINT>(place.scancode), MAPVK_VSC_TO_VK, layout);
     const auto typed = MapVirtualKeyExW(code, MAPVK_VK_TO_CHAR, layout) & 0x7fffu;
     if (typed != 0)
-        label = juce::String::charToString(static_cast<juce::juce_wchar>(typed)).toUpperCase().toStdString();
+        label = cydaw::base::Text::charToString(static_cast<char32_t>(typed)).toUpperCase().toStdString();
     if (code >= 'A' && code <= 'Z')
         return static_cast<ImGuiKey>(ImGuiKey_A + static_cast<int>(code - 'A'));
     if (code >= '0' && code <= '9')
@@ -102,11 +104,13 @@ ComputerKeyboard::~ComputerKeyboard()
 
 void ComputerKeyboard::readLayout()
 {
+    const std::scoped_lock guard(keyLock_);
     keys_.clear();
     for (const auto& place : places) {
         Key key;
         key.key = keyOfPlace(place, key.label);
         key.semitone = place.semitone;
+        key.scanCode = place.scancode;
         if (key.key != ImGuiKey_None)
             keys_.push_back(std::move(key));
     }
@@ -118,6 +122,17 @@ void ComputerKeyboard::update(const bool allowed)
     // A shortcut (Ctrl, Alt) or a text being typed: not a note.
     const auto playing = enabled_ && allowed && !io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && !io.KeySuper;
     active_ = playing;
+    nativeControlsAllowed_.store(!io.WantTextInput && !io.KeyCtrl && !io.KeyAlt && !io.KeySuper,std::memory_order_release);
+    nativeAllowed_.store(enabled_ && allowed && !io.WantTextInput, std::memory_order_release);
+    if (nativeSettingsDirty_.exchange(false)) save();
+    if (nativeInput_) {
+        if (!playing) allNotesOff();
+        if (playing) {
+            static const auto owner = ImHashStr("CyDAW computer keyboard");
+            for (const auto& key : keys_) ImGui::SetKeyOwner(key.key, owner, ImGuiInputFlags_LockThisFrame);
+        }
+        return;
+    }
     if (!playing) {
         allNotesOff();
         return;
@@ -154,8 +169,45 @@ void ComputerKeyboard::update(const bool allowed)
     }
 }
 
+void ComputerKeyboard::nativeKey(const int scanCode, const bool down, const bool blocked)
+{
+    const std::scoped_lock guard(keyLock_);
+    const auto found = std::find_if(std::begin(places), std::end(places), [=](const auto& p) { return p.scancode == scanCode; });
+    if (found == std::end(places)) return;
+    const auto mapped = std::find_if(keys_.begin(),keys_.end(),[=](const auto& k){return k.scanCode==scanCode;});
+    if(mapped==keys_.end())return;
+    const auto key = mapped->key;
+    const auto held = held_.find(key);
+    // Releases never depend on focus, modifier keys or the current octave.
+    if (!down) {
+        if (held != held_.end()) {
+            if (held->second >= 0) studio_.engine().computerKeyboardNote(held->second,0,false);
+            held_.erase(held);
+        }
+        return;
+    }
+    if (!enabled_ || !nativeAllowed_.load(std::memory_order_acquire) || blocked || held != held_.end()) return;
+#if defined(_WIN32)
+    if ((GetAsyncKeyState(VK_CONTROL)|GetAsyncKeyState(VK_MENU)|GetAsyncKeyState(VK_LWIN)|GetAsyncKeyState(VK_RWIN)) & 0x8000) return;
+#endif
+    if (found->semitone >= 0) {
+        const auto note=(octave_.load()+1)*12+found->semitone;
+        if (note>=0 && note<=127) { studio_.engine().computerKeyboardNote(note,velocity_.load()/127.0f,true); held_[key]=note; }
+    } else {
+        switch(found->semitone) {
+        case -1: octave_=std::max(-1,octave_.load()-1);break;
+        case -2: octave_=std::min(8,octave_.load()+1);break;
+        case -3: velocity_=std::max(1,velocity_.load()-20);break;
+        case -4: velocity_=std::min(127,velocity_.load()+20);break;
+        default:break;
+        }
+        held_[key]=-1;nativeSettingsDirty_=true;
+    }
+}
+
 void ComputerKeyboard::allNotesOff()
 {
+    const std::scoped_lock guard(keyLock_);
     auto& engine = studio_.engine();
     for (const auto& [key, note] : held_)
         if (note >= 0)
@@ -187,6 +239,7 @@ void ComputerKeyboard::setVelocity(const int velocity)
 
 std::vector<int> ComputerKeyboard::heldNotes() const
 {
+    const std::scoped_lock guard(keyLock_);
     std::vector<int> notes;
     for (const auto& [key, note] : held_)
         if (note >= 0)
@@ -201,9 +254,9 @@ void ComputerKeyboard::save()
     if (!studio_.keepsSettings())
         return;
     auto& settings = studio_.settings();
-    settings.setValue("computerKeyboard", enabled_);
-    settings.setValue("computerKeyboardOctave", octave_);
-    settings.setValue("computerKeyboardVelocity", velocity_);
+    settings.setValue("computerKeyboard", enabled_.load());
+    settings.setValue("computerKeyboardOctave", octave_.load());
+    settings.setValue("computerKeyboardVelocity", velocity_.load());
 }
 
 } // namespace cydaw::v2

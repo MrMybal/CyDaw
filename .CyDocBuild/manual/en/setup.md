@@ -5,7 +5,7 @@ description: Choose audio outputs, buffer size and MIDI inputs.
 section: Manual / Start here
 parent: welcome
 order: 1
-revision: b70548790723c3c5
+revision: 8fe7c4913878c8b8
 ---
 
 ## Overview {#overview}
@@ -26,9 +26,13 @@ In Options > Audio settings choose the driver type, device, sample rate and buff
 A smaller buffer reduces monitoring latency but raises scheduling pressure. Increase it if playback crackles or overload counters rise. Keep the device rate compatible with the session and other applications using a shared driver. Installing an ASIO driver alone does not add that backend to the distributed WASAPI build.
 
 ## MIDI and monitoring {#midi}
-Enable the intended MIDI input, select an instrument track and play. An audio track needs a source or recording input; a MIDI clip needs an instrument to turn notes into audio. Arm the intended track and verify input and monitoring before recording. Ctrl+K switches the computer keyboard's note-playing function; octave and velocity are set in the transport.
+In Options > Controllers and inputs > Detected hardware, enable the intended MIDI input, select an instrument track and play. An audio track needs a source or recording input; a MIDI clip needs an instrument to turn notes into audio. Arm the intended track and verify input and monitoring before recording. Ctrl+K switches the computer keyboard's note-playing function; octave, velocity and key preview are in the Musical keyboard tab of the same controller window.
 
 ## Storage and portability {#storage}
 Options > Locations lists caches, devices, presets, banks, exports and mode-specific sessions. Use this panel to change managed folders. Large banks can live on a data drive; build caches and source samples serve different purposes. Keep a saved project and all audio it references when moving work.
 
 If setup looks correct but nothing is audible, follow [troubleshooting](doc:troubleshooting#silence). Continue with [the workspace](doc:workspace) and [recording](doc:studio#recording).
+
+## Display frame rate {#display-frame-rate}
+
+In **Options > Frame rate**, choose **30, 60 or 120 FPS**. The default is **60 FPS**. The choice takes effect immediately and is saved for the next launch. It limits animated interface updates in every mode, including detached panels; it does not change the audio sample rate or buffer. The interface drops to 12 FPS at rest. Complex projects may render below the selected maximum.

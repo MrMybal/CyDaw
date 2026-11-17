@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 #include "SourceEditor.h"
 
@@ -20,7 +21,7 @@
 // mouse, and bound to the device's published settings. Play mode turns the
 // knobs instead of moving them.
 //
-// It edits the root graph's own interface (NodeGraphComponent::
+// It edits the root graph's own interface (GraphDocument::
 // editorSetInterface): a plugin exported from the workshop opens exactly
 // this layout at this size.
 
@@ -34,12 +35,12 @@ public:
     void drawCanvas(GraphSlot& slot);
     void setDeviceLayout(bool device);
     [[nodiscard]] bool deviceLayout() const noexcept { return deviceLayout_; }
-    [[nodiscard]] const juce::String& lastError() const noexcept { return error_; }
+    [[nodiscard]] const cydaw::base::Text& lastError() const noexcept { return error_; }
     void drawCode(GraphSlot& slot);
     void drawLayers(GraphSlot& slot);
     void drawNativePalette(GraphSlot& slot);
-    bool addInstrumentSection(GraphSlot& slot,const juce::String& type,const juce::String& panelId);
-    bool addInstrumentInterface(GraphSlot& slot,std::uint64_t node,bool whole,const juce::String& panelId={});
+    bool addInstrumentSection(GraphSlot& slot,const cydaw::base::Text& type,const cydaw::base::Text& panelId);
+    bool addInstrumentInterface(GraphSlot& slot,std::uint64_t node,bool whole,const cydaw::base::Text& panelId={});
     // What can go on it: the kinds of controls, and the published settings.
     void drawPalette(GraphSlot& slot);
     // The control picked, or the window when none is.
@@ -48,7 +49,7 @@ public:
     // filling `size` (its proportions kept). `setValue` turns a setting.
     // `id` keeps each window's gesture apart.
     void drawPlayed(const char* id, const app::ModuleInterfaceState& state, ImVec2 size,
-                    const std::function<void(const juce::String&, double)>& setValue,
+                    const std::function<void(const cydaw::base::Text&, double)>& setValue,
                     const engine::AudioAnalysisFrame* analysis = nullptr);
 
     static constexpr const char* kindPayload = "CYDAW_UI_KIND";
@@ -62,18 +63,18 @@ private:
     void pull(GraphSlot& slot, bool force = false);
     bool push(GraphSlot& slot, bool commit);
     [[nodiscard]] Control* find(std::uint64_t id);
-    [[nodiscard]] const app::ModulePublishedParameter* parameter(const juce::String& key) const;
-    [[nodiscard]] double value01(const juce::String& key) const;
-    void setValue01(GraphSlot& slot, const juce::String& key, double position);
+    [[nodiscard]] const app::ModulePublishedParameter* parameter(const cydaw::base::Text& key) const;
+    [[nodiscard]] double value01(const cydaw::base::Text& key) const;
+    void setValue01(GraphSlot& slot, const cydaw::base::Text& key, double position);
     // A new control of a kind, its bindings chosen among the published
     // settings (`binding` first when given); its id, 0 and why not.
-    std::uint64_t add(GraphSlot& slot, Kind kind, ImVec2 at, const juce::String& binding);
+    std::uint64_t add(GraphSlot& slot, Kind kind, ImVec2 at, const cydaw::base::Text& binding);
     void autoLayout(GraphSlot& slot);
     [[nodiscard]] std::uint64_t hit(ImVec2 screen) const;
     void drawControl(ImDrawList* list, const Control& control, ImVec2 min, ImVec2 max) const;
     [[nodiscard]] float snap(float value, int cells) const;
     [[nodiscard]] ImVec2 windowSize() const;
-    void report(const juce::String& message);
+    void report(const cydaw::base::Text& message);
 
     SourceEditor sourceEditor_, cppEditor_;
     DeviceHost& studio_;
@@ -92,17 +93,17 @@ private:
     bool deviceLayout_ {};
     bool codeMode_ {};
     bool renderingPlayed_ {};
-    std::function<void(const juce::String&,double)> componentSet_;
+    std::function<void(const cydaw::base::Text&,double)> componentSet_;
     float zoom_ { 1.0f };
     bool actualSize_ {};
     int libraryInstrument_ {4};
     ImVec2 pan_ {};
-    juce::String page_;
+    cydaw::base::Text page_;
     std::set<std::uint64_t> selection_;
     std::map<std::uint64_t, Control> dragOrigins_;
     std::vector<char> code_ = std::vector<char>(1'048'576, 0);
     std::vector<char> cpp_ = std::vector<char>(131'072, 0);
-    juce::String codeError_;
+    cydaw::base::Text codeError_;
     std::map<std::string,std::vector<char>> designText_;
     const cydaw::engine::AudioAnalysisFrame* analysis_ {};
     [[nodiscard]] bool visible(const Control& control) const;
@@ -112,7 +113,7 @@ private:
     [[nodiscard]] ImU32 surfaceColour(const char* key, ImU32 fallback) const;
     ImVec2 canvasMin_ {};
     ImVec2 canvasMax_ {};
-    juce::String error_;
+    cydaw::base::Text error_;
     double errorTime_ {};
     std::vector<char> label_ = std::vector<char>(128, 0);
     // The played windows' gestures.

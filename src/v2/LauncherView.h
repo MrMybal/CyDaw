@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -14,7 +15,7 @@ class LauncherView final {
 public:
     LauncherView(Studio& studio, UiState& state);
     void draw();
-    bool dropFiles(const juce::StringArray& files, ImVec2 screenPoint);
+    bool dropFiles(const cydaw::base::TextList& files, ImVec2 screenPoint);
     // Ctrl+E, the slot menu: the selected empty slots' stop taken off (a
     // scene launched then leaves their track playing), or put back.
     void toggleSelectedStops();

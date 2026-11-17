@@ -1,3 +1,6 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "RoutingUi.h"
 #include "LauncherView.h"
 #include "AddTrackMenu.h"
@@ -358,8 +361,8 @@ void LauncherView::draw()
                 const SlotRef slot { track, scene };
                 const ImVec2 min(origin.x + column * (cellWidth + gap), y);
                 const ImVec2 max(min.x + cellWidth, y + cellHeight);
-                juce::String name;
-                juce::uint32 colour {};
+                cydaw::base::Text name;
+                std::uint32_t colour {};
                 auto exists = false;
                 auto progress = 0.0f;
                 std::uint64_t midiClip {};
@@ -424,7 +427,7 @@ void LauncherView::draw()
                 dropSlots_.push_back({slot, min, max});
                 if (ImGui::BeginDragDropTarget()) {
                     if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
-                        dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
+                        dropFiles(cydaw::base::TextList(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
                     if (!group)
                         if (const auto* payload = ImGui::AcceptDragDropPayload(kLauncherClipPayload, ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
                             payload != nullptr && payload->DataSize == sizeof(SlotRef)) {
@@ -658,7 +661,7 @@ void LauncherView::draw()
         if (grid && blankX < dropMax_.x && ImGui::BeginDragDropTargetCustom(
                 ImRect(ImVec2(std::max(blankX, dropMin_.x), viewTop), dropMax_), ImGui::GetID("##newSamplerDrop"))) {
             if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
-                dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
+                dropFiles(cydaw::base::TextList(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
             ImGui::EndDragDropTarget();
         }
 
@@ -829,7 +832,7 @@ void LauncherView::draw()
     optionsColumn(available.y);
 }
 
-bool LauncherView::dropFiles(const juce::StringArray& files, const ImVec2 point)
+bool LauncherView::dropFiles(const cydaw::base::TextList& files, const ImVec2 point)
 {
     if (state_.mode != AppMode::studio || ImGui::GetFrameCount() - drawnFrame_ > 1) return false;
     if (point.x < dropMin_.x || point.x >= dropMax_.x || point.y < dropMin_.y || point.y >= dropMax_.y)
@@ -842,7 +845,7 @@ bool LauncherView::dropFiles(const juce::StringArray& files, const ImVec2 point)
         }
     bool added = false;
     for (const auto& path : files) {
-        const juce::File file(path);
+        const cydaw::base::File file(path);
         if (!file.existsAsFile() || !file.hasFileExtension("wav;aif;aiff;flac;ogg;mp3;wv"))
             continue;
         if (target && !studio_.isGroupTrack(target->track) && (!target->track.midi || !studio_.isBusTrack(target->track))) {
@@ -859,7 +862,7 @@ bool LauncherView::dropFiles(const juce::StringArray& files, const ImVec2 point)
             ++target->scene;
             added = true;
         } else {
-            juce::String error;
+            cydaw::base::Text error;
             if (const auto track = studio_.newSamplerTrack({file}, error)) {
                 state_.selectTrack(*track);
                 added = true;
@@ -995,7 +998,7 @@ void LauncherView::devicesCell(const TrackRef& track, const ImVec2 min, const Im
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     list->AddRectFilled(min, ImVec2(min.x + size.x, min.y + size.y), p.bg2, dp(3.0f));
-    juce::StringArray names;
+    cydaw::base::TextList names;
     if (const auto* slot = studio_.graphFor(track))
         for (const auto& node : slot->graph().editorNodes())
             if (!node.boundary)
@@ -1011,7 +1014,7 @@ void LauncherView::devicesCell(const TrackRef& track, const ImVec2 min, const Im
     };
     for (auto index = 0; index < names.size() && index < room; ++index) {
         const auto last = index == room - 1 && names.size() > room;
-        const auto text = last ? "+" + juce::String(names.size() - index) + ui::Ls(" autres", " more") : names[index];
+        const auto text = last ? "+" + cydaw::base::Text(names.size() - index) + ui::Ls(" autres", " more") : names[index];
         ImGui::SetCursorScreenPos(ImVec2(min.x + dp(3.0f), y));
         ImGui::PushID(index);
         if (ImGui::InvisibleButton("##device", ImVec2(size.x - dp(6.0f), row - dp(1.0f))))
@@ -1147,7 +1150,7 @@ void LauncherView::ioCell(const TrackRef& track, const ImVec2 min, const ImVec2 
     // Where it goes: on the last row.
     ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), rowY(size.y > dp(70.0f) ? 2 : 1)));
     picture(icon::volume, p.play, L("Sortie : où va son son", "Output: where its sound goes"));
-    juce::String error;
+    cydaw::base::Text error;
     routing_ui::mainOutputCombo(studio_, track, width, error);
     ImGui::PopStyleVar();
     ImGui::PopFont();

@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "DeviceHost.h"
@@ -12,8 +13,8 @@ namespace cydaw::v2 {
 
 class CardFileScope final {
 public:
-    CardFileScope(DeviceHost& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId,
-                  const juce::String& typeKey);
+    CardFileScope(DeviceHost& studio, UiState& state, const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId,
+                  const cydaw::base::Text& typeKey);
     ~CardFileScope();
     CardFileScope(const CardFileScope&) = delete;
     CardFileScope& operator=(const CardFileScope&) = delete;

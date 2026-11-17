@@ -1,4 +1,8 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ControllersImpl.h"
+#include "ComputerKeyboard.h"
+#include <cstdio>
 
 #include "Icons.h"
 #include "ImGuiHost.h"
@@ -29,12 +33,12 @@ using RawKind = Controllers::Impl::RawKind;
 
 double secondsNow()
 {
-    return juce::Time::getMillisecondCounterHiRes() * 0.001;
+    return cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
 }
 
-juce::String middleDot()
+cydaw::base::Text middleDot()
 {
-    return juce::String::fromUTF8(" \xc2\xb7 ");
+    return cydaw::base::Text::fromUTF8(" \xc2\xb7 ");
 }
 
 const char* kindLabel(const control::ControlKind kind)
@@ -63,6 +67,7 @@ const char* modifierLabel(const Kind kind)
     case Kind::deadzone: return L("Zone morte", "Dead zone");
     case Kind::steps: return L("Pas", "Steps");
     case Kind::scale: return L("Plage de sortie", "Output range");
+    case Kind::drawnCurve: return L("Courbe dessinée", "Drawn curve");
     }
     return "";
 }
@@ -81,6 +86,7 @@ const char* modifierHelp(const Kind kind)
     case Kind::deadzone: return L("Un stick ou une pédale : le milieu reste immobile.", "A stick or a pedal: the middle stays still.");
     case Kind::steps: return L("La valeur se pose sur ce nombre de crans.", "The value lands on this many steps.");
     case Kind::scale: return L("Le contrôle ne couvre que cette partie de la cible.", "The control only covers this part of the target.");
+    case Kind::drawnCurve: return L("Dessinez la réponse ; double-clic : droite. 17 points interpolés.","Draw the response; double-click: straight line. 17 interpolated knots.");
     }
     return "";
 }
@@ -90,6 +96,7 @@ const char* rawKindLabel(const RawKind kind)
     switch (kind) {
     case RawKind::midiIn: return L("Entrées MIDI", "MIDI inputs");
     case RawKind::midiOut: return L("Sorties MIDI", "MIDI outputs");
+    case RawKind::mouse:
     case RawKind::keyboard: return L("Cet ordinateur", "This computer");
     case RawKind::plugin: return L("Plug-ins d'application (manettes…)", "Application plug-ins (gamepads…)");
     case RawKind::osc: return L("OSC (réseau)", "OSC (network)");
@@ -103,6 +110,7 @@ int familyRank(const RawKind kind)
     switch (kind) {
     case RawKind::midiIn:
     case RawKind::midiOut: return 0;
+    case RawKind::mouse:
     case RawKind::keyboard: return 1;
     case RawKind::plugin: return 2;
     case RawKind::osc: return 3;
@@ -211,7 +219,7 @@ void Controllers::Impl::drawButton(bool& visible)
     }
     if (learnMode)
         ImGui::PopStyleColor();
-    ui::tooltip(L("Contrôleurs MIDI / OSC (clic droit ou Ctrl+M : apprendre)", "MIDI / OSC controllers (right click or Ctrl+M: learn)"));
+    ui::tooltip(L("Contrôleurs et entrées (clic droit ou Ctrl+M : apprendre)", "Controllers and inputs (right click or Ctrl+M: learn)"));
 }
 
 // ---- The window ---------------------------------------------------------------------------------
@@ -232,7 +240,7 @@ void Controllers::Impl::draw(bool& visible)
         ImGui::SetNextWindowSize(ImVec2(std::min(dp(1240.0f), main->WorkSize.x - dp(40.0f)), std::min(dp(780.0f), main->WorkSize.y - dp(40.0f))),
                                  ImGuiCond_Always);
     }
-    if (!ImGui::Begin(L("Contrôleurs MIDI / OSC###controllers", "MIDI / OSC controllers###controllers"), &visible)) {
+    if (!ImGui::Begin(L("Contrôleurs et entrées###controllers", "Controllers and inputs###controllers"), &visible)) {
         ImGui::End();
         return;
     }
@@ -258,10 +266,12 @@ void Controllers::Impl::draw(bool& visible)
         ImGui::TextDisabled("%s", L("Un périphérique : son matériel, puis ses règles, apprises en bougeant ses contrôles.",
                                     "A device: its hardware, then its rules, learnt by moving its controls."));
     if (ImGui::BeginTabBar("##controllersTabs")) {
+        const auto requested = std::exchange(requestedTab, -1);
         const char* names[] { L("Périphériques###devices", "Devices###devices"), L("Matériel détecté###hardware", "Detected hardware###hardware"),
-                              L("Toutes les assignations###assignments", "All assignments###assignments") };
-        for (int index = 0; index < 3; ++index) {
-            const auto flags = requestedTab == index ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+                              L("Toutes les assignations###assignments", "All assignments###assignments"),
+                              L("Clavier musical###keyboard", "Musical keyboard###keyboard") };
+        for (int index = 0; index < 4; ++index) {
+            const auto flags = requested == index ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
             if (!ImGui::BeginTabItem(names[index], nullptr, flags))
                 continue;
             tab = index;
@@ -297,18 +307,118 @@ void Controllers::Impl::draw(bool& visible)
                 if (ImGui::BeginChild("##raw", ImVec2(0.0f, 0.0f)))
                     drawRaw();
                 ImGui::EndChild();
-            } else {
+            } else if (index == 2) {
                 if (ImGui::BeginChild("##assignments", ImVec2(0.0f, 0.0f)))
                     drawAssignments();
+                ImGui::EndChild();
+            } else {
+                if (ImGui::BeginChild("##musicalKeyboard", ImVec2(0.0f, 0.0f)))
+                    drawComputerKeyboard();
                 ImGui::EndChild();
             }
             ImGui::EndTabItem();
         }
-        requestedTab = -1;
         ImGui::EndTabBar();
     }
     ImGui::End();
 }
+
+void Controllers::Impl::drawComputerKeyboard()
+{
+    const auto& p = theme::palette();
+    if (!noteKeyboard) { ImGui::TextDisabled("%s", L("Clavier indisponible", "Keyboard unavailable")); return; }
+    auto& keyboard = *noteKeyboard;
+    if (ImGui::Button(L("Créer un contrôleur clavier…", "Create a keyboard controller…"))) {
+        stopLearning();
+        selectedDevice = addVirtualDevice({}, computerKeyboardId);
+        selectedControl.clear();
+        learnControls = selectedDevice;
+        requestedTab = 0;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", L("Personnalisez les touches, macros, CC et commandes dans ses règles.",
+                               "Customize keys, macros, CCs and commands in its rules."));
+    ImGui::Spacing();
+    ui::sectionTitle(L("Clavier de l'ordinateur", "Computer keyboard"));
+    auto enabled = keyboard.enabled();
+    if (ImGui::Checkbox(L("Jouer des notes avec le clavier de l'ordinateur (Ctrl+K)", "Play notes with the computer keyboard (Ctrl+K)"),
+                        &enabled))
+        keyboard.setEnabled(enabled);
+    ImGui::BeginDisabled(!enabled);
+    auto octave = keyboard.octave();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Octave", "Octave"));
+    ImGui::SameLine(dp(110.0f));
+    ImGui::SetNextItemWidth(dp(140.0f));
+    if (ImGui::SliderInt("##keyboardOctave", &octave, -1, 8))
+        keyboard.setOctave(octave);
+    auto velocity = keyboard.velocity();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Vélocité", "Velocity"));
+    ImGui::SameLine(dp(110.0f));
+    ImGui::SetNextItemWidth(dp(140.0f));
+    if (ImGui::SliderInt("##keyboardVelocity", &velocity, 1, 127))
+        keyboard.setVelocity(velocity);
+
+    // Its keys drawn as a piano: what each one plays, as this keyboard has it.
+    ImGui::Spacing();
+    const auto origin = ImGui::GetCursorScreenPos();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto white = dp(40.0f);
+    const auto height = dp(84.0f);
+    const auto blackHeight = dp(50.0f);
+    static constexpr int whiteOf[] = { 0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6 };
+    const auto held = keyboard.heldNotes();
+    const auto base = (keyboard.octave() + 1) * 12;
+    const auto isHeld = [&held, base](const int semitone) { return std::find(held.begin(), held.end(), base + semitone) != held.end(); };
+    const auto whiteIndex = [](const int semitone) { return (semitone / 12) * 7 + whiteOf[semitone % 12]; };
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone < 0 || whiteOf[key.semitone % 12] < 0)
+            continue;
+        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone)) * white;
+        const ImVec2 min(x, origin.y);
+        const ImVec2 max(x + white - dp(2.0f), origin.y + height);
+        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : theme::mix(p.text, p.bg3, 0.12f), dp(3.0f));
+        char name[16];
+        const auto note = base + key.semitone;
+        static const char* namesFr[] = { "Do", "Do#", "Ré", "Ré#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si" };
+        static const char* namesEn[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        std::snprintf(name, sizeof(name), "%s%d", (ui::french() ? namesFr : namesEn)[note % 12], note / 12 - 1);
+        ui::centredText(list, ImVec2(min.x, max.y - dp(34.0f)), ImVec2(max.x, max.y - dp(18.0f)), p.bg0, key.label.c_str());
+        ui::centredText(list, ImVec2(min.x, max.y - dp(18.0f)), ImVec2(max.x, max.y - dp(2.0f)), theme::mix(p.bg0, p.text, 0.4f), name);
+    }
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone < 0 || whiteOf[key.semitone % 12] >= 0)
+            continue;
+        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone - 1) + 1) * white - white * 0.32f;
+        const ImVec2 min(x, origin.y);
+        const ImVec2 max(x + white * 0.62f, origin.y + blackHeight);
+        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : p.bg0, dp(3.0f));
+        list->AddRect(min, max, p.line, dp(3.0f));
+        ui::centredText(list, ImVec2(min.x, max.y - dp(20.0f)), ImVec2(max.x, max.y - dp(4.0f)), p.text, key.label.c_str());
+    }
+    ImGui::Dummy(ImVec2(white * 11.0f, height + dp(6.0f)));
+    std::string octaveKeys, velocityKeys;
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone == -1 || key.semitone == -2)
+            octaveKeys += (octaveKeys.empty() ? "" : " / ") + key.label;
+        if (key.semitone == -3 || key.semitone == -4)
+            velocityKeys += (velocityKeys.empty() ? "" : " / ") + key.label;
+    }
+    ImGui::TextColored(theme::vec(p.textDim), "%s %s    %s %s", L("Octave − / + :", "Octave − / +:"), octaveKeys.c_str(),
+                       L("Vélocité − / + :", "Velocity − / +:"), velocityKeys.c_str());
+    ImGui::EndDisabled();
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextColored(theme::vec(p.textFaint), "%s",
+                       L("Il joue la piste instrument choisie, comme un clavier MIDI. Ses touches passent avant les raccourcis "
+                         "d'une seule lettre (S, L…) tant qu'une piste instrument est choisie ; Ctrl et Alt gardent les leurs. "
+                         "Dans le graphe et l'atelier, les lettres restent des raccourcis.",
+                         "It plays the picked instrument track, as a MIDI keyboard does. Its keys come before the one-letter "
+                         "shortcuts (S, L…) while an instrument track is picked; Ctrl and Alt keep theirs. In the graph and "
+                         "the workshop, letters stay shortcuts."));
+    ImGui::PopTextWrapPos();
+}
+
 
 // ---- Devices ------------------------------------------------------------------------------------
 
@@ -357,7 +467,7 @@ void Controllers::Impl::drawDeviceList()
         auto detail = device.input.empty() ? ui::Ls("sans matériel", "no hardware") : nameOf(device.input);
         if (input != nullptr && !input->present)
             detail << (input->kind == RawKind::osc ? ui::Ls(" (fermé)", " (closed)") : ui::Ls(" (débranché)", " (unplugged)"));
-        detail << middleDot() << juce::String(static_cast<int>(device.controls.size())) << ui::Ls(" règle(s)", " rule(s)");
+        detail << middleDot() << cydaw::base::Text(static_cast<int>(device.controls.size())) << ui::Ls(" règle(s)", " rule(s)");
         ui::clippedText(list, ImVec2(at.x + dp(18.0f), at.y + dp(5.0f) + line), width - dp(22.0f), p.textDim, detail.toRawUTF8());
         ImGui::PopID();
     }
@@ -467,7 +577,7 @@ bool Controllers::Impl::rawCombo(const char* id, std::string& value, const bool 
             if (outputs ? isOutput(owned->kind) : isInput(owned->kind))
                 shown.push_back(owned.get());
         std::stable_sort(shown.begin(), shown.end(), [](const auto* a, const auto* b) { return familyRank(a->kind) < familyRank(b->kind); });
-        juce::String family;
+        cydaw::base::Text family;
         auto gamepads = false;
         for (const auto* device : shown) {
             const auto its = familyOf(*device);
@@ -479,7 +589,7 @@ bool Controllers::Impl::rawCombo(const char* id, std::string& value, const bool 
             auto label = nameOf(device->id);
             if (!device->present)
                 label << (device->kind == RawKind::osc ? ui::Ls(" (fermé)", " (closed)") : ui::Ls(" (débranché)", " (unplugged)"));
-            if (ImGui::Selectable((label + "##" + juce::String(device->id)).toRawUTF8(), device->id == value))
+            if (ImGui::Selectable((label + "##" + cydaw::base::Text(device->id)).toRawUTF8(), device->id == value))
                 value = device->id, picked = true;
         }
         if (!gamepads) {
@@ -518,7 +628,7 @@ void Controllers::Impl::drawOscSettings(RawDevice& device)
     ImGui::SameLine(0.0f, dp(14.0f));
     std::string hostName = device.sendHost.toStdString();
     if (inputText("##sendHost", hostName, dp(120.0f)))
-        device.sendHost = juce::String(hostName), edited = true;
+        device.sendHost = cydaw::base::Text(hostName), edited = true;
     ImGui::SameLine(0.0f, dp(4.0f));
     auto sendPort = device.sendPort;
     ImGui::SetNextItemWidth(dp(80.0f));
@@ -706,9 +816,9 @@ void Controllers::Impl::drawControls(control::VirtualDevice& device)
                 ImGui::TextDisabled("%s", L("rien", "nothing"));
             } else {
                 const auto info = targets.describe(found->second.front());
-                auto what = info ? info->label : juce::String(found->second.front());
+                auto what = info ? info->label : cydaw::base::Text(found->second.front());
                 if (found->second.size() > 1)
-                    what << " +" << juce::String(static_cast<int>(found->second.size()) - 1);
+                    what << " +" << cydaw::base::Text(static_cast<int>(found->second.size()) - 1);
                 ImGui::TextUnformatted(what.toRawUTF8());
             }
             ImGui::PopID();
@@ -726,7 +836,7 @@ void Controllers::Impl::drawControl(control::VirtualDevice& device, control::Vir
 {
     const auto& p = theme::palette();
     ImGui::PushID(control.id.c_str());
-    ui::sectionTitle((ui::Ls("Règle « ", "Rule « ") + juce::String(control.name) + ui::Ls(" »", " »")).toRawUTF8());
+    ui::sectionTitle((ui::Ls("Règle « ", "Rule « ") + cydaw::base::Text(control.name) + ui::Ls(" »", " »")).toRawUTF8());
     const auto label = dp(84.0f);
     // Its name and kind.
     formLabel(L("Nom", "Name"), label);
@@ -870,6 +980,24 @@ void Controllers::Impl::drawControl(control::VirtualDevice& device, control::Vir
         case Kind::steps:
             edited |= ImGui::DragFloat("##a", &a, 0.1f, 2.0f, 128.0f, "%.0f");
             break;
+        case Kind::drawnCurve: {
+            const auto origin=ImGui::GetCursorScreenPos();
+            const ImVec2 size(std::max(dp(180.0f),ImGui::GetContentRegionAvail().x-dp(60.0f)),dp(105.0f));
+            ImGui::InvisibleButton("##drawnCurve",size);
+            auto* list=ImGui::GetWindowDrawList();list->AddRectFilled(origin,ImVec2(origin.x+size.x,origin.y+size.y),p.bg0);
+            for(int line=1;line<4;++line){const auto t=line/4.0f;list->AddLine(ImVec2(origin.x+size.x*t,origin.y),ImVec2(origin.x+size.x*t,origin.y+size.y),p.grid);list->AddLine(ImVec2(origin.x,origin.y+size.y*t),ImVec2(origin.x+size.x,origin.y+size.y*t),p.grid);}
+            if(ImGui::IsItemActive() && ImGui::IsMouseDown(0)) {
+                const auto& mouse=ImGui::GetIO().MousePos;
+                const auto knot=std::clamp(int(std::lround((mouse.x-origin.x)/size.x*16)),0,16);
+                modifier.points[std::size_t(knot)]=std::clamp(1.0-double((mouse.y-origin.y)/size.y),0.0,1.0);edited=true;
+            }
+            if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){modifier.points=control::defaultModifier(Kind::drawnCurve).points;edited=true;}
+            for(std::size_t i=0;i+1<modifier.points.size();++i)
+                list->AddLine(ImVec2(origin.x+size.x*float(i)/16,origin.y+size.y*float(1-modifier.points[i])),ImVec2(origin.x+size.x*float(i+1)/16,origin.y+size.y*float(1-modifier.points[i+1])),p.accent,dp(2));
+            for(std::size_t i=0;i<modifier.points.size();++i)
+                list->AddCircleFilled(ImVec2(origin.x+size.x*float(i)/16,origin.y+size.y*float(1-modifier.points[i])),dp(2.5f),p.accent);
+            ui::tooltip(modifierHelp(Kind::drawnCurve));break;
+        }
         case Kind::invert:
         case Kind::toggle:
             ImGui::Dummy(ImVec2(dp(80.0f), 0.0f));
@@ -936,7 +1064,7 @@ void Controllers::Impl::drawControlTargets(control::VirtualDevice& device, contr
             ImGui::TextUnformatted(info->label.toRawUTF8());
         else
             ImGui::TextColored(theme::vec(p.record), "%s", assignment.target.c_str());
-        ui::tooltip((juce::String(assignment.target) + (assignment.project ? ui::Ls("  ·  gardée avec le projet", "  ·  kept with the project")
+        ui::tooltip((cydaw::base::Text(assignment.target) + (assignment.project ? ui::Ls("  ·  gardée avec le projet", "  ·  kept with the project")
                                                                           : ui::Ls("  ·  pour tous les projets", "  ·  for every project")))
                         .toRawUTF8());
         // Its range and pickup, on the right.
@@ -974,6 +1102,18 @@ void Controllers::Impl::drawControlTargets(control::VirtualDevice& device, contr
         ImGui::TextDisabled("%s", L("Rien encore.", "Nothing yet."));
     if (removed)
         unassign(*removed);
+    // A macro is one control with several destinations, MIDI and/or DAW.
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s",L("Macro : ajoutez plusieurs destinations, chacune avec sa plage.","Macro: add several destinations, each with its own range."));
+    ImGui::SetNextItemWidth(dp(125));
+    ImGui::Combo("##midiKind",&midiKind,"CC\0Note\0Pitch bend\0Pressure\0");
+    ImGui::SameLine();ImGui::SetNextItemWidth(dp(60));ImGui::InputInt(L("Canal##midi","Channel##midi"),&midiChannel,0);midiChannel=std::clamp(midiChannel,1,16);
+    if(midiKind<2){ImGui::SameLine();ImGui::SetNextItemWidth(dp(60));ImGui::InputInt(L("Numéro##midi","Number##midi"),&midiNumber,0);midiNumber=std::clamp(midiNumber,0,127);}
+    if(ImGui::Button(L("+ Destination MIDI directe","+ Direct MIDI destination"))) {
+        const auto address=std::string(midiKind==0?"cc/":midiKind==1?"note/":midiKind==2?"pb/":"at/")+std::to_string(midiChannel)+(midiKind<2?"/"+std::to_string(midiNumber):"");
+        assign(device.id,control.id,"midi/live/"+address,false);
+    }
+    ui::tooltip(L("Convertit sur le thread d’entrée, vers les pistes instrument écoutées. Les commandes du logiciel utilisent le dispatcher de l’application.","Converts on the input thread to the listening instrument tracks. DAW commands use the application's dispatcher."));
     // A target picked by a click in the interface, or found by name.
     ImGui::Spacing();
     const auto picking = pickTarget && pickTarget->first == device.id && pickTarget->second == control.id;
@@ -1002,15 +1142,15 @@ void Controllers::Impl::drawControlTargets(control::VirtualDevice& device, contr
     if (targetFilter[0] == 0)
         return;
     if (ImGui::BeginChild("##targetList", ImVec2(0.0f, dp(170.0f)), ImGuiChildFlags_Borders)) {
-        const auto filter = juce::String::fromUTF8(targetFilter);
+        const auto filter = cydaw::base::Text::fromUTF8(targetFilter);
         auto shown = 0;
         for (const auto& key : targets.list()) {
             const auto info = targets.describe(key);
-            if (!info || (!info->label.containsIgnoreCase(filter) && !juce::String(key).containsIgnoreCase(filter)))
+            if (!info || (!info->label.containsIgnoreCase(filter) && !cydaw::base::Text(key).containsIgnoreCase(filter)))
                 continue;
             if (++shown > 200)
                 break;
-            if (ImGui::Selectable((info->label + "##" + juce::String(key)).toRawUTF8()))
+            if (ImGui::Selectable((info->label + "##" + cydaw::base::Text(key)).toRawUTF8()))
                 assign(device.id, control.id, key, false);
         }
         if (shown == 0)
@@ -1029,13 +1169,13 @@ void Controllers::Impl::drawRaw()
                                 "What CyDAW sees as it is: the MIDI ports, the computer's keyboard, the application plug-ins' devices (gamepads), the OSC endpoints. A device takes an input and a feedback output from them."));
     ImGui::PopTextWrapPos();
     // Which devices use each one.
-    std::map<std::string, juce::String> users;
+    std::map<std::string, cydaw::base::Text> users;
     for (const auto& device : router.devices)
         for (const auto* id : { &device.input, &device.output })
             if (!id->empty()) {
                 auto& names = users[*id];
-                if (!names.contains(juce::String(device.name)))
-                    names << (names.isEmpty() ? "" : ", ") << juce::String(device.name);
+                if (!names.contains(cydaw::base::Text(device.name)))
+                    names << (names.isEmpty() ? "" : ", ") << cydaw::base::Text(device.name);
             }
     for (const auto kind : { RawKind::midiIn, RawKind::midiOut, RawKind::keyboard, RawKind::plugin, RawKind::osc }) {
         ImGui::Spacing();
@@ -1043,7 +1183,7 @@ void Controllers::Impl::drawRaw()
         auto any = false;
         for (auto& owned : raw) {
             auto& device = *owned;
-            if (device.kind != kind)
+            if (device.kind != kind && !(kind==RawKind::keyboard && device.kind==RawKind::mouse))
                 continue;
             any = true;
             ImGui::PushID(device.id.c_str());
@@ -1074,10 +1214,14 @@ void Controllers::Impl::drawRaw()
                     changed(true, false);
                 }
             }
+            if (device.id == computerKeyboardId) {
+                ImGui::SameLine();
+                if (ImGui::SmallButton(L("Clavier musical…", "Musical keyboard…"))) requestedTab = 3;
+            }
             if (const auto found = users.find(device.id); found != users.end()) {
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
-                ImGui::TextColored(theme::vec(p.textDim), "%s", (juce::String::fromUTF8("\xe2\x86\x92 ") + found->second).toRawUTF8());
+                ImGui::TextColored(theme::vec(p.textDim), "%s", (cydaw::base::Text::fromUTF8("\xe2\x86\x92 ") + found->second).toRawUTF8());
             }
             if (isInput(kind) && device.present) {
                 ImGui::SameLine();
@@ -1114,7 +1258,7 @@ void Controllers::Impl::drawRaw()
             ImGui::PushID("newOsc");
             std::string name = newOscName.toStdString();
             if (inputText("##name", name, dp(110.0f)))
-                newOscName = juce::String(name);
+                newOscName = cydaw::base::Text(name);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(dp(80.0f));
             ImGui::InputInt("##port", &newOscPort, 0);
@@ -1170,8 +1314,8 @@ void Controllers::Impl::drawAssignments()
             ImGui::TableNextColumn();
             const auto* device = router.findDevice(assignment.device);
             const auto* control = router.findControl(assignment.device, assignment.control);
-            const auto name = (device != nullptr ? juce::String(device->name) : juce::String("?")) + middleDot()
-                              + (control != nullptr ? juce::String(control->name) : juce::String("?"));
+            const auto name = (device != nullptr ? cydaw::base::Text(device->name) : cydaw::base::Text("?")) + middleDot()
+                              + (control != nullptr ? cydaw::base::Text(control->name) : cydaw::base::Text("?"));
             if (ImGui::Selectable(name.toRawUTF8(), false) && control != nullptr) {
                 selectedDevice = assignment.device;
                 selectedControl = assignment.control;
@@ -1184,7 +1328,7 @@ void Controllers::Impl::drawAssignments()
                 ImGui::TextUnformatted(info->label.toRawUTF8());
             else
                 ImGui::TextColored(theme::vec(p.record), "%s", assignment.target.c_str());
-            ui::tooltip((juce::String(assignment.target) + (assignment.project ? ui::Ls("  ·  gardée avec le projet", "  ·  kept with the project")
+            ui::tooltip((cydaw::base::Text(assignment.target) + (assignment.project ? ui::Ls("  ·  gardée avec le projet", "  ·  kept with the project")
                                                                               : ui::Ls("  ·  pour tous les projets", "  ·  for every project")))
                             .toRawUTF8());
             ImGui::TableNextColumn();
@@ -1265,7 +1409,7 @@ void Controllers::Impl::drawMonitor(const control::VirtualDevice* only)
                 // The address, and how it reads when that says more.
                 const auto readable = readableAddress(seen.message.address);
                 ImGui::TextUnformatted(seen.message.address.c_str());
-                if (readable != juce::String(seen.message.address)) {
+                if (readable != cydaw::base::Text(seen.message.address)) {
                     ImGui::SameLine();
                     ImGui::TextDisabled("%s", readable.toRawUTF8());
                 }
@@ -1316,6 +1460,8 @@ bool Controllers::Impl::keyboardWanted()
 
 void Controllers::Impl::pollKeys()
 {
+    nativeLearning.store(keyboardWanted(),std::memory_order_release);
+    const auto native = nativeInput && nativeInput->available();
     const auto& io = ImGui::GetIO();
     // Escape stops what the window is learning.
     if ((!learnHardware.empty() || !learnControls.empty() || learnSource) && !io.WantTextInput
@@ -1346,13 +1492,14 @@ void Controllers::Impl::pollKeys()
                 keys.insert(key);
     }
     const auto say = [this](const int key, const bool down) {
-        process({ Incoming::Kind::message, computerKeyboardId,
-                  { "key/" + std::string(ImGui::GetKeyName(static_cast<ImGuiKey>(key))), down ? 1.0 : 0.0 } });
+        const control::RawMessage message{"key/"+std::string(ImGui::GetKeyName(static_cast<ImGuiKey>(key))),down?1.0:0.0};
+        directMidi.receive(computerKeyboardId,message);
+        process({Incoming::Kind::message,computerKeyboardId,message});
     };
     // A key said down that is not listened to any more: let go.
     for (auto it = keysDown.begin(); it != keysDown.end();) {
         if (!keys.contains(it->first)) {
-            if (it->second)
+            if (it->second && !native)
                 say(it->first, false);
             it = keysDown.erase(it);
         } else {
@@ -1367,7 +1514,7 @@ void Controllers::Impl::pollKeys()
         auto& was = keysDown[key];
         if (down != was) {
             was = down;
-            say(key, down);
+            if (!native) say(key, down);
         }
     }
 }
@@ -1397,10 +1544,10 @@ void Controllers::Impl::drawOverlay()
     if (pickTarget && picking == nullptr)
         pickTarget.reset();
     // What each target is moved by now.
-    std::map<std::string, juce::String> assigned;
+    std::map<std::string, cydaw::base::Text> assigned;
     for (const auto& assignment : router.assignments)
         if (const auto* control = router.findControl(assignment.device, assignment.control))
-            assigned[assignment.target] = juce::String(control->name);
+            assigned[assignment.target] = cydaw::base::Text(control->name);
     std::map<ImGuiID, std::vector<const ui::LearnSpot*>> byViewport;
     byViewport[ImGui::GetMainViewport()->ID];
     for (const auto& spot : spots)
@@ -1462,11 +1609,11 @@ void Controllers::Impl::drawOverlay()
             ImGui::EndTooltip();
             if (clickedLeft) {
                 const auto info = targets.describe(hovered->key);
-                const auto label = info ? info->label : juce::String(hovered->label);
+                const auto label = info ? info->label : cydaw::base::Text(hovered->label);
                 if (picking != nullptr) {
                     // The rule picked in the window moves it.
                     const auto [deviceId, controlId] = *pickTarget;
-                    learnStatus = label + juce::String::fromUTF8(" \xe2\x86\x90 ") + juce::String(picking->name);
+                    learnStatus = label + cydaw::base::Text::fromUTF8(" \xe2\x86\x90 ") + cydaw::base::Text(picking->name);
                     assign(deviceId, controlId, hovered->key, false);
                     pickTarget.reset();
                     learnMode = false;
@@ -1485,7 +1632,7 @@ void Controllers::Impl::drawOverlay()
         // The banner, on the main window.
         if (id == ImGui::GetMainViewport()->ID && learnMode) {
             const auto message = pickTarget && picking != nullptr
-                                     ? ui::Ls("« ", "« ") + juce::String(picking->name)
+                                     ? ui::Ls("« ", "« ") + cydaw::base::Text(picking->name)
                                            + ui::Ls(" » : cliquez ce que la règle doit piloter. Échap : annuler.", " »: click what the rule should move. Escape: cancel.")
                                  : !learnTarget.empty()
                                      ? ui::Ls("« ", "« ") + learnTargetLabel + ui::Ls(" » : bougez un contrôle de votre appareil…", " »: move a control on your device…")

@@ -1,3 +1,6 @@
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "DjLibrary.h"
@@ -5,7 +8,6 @@
 
 #include <imgui.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <array>
 #include <atomic>
@@ -37,10 +39,11 @@ public:
     // mix recorded.
     void drawTransport();
     // The control port's "dj" command.
-    [[nodiscard]] juce::var command(const juce::var& request);
-    void loadFile(int deck, const juce::File& file);
+    [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value& request);
+    void loadFile(int deck, const cydaw::base::File& file);
+    [[nodiscard]] cydaw::base::Result loadTemplate(const cydaw::base::File& file);
     // Files dropped on the window: the first deck that is not playing.
-    bool dropFiles(const juce::StringArray& files);
+    bool dropFiles(const cydaw::base::TextList& files);
     [[nodiscard]] DjLibrary& library();
     // Saved now (on quitting).
     void flush();
@@ -57,7 +60,7 @@ private:
         float meter {};
         // The track whose analysis went into the collection, and whose
         // gain was set by it.
-        juce::File learned;
+        cydaw::base::File learned;
         bool wasPlaying {};
         std::array<double, 8> cues {};
         double cuePoint {};
@@ -74,7 +77,7 @@ private:
     std::uint64_t observedProcessingRevision_{};
     double processingChangedAt_{};
     std::atomic<bool> processingWriteFailed_{false};
-    juce::ThreadPool processingWriter_{1};
+    cydaw::base::ThreadPool processingWriter_{1};
     float processingHeight_ { 280.0f };
     void learnFromDecks();
     void drawDeck(int deck, ImVec2 size);
@@ -93,7 +96,7 @@ private:
     void chooseFolder();
     void startRecording();
     [[nodiscard]] int freeDeck() const;
-    [[nodiscard]] juce::var deckJson(int deck) const;
+    [[nodiscard]] cydaw::base::Value deckJson(int deck) const;
 
     Studio& studio_;
     UiState& state_;
@@ -105,7 +108,7 @@ private:
     float browserShare_ { 0.36f };
     // The collection as shown: filtered and sorted.
     std::array<char, 160> search_ {};
-    juce::String shownQuery_;
+    cydaw::base::Text shownQuery_;
     int folder_ { -1 };        // -1 every track, -2 played this session, else a folder
     int shownFolder_ { -3 };
     int shownRevision_ { -1 };
@@ -113,9 +116,9 @@ private:
     bool sortAscending_ { true };
     bool sortChanged_ {};
     std::vector<DjTrack> rows_;
-    juce::File selected_;
-    std::vector<juce::File> history_;
-    std::unique_ptr<juce::FileChooser> chooser_;
+    cydaw::base::File selected_;
+    std::vector<cydaw::base::File> history_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 };
 
 } // namespace cydaw::v2

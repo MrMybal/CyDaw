@@ -1,3 +1,12 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
+#include <cydaw/base/Process.h>
+#include <cydaw/base/EventLoop.h>
+#include <cydaw/base/Properties.h>
+#include <cydaw/base/File.h>
 #include "TransportSync.h"
 #include "Localization.h"
 #include "Theme.h"
@@ -16,23 +25,23 @@
 
 namespace cydaw::v2 {
 namespace {
-    double nowSeconds() { return juce::Time::getMillisecondCounterHiRes() * 0.001; }
-    juce::var obj() { return juce::var(new juce::DynamicObject()); }
-    void put(juce::var& v, const char* k, const juce::var& x) { v.getDynamicObject()->setProperty(k, x); }
+    double nowSeconds() { return cydaw::base::Time::getMillisecondCounterHiRes() * 0.001; }
+    cydaw::base::Value obj() { return cydaw::base::Value(new cydaw::base::Object()); }
+    void put(cydaw::base::Value& v, const char* k, const cydaw::base::Value& x) { v.getDynamicObject()->setProperty(k, x); }
     const char* protocols[] = { "MIDI Clock", "MTC + MMC", "JACK Transport", "Ableton Link" };
     const char* protocolKeys[] = { "midi-clock", "mtc-mmc", "jack", "link" };
     const char* targetKeys[] = { "studio", "foundry", "deck-a", "deck-b", "deck-c", "deck-d", "cinema" };
     struct Packet {
-        std::vector<juce::uint8> bytes;
+        std::vector<std::uint8_t> bytes;
         double time {};
     };
     struct Config {
         bool enabled {}, send {}, tempo { true }, play { true }, position { true }, stopOnLoss { true };
         int protocol {}, target {}, rate { 1 }, device { 127 };
         double offsetMs {}, quantum { 4.0 };
-        juce::String input, output, jackLibrary, server;
+        cydaw::base::Text input, output, jackLibrary, server;
     };
-    juce::var json(const Config& c)
+    cydaw::base::Value json(const Config& c)
     {
         auto v = obj();
         put(v, "enabled", c.enabled);
@@ -53,7 +62,7 @@ namespace {
         put(v, "server", c.server);
         return v;
     }
-    juce::String parse(const juce::var& v, Config& c)
+    cydaw::base::Text parse(const cydaw::base::Value& v, Config& c)
     {
         if (!v.isObject())
             return "configuration must be an object";
@@ -99,18 +108,18 @@ namespace {
     }
 }
 
-class TransportSync::Impl final : private juce::Timer,
-                                  private juce::MidiInputCallback,
-                                  private juce::HighResolutionTimer {
+class TransportSync::Impl final : private cydaw::base::Timer,
+                                  private cydaw::midi::InputCallback,
+                                  private cydaw::base::HighResolutionTimer {
 public:
-    Impl(juce::PropertiesFile& properties, juce::AudioDeviceManager& manager, bool saves, Read read, Apply apply)
+    Impl(cydaw::base::PropertiesFile& properties, cydaw::integration::DeviceManager& manager, bool saves, Read read, Apply apply)
         : settings(properties)
         , midiManager(manager)
         , saving(saves)
         , read_(std::move(read))
         , apply_(std::move(apply))
     {
-        auto saved = juce::JSON::parse(settings.getValue("transportSync"));
+        auto saved = cydaw::base::JSON::parse(settings.getValue("transportSync"));
         if (saved.isObject()) {
             auto candidate = config;
             if (parse(saved, candidate).isEmpty())
@@ -122,10 +131,10 @@ public:
     }
     ~Impl() override { disconnect(); }
     Config config, draft;
-    juce::String error, info;
-    juce::Array<juce::MidiDeviceInfo> inputs, outputs;
+    cydaw::base::Text error, info;
+    cydaw::base::Array<cydaw::midi::DeviceInfo> inputs, outputs;
     bool connected {};
-    juce::String configure(Config next)
+    cydaw::base::Text configure(Config next)
     {
         disconnect();
         config = next;
@@ -149,13 +158,13 @@ public:
         if (config.enabled) {
             if (config.protocol < 2) {
                 if (config.send) {
-                    output = juce::MidiOutput::openDevice(config.output);
+                    output = cydaw::midi::Output::openDevice(config.output);
                     if (!output)
                         error = ui::Ls(
                             "Sortie MIDI indisponible. Choisissez un port.", "MIDI output unavailable. Choose a port.");
                 } else {
                     bool found = false;
-                    for (const auto& device : juce::MidiInput::getAvailableDevices())
+                    for (const auto& device : cydaw::midi::Input::getAvailableDevices())
                         if (device.identifier == config.input)
                             found = true;
                     if (!found)
@@ -186,7 +195,7 @@ public:
                         - previous.seconds * previous.bpm / 60;
                     connected = true;
                 } catch (const std::exception& ex) {
-                    error = juce::String("Link: ") + ex.what();
+                    error = cydaw::base::Text("Link: ") + ex.what();
                 }
             }
             if (!connected) {
@@ -196,44 +205,44 @@ public:
         }
         if (config.enabled) {
             publishOutput(previous, true);
-            juce::Timer::startTimer(10);
+            cydaw::base::Timer::startTimer(10);
             if (config.protocol < 2 && config.send)
-                juce::HighResolutionTimer::startTimer(1);
+                cydaw::base::HighResolutionTimer::startTimer(1);
         }
         draft = config;
         if (saving) {
             auto saved = json(config);
             put(saved, "enabled", false);
-            settings.setValue("transportSync", juce::JSON::toString(saved, false));
+            settings.setValue("transportSync", cydaw::base::Text::fromUTF8(cydaw::base::JSON::toString(saved, false).toRawUTF8()));
         }
         return error;
     }
     void refreshDevices()
     {
-        inputs = juce::MidiInput::getAvailableDevices();
-        outputs = juce::MidiOutput::getAvailableDevices();
+        inputs = cydaw::midi::Input::getAvailableDevices();
+        outputs = cydaw::midi::Output::getAvailableDevices();
     }
-    juce::var status()
+    cydaw::base::Value status()
     {
         auto v = json(config);
         put(v, "connected", connected);
         put(v, "error", error);
         put(v, "info", info);
-        put(v, "rxMessages", static_cast<juce::int64>(rxCount.load()));
-        put(v, "txMessages", static_cast<juce::int64>(txCount.load()));
+        put(v, "rxMessages", static_cast<std::int64_t>(rxCount.load()));
+        put(v, "txMessages", static_cast<std::int64_t>(txCount.load()));
         put(v, "signal", lastSignal > 0 && nowSeconds() - lastSignal < 1);
         put(v, "peers", link ? static_cast<int>(link->numPeers()) : 0);
         put(v, "timing",
             "message-thread transport; dedicated 1 ms MIDI output scheduler; not sample-locked across audio devices");
         auto ports = [](const auto& devices) {
-            juce::Array<juce::var> a;
+            cydaw::base::Array<cydaw::base::Value> a;
             for (const auto& d : devices) {
                 auto p = obj();
                 put(p, "id", d.identifier);
                 put(p, "name", d.name);
                 a.add(p);
             }
-            return juce::var(a);
+            return cydaw::base::Value(a);
         };
         put(v, "inputs", ports(inputs));
         put(v, "outputs", ports(outputs));
@@ -246,7 +255,7 @@ public:
         put(v, "transport", state);
         return v;
     }
-    juce::var command(const juce::var& request)
+    cydaw::base::Value command(const cydaw::base::Value& request)
     {
         auto action = request.getProperty("action", "status").toString();
         if (action == "configure") {
@@ -264,7 +273,7 @@ public:
         } else if (action == "refresh")
             refreshDevices();
         else if (action == "inject") {
-            if (juce::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isEmpty())
+            if (cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isEmpty())
                 return "diagnostic injection requires CYDAW_NO_RECOVERY";
             if (config.enabled)
                 return "disable live synchronization before diagnostic injection";
@@ -293,26 +302,26 @@ public:
                     int n = static_cast<int>(value);
                     if (n < 0 || n > 255)
                         return "byte out of range";
-                    packet.bytes.push_back(static_cast<juce::uint8>(n));
+                    packet.bytes.push_back(static_cast<std::uint8_t>(n));
                 }
                 receive(packet);
             }
             applyIncoming(false);
             draft = config;
         } else if (action == "capture") {
-            juce::Array<juce::var> messages;
+            cydaw::base::Array<cydaw::base::Value> messages;
             {
                 std::lock_guard guard(ioMutex);
                 for (const auto& bytes : sent) {
-                    juce::Array<juce::var> a;
+                    cydaw::base::Array<cydaw::base::Value> a;
                     for (auto b : bytes)
                         a.add(static_cast<int>(b));
-                    messages.add(juce::var(a));
+                    messages.add(cydaw::base::Value(a));
                 }
                 sent.clear();
             }
             auto v = status();
-            put(v, "messages", juce::var(messages));
+            put(v, "messages", cydaw::base::Value(messages));
             return v;
         } else if (action != "status")
             return "action: status, configure, disable, refresh, capture";
@@ -325,14 +334,14 @@ public:
     [[nodiscard]] int linkPeers() const { return link ? static_cast<int>(link->numPeers()) : 0; }
 
 private:
-    juce::PropertiesFile& settings;
-    juce::AudioDeviceManager& midiManager;
+    cydaw::base::PropertiesFile& settings;
+    cydaw::integration::DeviceManager& midiManager;
     bool saving;
     Read read_;
     Apply apply_;
-    juce::String registeredInput;
+    cydaw::base::Text registeredInput;
     bool inputWasEnabled {};
-    std::unique_ptr<juce::MidiOutput> output;
+    std::unique_ptr<cydaw::midi::Output> output;
     std::unique_ptr<ableton::Link> link;
     bool remoteRunning {}, clockArmed {}, lastLinkPlaying {}, linkPending {};
     double linkStartTime {}, linkBeatOffset {}, linkLocalStart {};
@@ -345,14 +354,14 @@ private:
     std::atomic<std::uint64_t> rxCount {}, txCount {};
     std::mutex ioMutex;
     std::vector<Packet> received;
-    std::deque<std::vector<juce::uint8>> sent;
+    std::deque<std::vector<std::uint8_t>> sent;
     State outputState;
     double outputAt {};
     bool outputReset {};
     double nextPulse {};
     int quarterPiece {};
     timecode::Code outgoingCode;
-    juce::DynamicLibrary jackLibrary;
+    cydaw::base::DynamicLibrary jackLibrary;
     jack_client_t* client {};
     std::atomic<bool> jackDead {};
     std::atomic<double> jackBpm { 120 };
@@ -370,8 +379,8 @@ private:
     jack_nframes_t (*jackRate)(jack_client_t*) {};
     void disconnect()
     {
-        juce::Timer::stopTimer();
-        juce::HighResolutionTimer::stopTimer();
+        cydaw::base::Timer::stopTimer();
+        cydaw::base::HighResolutionTimer::stopTimer();
         if (registeredInput.isNotEmpty()) {
             midiManager.removeMidiInputDeviceCallback(registeredInput, this);
             if (!inputWasEnabled)
@@ -380,10 +389,10 @@ private:
         }
         if (output && config.send && config.play && outputState.playing) {
             if (config.protocol == 0)
-                output->sendMessageNow(juce::MidiMessage::midiStop());
+                output->sendMessageNow(cydaw::midi::Message::midiStop());
             else {
-                const juce::uint8 bytes[] = { 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 6, 1, 0xf7 };
-                output->sendMessageNow(juce::MidiMessage(bytes, 6, 0));
+                const std::uint8_t bytes[] = { 0xf0, 0x7f, static_cast<std::uint8_t>(config.device), 6, 1, 0xf7 };
+                output->sendMessageNow(cydaw::midi::Message(bytes, 6, 0));
             }
         }
         output.reset();
@@ -403,7 +412,7 @@ private:
         outputReset = false;
         connected = false;
     }
-    void handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message) override
+    void handleIncomingMidiMessage(cydaw::midi::Input*, const cydaw::midi::Message& message) override
     {
         const auto* bytes = message.getRawData();
         const auto size = message.getRawDataSize();
@@ -414,7 +423,7 @@ private:
         const auto time = stamp > 0 && std::abs(arrived - stamp) < 1 ? stamp : arrived;
         std::lock_guard guard(ioMutex);
         if (received.size() < 4096)
-            received.push_back({ std::vector<juce::uint8>(bytes, bytes + size), time });
+            received.push_back({ std::vector<std::uint8_t>(bytes, bytes + size), time });
     }
     void receive(const Packet&);
     bool acceptDevice(int id) const { return id == 127 || config.device == 127 || config.device == id; }
@@ -424,10 +433,10 @@ private:
     {
         return std::abs(s.seconds - previous.seconds - (previous.playing ? t - previousAt : 0)) > 0.075;
     }
-    void sendBytes(const std::vector<juce::uint8>& bytes)
+    void sendBytes(const std::vector<std::uint8_t>& bytes)
     {
         if (output)
-            output->sendMessageNow(juce::MidiMessage(bytes.data(), static_cast<int>(bytes.size()), 0));
+            output->sendMessageNow(cydaw::midi::Message(bytes.data(), static_cast<int>(bytes.size()), 0));
         ++txCount;
         if (sent.size() >= 256)
             sent.pop_front();
@@ -638,12 +647,12 @@ void TransportSync::Impl::timerCallback()
 void TransportSync::Impl::sendCode(double seconds)
 {
     const auto c = timecode::fromSeconds(seconds, config.rate);
-    sendBytes({ 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 1, 1,
-        static_cast<juce::uint8>(c.hours | (c.rate << 5)), static_cast<juce::uint8>(c.minutes),
-        static_cast<juce::uint8>(c.seconds), static_cast<juce::uint8>(c.frames), 0xf7 });
-    sendBytes({ 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 6, 0x44, 6, 1,
-        static_cast<juce::uint8>(c.hours | (c.rate << 5)), static_cast<juce::uint8>(c.minutes),
-        static_cast<juce::uint8>(c.seconds), static_cast<juce::uint8>(c.frames), 0, 0xf7 });
+    sendBytes({ 0xf0, 0x7f, static_cast<std::uint8_t>(config.device), 1, 1,
+        static_cast<std::uint8_t>(c.hours | (c.rate << 5)), static_cast<std::uint8_t>(c.minutes),
+        static_cast<std::uint8_t>(c.seconds), static_cast<std::uint8_t>(c.frames), 0xf7 });
+    sendBytes({ 0xf0, 0x7f, static_cast<std::uint8_t>(config.device), 6, 0x44, 6, 1,
+        static_cast<std::uint8_t>(c.hours | (c.rate << 5)), static_cast<std::uint8_t>(c.minutes),
+        static_cast<std::uint8_t>(c.seconds), static_cast<std::uint8_t>(c.frames), 0, 0xf7 });
 }
 void TransportSync::Impl::publishOutput(const State& s, bool initial)
 {
@@ -659,18 +668,18 @@ void TransportSync::Impl::publishOutput(const State& s, bool initial)
                 sendBytes({ 0xfc });
             const auto spp = std::clamp(
                 static_cast<int>(std::max(0.0, s.seconds - config.offsetMs / 1000) * s.bpm / 60 * 4), 0, 16383);
-            sendBytes({ 0xf2, static_cast<juce::uint8>(spp & 127), static_cast<juce::uint8>((spp >> 7) & 127) });
+            sendBytes({ 0xf2, static_cast<std::uint8_t>(spp & 127), static_cast<std::uint8_t>((spp >> 7) & 127) });
             if (seek && s.playing && config.play && !changed)
                 sendBytes({ 0xfb });
         }
         if (config.play && (changed || (initial && s.playing)))
-            sendBytes({ static_cast<juce::uint8>(s.playing ? (s.seconds < 0.001 ? 0xfa : 0xfb) : 0xfc) });
+            sendBytes({ static_cast<std::uint8_t>(s.playing ? (s.seconds < 0.001 ? 0xfa : 0xfb) : 0xfc) });
     } else {
         if (config.position && (initial || seek || (changed && s.playing)))
             sendCode(std::max(0.0, s.seconds - config.offsetMs / 1000));
         if (config.play && (changed || (initial && s.playing)))
-            sendBytes({ 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 6,
-                static_cast<juce::uint8>(s.playing ? 2 : 1), 0xf7 });
+            sendBytes({ 0xf0, 0x7f, static_cast<std::uint8_t>(config.device), 6,
+                static_cast<std::uint8_t>(s.playing ? 2 : 1), 0xf7 });
     }
     outputState = s;
     outputAt = t;
@@ -706,19 +715,19 @@ void TransportSync::Impl::hiResTimerCallback()
             outgoingCode = timecode::fromSeconds(
                 std::max(0.0, outputState.seconds + (t - outputAt) - config.offsetMs / 1000), config.rate);
         const auto parts = timecode::nibbles(outgoingCode);
-        sendBytes({ 0xf1, static_cast<juce::uint8>((quarterPiece << 4) | parts[quarterPiece]) });
+        sendBytes({ 0xf1, static_cast<std::uint8_t>((quarterPiece << 4) | parts[quarterPiece]) });
         quarterPiece = (quarterPiece + 1) % 8;
     }
     nextPulse += interval;
 }
 void TransportSync::Impl::connectJack()
 {
-    juce::StringArray paths;
+    cydaw::base::TextList paths;
     if (config.jackLibrary.isNotEmpty())
         paths.add(config.jackLibrary);
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     else {
-        const auto pf = juce::SystemStats::getEnvironmentVariable("ProgramW6432", "C:/Program Files");
+        const auto pf = cydaw::base::SystemStats::getEnvironmentVariable("ProgramW6432", "C:/Program Files");
         paths.add(pf + "/JACK2/lib/libjack64.dll");
         paths.add(pf + "/JACK2/lib/libjack.dll");
         paths.add("libjack64.dll");
@@ -942,7 +951,7 @@ void TransportSync::Impl::tickLink(const State& local)
 }
 
 TransportSync::TransportSync(
-    juce::PropertiesFile& p, juce::AudioDeviceManager& manager, bool save, Read read, Apply apply)
+    cydaw::base::PropertiesFile& p, cydaw::integration::DeviceManager& manager, bool save, Read read, Apply apply)
     : impl_(std::make_unique<Impl>(p, manager, save, std::move(read), std::move(apply)))
 {
 }
@@ -950,25 +959,25 @@ TransportSync::~TransportSync() = default;
 bool TransportSync::active() const { return impl_->config.enabled && impl_->connected; }
 std::uint64_t TransportSync::receivedCount() const { return impl_->receivedMessages(); }
 std::uint64_t TransportSync::sentCount() const { return impl_->sentMessages(); }
-juce::String TransportSync::statusText() const
+cydaw::base::Text TransportSync::statusText() const
 {
     if (!active())
         return {};
-    auto text = juce::String(protocols[impl_->config.protocol]);
+    auto text = cydaw::base::Text(protocols[impl_->config.protocol]);
     if (impl_->config.protocol == 3)
         text << " (" << impl_->linkPeers() << ui::Ls(" pair(s))", " peer(s))");
     else
         text << (impl_->config.send ? ui::Ls(" : CyDAW l'envoie", ": CyDAW sends it") : ui::Ls(" : CyDAW le suit", ": CyDAW follows it"));
     return text;
 }
-juce::var TransportSync::command(const juce::var& request) { return impl_->command(request); }
+cydaw::base::Value TransportSync::command(const cydaw::base::Value& request) { return impl_->command(request); }
 void TransportSync::drawButton(bool& visible)
 {
     using ui::L;
     if (active())
         ImGui::PushStyleColor(ImGuiCol_Button, theme::vec(theme::palette().accent));
     const auto label
-        = active() ? juce::String::fromUTF8("SYNC · ") + protocols[impl_->config.protocol] : juce::String("SYNC");
+        = active() ? cydaw::base::Text::fromUTF8("SYNC · ") + protocols[impl_->config.protocol] : cydaw::base::Text("SYNC");
     if (ImGui::Button(label.toRawUTF8()))
         visible = !visible;
     if (active())
@@ -1014,7 +1023,7 @@ void TransportSync::Impl::draw(bool& visible)
     if (draft.protocol < 2) {
         auto& ports = draft.send ? outputs : inputs;
         auto& selected = draft.send ? draft.output : draft.input;
-        juce::String name = ui::Ls("Choisir un port…", "Choose a port…");
+        cydaw::base::Text name = ui::Ls("Choisir un port…", "Choose a port…");
         for (const auto& p : ports)
             if (p.identifier == selected)
                 name = p.name;
@@ -1034,12 +1043,12 @@ void TransportSync::Impl::draw(bool& visible)
                 "Virtual and network MIDI ports installed in Windows appear in this list."));
     }
     if (draft.protocol == 2) {
-        auto edit = [](const char* name, juce::String& value) {
+        auto edit = [](const char* name, cydaw::base::Text& value) {
             char buffer[1024] {};
             value.copyToUTF8(buffer, sizeof(buffer));
             ImGui::SetNextItemWidth(ui::dp(360));
             if (ImGui::InputText(name, buffer, sizeof(buffer)))
-                value = juce::String::fromUTF8(buffer);
+                value = cydaw::base::Text::fromUTF8(buffer);
         };
         edit(L("Bibliothèque JACK (facultatif)", "JACK library (optional)"), draft.jackLibrary);
         edit(L("Serveur JACK (vide : défaut)", "JACK server (empty: default)"), draft.server);

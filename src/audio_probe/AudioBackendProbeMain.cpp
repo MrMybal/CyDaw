@@ -1,5 +1,16 @@
-#include <juce_audio_devices/juce_audio_devices.h>
-#include <juce_gui_basics/juce_gui_basics.h>
+#include <cydaw/base/Platform.h>
+#ifdef _WIN32
+#define NOMINMAX
+// clang-format off
+#include <windows.h>
+#include <objbase.h>
+// clang-format on
+#endif
+#include <cydaw/base/File.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/midi/Devices.h>
 
 #include <algorithm>
 #include <iostream>
@@ -7,178 +18,243 @@
 
 namespace {
 
-juce::var stringArrayToVar(const juce::StringArray& values)
-{
-    juce::Array<juce::var> result;
-    for (const auto& value : values)
-        result.add(value);
-    return result;
+cydaw::base::Value stringArrayToVar(const cydaw::base::TextList &values) {
+  cydaw::base::Array<cydaw::base::Value> result;
+  for (const auto &value : values)
+    result.add(value);
+  return result;
 }
 
-bool containsIgnoreCase(const juce::StringArray& values, const juce::String& expected)
-{
-    return std::any_of(values.begin(), values.end(), [&expected](const auto& value) {
-        return value.containsIgnoreCase(expected);
-    });
+bool containsIgnoreCase(const cydaw::base::TextList &values,
+                        const cydaw::base::Text &expected) {
+  return std::any_of(values.begin(), values.end(),
+                     [&expected](const auto &value) {
+                       return value.containsIgnoreCase(expected);
+                     });
 }
 
-juce::String argumentValue(const juce::StringArray& arguments,
-                           const juce::String& key,
-                           const juce::String& fallback = {})
-{
-    const auto index = arguments.indexOf(key);
-    return index >= 0 && index + 1 < arguments.size() ? arguments[index + 1] : fallback;
+cydaw::base::Text argumentValue(const cydaw::base::TextList &arguments,
+                                const cydaw::base::Text &key,
+                                const cydaw::base::Text &fallback = {}) {
+  const auto index = arguments.indexOf(key);
+  return index >= 0 && index + 1 < arguments.size() ? arguments[index + 1]
+                                                    : fallback;
 }
 
-juce::String matchingName(const juce::StringArray& values, const juce::String& requested)
-{
-    for (const auto& value : values)
-        if (value.containsIgnoreCase(requested))
-            return value;
-    return {};
+cydaw::base::Text matchingName(const cydaw::base::TextList &values,
+                               const cydaw::base::Text &requested) {
+  for (const auto &value : values)
+    if (value.containsIgnoreCase(requested))
+      return value;
+  return {};
 }
+
+struct SilentCallback final : cydaw::audio::DeviceCallback {
+  std::atomic<unsigned> calls{0};
+  std::atomic<unsigned long long> frames{0};
+  void audioDeviceAboutToStart(cydaw::audio::Device *) override {}
+  void audioDeviceStopped() override {}
+  void audioDeviceIOCallbackWithContext(
+      const float *const *, int, float *const *outputs, int channels, int count,
+      const cydaw::audio::DeviceCallbackContext &) override {
+    for (int ch = 0; ch < channels; ++ch)
+      if (outputs[ch])
+        std::fill_n(outputs[ch], count, 0.0f);
+    frames.fetch_add(static_cast<unsigned>(count), std::memory_order_relaxed);
+    calls.fetch_add(1, std::memory_order_release);
+  }
+};
 
 } // namespace
 
-int main(const int argc, char* argv[])
-{
-    juce::ScopedJuceInitialiser_GUI initialiseJuce;
-    juce::StringArray arguments;
-    for (int index = 1; index < argc; ++index)
-        arguments.add(juce::String::fromUTF8(argv[index]));
-
-    juce::AudioDeviceManager manager;
-    juce::Array<juce::var> deviceTypes;
-    juce::StringArray availableTypeNames;
-    juce::StringArray allDeviceNames;
-    for (auto* type : manager.getAvailableDeviceTypes()) {
-        type->scanForDevices();
-        const auto inputs = type->getDeviceNames(true);
-        const auto outputs = type->getDeviceNames(false);
-        availableTypeNames.add(type->getTypeName());
-        allDeviceNames.addArray(inputs);
-        allDeviceNames.addArray(outputs);
-
-        auto description = juce::DynamicObject::Ptr(new juce::DynamicObject());
-        description->setProperty("name", type->getTypeName());
-        description->setProperty("inputs", stringArrayToVar(inputs));
-        description->setProperty("outputs", stringArrayToVar(outputs));
-        deviceTypes.add(juce::var(description.get()));
+int main(const int argc, char *argv[]) {
+#ifdef _WIN32
+  struct ComScope {
+    HRESULT status = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    ~ComScope() {
+      if (SUCCEEDED(status))
+        CoUninitialize();
     }
-
-    juce::Array<juce::var> midiInputs;
-    for (const auto& device : juce::MidiInput::getAvailableDevices()) {
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
-        value->setProperty("name", device.name);
-        value->setProperty("identifier", device.identifier);
-        midiInputs.add(juce::var(value.get()));
-    }
-    juce::Array<juce::var> midiOutputs;
-    for (const auto& device : juce::MidiOutput::getAvailableDevices()) {
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
-        value->setProperty("name", device.name);
-        value->setProperty("identifier", device.identifier);
-        midiOutputs.add(juce::var(value.get()));
-    }
-
-    auto report = juce::DynamicObject::Ptr(new juce::DynamicObject());
-    report->setProperty("application", "CyDAW Audio Probe");
-    report->setProperty("asioCompiled", JUCE_ASIO != 0);
-    report->setProperty("jackCompiled", JUCE_JACK != 0);
-    report->setProperty("audioDeviceTypes", juce::var(deviceTypes));
-    report->setProperty("midiInputs", juce::var(midiInputs));
-    report->setProperty("midiOutputs", juce::var(midiOutputs));
-    auto exitCode = 0;
-    if (arguments.contains("--self-test")) {
-#if JUCE_WINDOWS
-        if (!containsIgnoreCase(availableTypeNames, "Windows Audio"))
-            exitCode = 10;
+  } com;
 #endif
-#if JUCE_ASIO
-        if (!containsIgnoreCase(availableTypeNames, "ASIO"))
-            exitCode = 11;
+  auto arguments = cydaw::base::commandLineArguments(argc, argv);
+  if (!arguments.isEmpty())
+    arguments.remove(0);
+
+  cydaw::integration::DeviceManager manager;
+  cydaw::base::Array<cydaw::base::Value> deviceTypes;
+  cydaw::base::TextList availableTypeNames;
+  cydaw::base::TextList allDeviceNames;
+  for (auto *type : manager.getAvailableDeviceTypes()) {
+    type->scanForDevices();
+    const auto inputs = type->getDeviceNames(true);
+    const auto outputs = type->getDeviceNames(false);
+    availableTypeNames.add(type->getTypeName());
+    allDeviceNames.addArray(inputs);
+    allDeviceNames.addArray(outputs);
+
+    auto description = cydaw::base::Object::Ptr(new cydaw::base::Object());
+    description->setProperty("name", type->getTypeName());
+    description->setProperty("inputs", stringArrayToVar(inputs));
+    description->setProperty("outputs", stringArrayToVar(outputs));
+    deviceTypes.add(cydaw::base::Value(description.get()));
+  }
+
+  cydaw::base::Array<cydaw::base::Value> midiInputs;
+  for (const auto &device : cydaw::midi::Input::getAvailableDevices()) {
+    auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
+    value->setProperty("name", device.name);
+    value->setProperty("identifier", device.identifier);
+    midiInputs.add(cydaw::base::Value(value.get()));
+  }
+  cydaw::base::Array<cydaw::base::Value> midiOutputs;
+  for (const auto &device : cydaw::midi::Output::getAvailableDevices()) {
+    auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
+    value->setProperty("name", device.name);
+    value->setProperty("identifier", device.identifier);
+    midiOutputs.add(cydaw::base::Value(value.get()));
+  }
+
+  auto report = cydaw::base::Object::Ptr(new cydaw::base::Object());
+  report->setProperty("application", "CyDAW Audio Probe");
+  report->setProperty("asioCompiled", CYDAW_WITH_ASIO != 0);
+  report->setProperty("jackCompiled", CYDAW_WITH_JACK != 0);
+  report->setProperty("audioDeviceTypes", cydaw::base::Value(deviceTypes));
+  report->setProperty("midiInputs", cydaw::base::Value(midiInputs));
+  report->setProperty("midiOutputs", cydaw::base::Value(midiOutputs));
+  auto exitCode = 0;
+  if (arguments.contains("--self-test")) {
+#if defined(_WIN32)
+    if (!containsIgnoreCase(availableTypeNames, "Windows Audio"))
+      exitCode = 10;
 #endif
-#if JUCE_JACK
-        if (!containsIgnoreCase(availableTypeNames, "JACK"))
-            exitCode = 12;
+#if CYDAW_WITH_ASIO
+    if (!containsIgnoreCase(availableTypeNames, "ASIO"))
+      exitCode = 11;
 #endif
-    }
+#if CYDAW_WITH_JACK
+    if (!containsIgnoreCase(availableTypeNames, "JACK"))
+      exitCode = 12;
+#endif
+  }
 
-    const auto requiredTypeIndex = arguments.indexOf("--require-type");
-    if (requiredTypeIndex >= 0
-        && (requiredTypeIndex + 1 >= arguments.size()
-            || !containsIgnoreCase(availableTypeNames, arguments[requiredTypeIndex + 1])))
-        exitCode = 20;
+  const auto requiredTypeIndex = arguments.indexOf("--require-type");
+  if (requiredTypeIndex >= 0 &&
+      (requiredTypeIndex + 1 >= arguments.size() ||
+       !containsIgnoreCase(availableTypeNames,
+                           arguments[requiredTypeIndex + 1])))
+    exitCode = 20;
 
-    const auto requiredDeviceIndex = arguments.indexOf("--require-device");
-    if (requiredDeviceIndex >= 0
-        && (requiredDeviceIndex + 1 >= arguments.size()
-            || !containsIgnoreCase(allDeviceNames, arguments[requiredDeviceIndex + 1])))
-        exitCode = 21;
+  const auto requiredDeviceIndex = arguments.indexOf("--require-device");
+  if (requiredDeviceIndex >= 0 &&
+      (requiredDeviceIndex + 1 >= arguments.size() ||
+       !containsIgnoreCase(allDeviceNames, arguments[requiredDeviceIndex + 1])))
+    exitCode = 21;
 
-    const auto openType = argumentValue(arguments, "--open-type");
-    if (openType.isNotEmpty()) {
-        const auto requestedDevice = argumentValue(arguments, "--open-device");
-        auto openResult = juce::DynamicObject::Ptr(new juce::DynamicObject());
-        openResult->setProperty("requestedType", openType);
-        openResult->setProperty("requestedDevice", requestedDevice);
-        openResult->setProperty("requestedSampleRate",
-                                argumentValue(arguments, "--sample-rate", "48000").getDoubleValue());
-        openResult->setProperty("requestedBlockSize",
-                                argumentValue(arguments, "--block-size", "64").getIntValue());
+  const auto openType = argumentValue(arguments, "--open-type");
+  if (openType.isNotEmpty()) {
+    const auto requestedDevice = argumentValue(arguments, "--open-device");
+    auto openResult = cydaw::base::Object::Ptr(new cydaw::base::Object());
+    openResult->setProperty("requestedType", openType);
+    openResult->setProperty("requestedDevice", requestedDevice);
+    openResult->setProperty(
+        "requestedSampleRate",
+        argumentValue(arguments, "--sample-rate", "48000").getDoubleValue());
+    openResult->setProperty(
+        "requestedBlockSize",
+        argumentValue(arguments, "--block-size", "64").getIntValue());
 
-        juce::AudioIODeviceType* selectedType = nullptr;
-        for (auto* type : manager.getAvailableDeviceTypes())
-            if (type->getTypeName().containsIgnoreCase(openType)) {
-                selectedType = type;
-                break;
-            }
+    cydaw::audio::DeviceType *selectedType = nullptr;
+    for (auto *type : manager.getAvailableDeviceTypes())
+      if (type->getTypeName().containsIgnoreCase(openType)) {
+        selectedType = type;
+        break;
+      }
 
-        if (selectedType == nullptr) {
-            openResult->setProperty("opened", false);
-            openResult->setProperty("error", "Requested audio type was not found");
-            exitCode = 30;
-        } else {
-            const auto inputs = selectedType->getDeviceNames(true);
-            const auto outputs = selectedType->getDeviceNames(false);
-            const auto inputName = matchingName(inputs, requestedDevice);
-            const auto outputName = matchingName(outputs, requestedDevice);
-            auto device = std::unique_ptr<juce::AudioIODevice>(
-                selectedType->createDevice(outputName, inputName));
-            if (device == nullptr) {
-                openResult->setProperty("opened", false);
-                openResult->setProperty("error", "Requested audio device could not be created");
-                exitCode = 31;
-            } else {
-                juce::BigInteger inputChannels;
-                juce::BigInteger outputChannels;
-                for (int channel = 0; channel < std::min(2, device->getInputChannelNames().size()); ++channel)
-                    inputChannels.setBit(channel);
-                for (int channel = 0; channel < std::min(2, device->getOutputChannelNames().size()); ++channel)
-                    outputChannels.setBit(channel);
-                const auto error = device->open(
-                    inputChannels, outputChannels,
-                    argumentValue(arguments, "--sample-rate", "48000").getDoubleValue(),
-                    argumentValue(arguments, "--block-size", "64").getIntValue());
-                openResult->setProperty("opened", error.isEmpty());
-                openResult->setProperty("error", error);
-                openResult->setProperty("deviceName", device->getName());
-                openResult->setProperty("sampleRate", device->getCurrentSampleRate());
-                openResult->setProperty("blockSize", device->getCurrentBufferSizeSamples());
-                openResult->setProperty("inputLatencySamples", device->getInputLatencyInSamples());
-                openResult->setProperty("outputLatencySamples", device->getOutputLatencyInSamples());
-                openResult->setProperty("inputChannels", stringArrayToVar(device->getInputChannelNames()));
-                openResult->setProperty("outputChannels", stringArrayToVar(device->getOutputChannelNames()));
-                device->close();
-                if (error.isNotEmpty())
-                    exitCode = 32;
-            }
+    if (selectedType == nullptr) {
+      openResult->setProperty("opened", false);
+      openResult->setProperty("error", "Requested audio type was not found");
+      exitCode = 30;
+    } else {
+      const auto inputs = selectedType->getDeviceNames(true);
+      const auto outputs = selectedType->getDeviceNames(false);
+      const auto inputName = matchingName(inputs, requestedDevice);
+      const auto outputName = matchingName(outputs, requestedDevice);
+      auto device = std::unique_ptr<cydaw::audio::Device>(
+          selectedType->createDevice(outputName, inputName));
+      if (device == nullptr) {
+        openResult->setProperty("opened", false);
+        openResult->setProperty("error",
+                                "Requested audio device could not be created");
+        exitCode = 31;
+      } else {
+        cydaw::base::Array<cydaw::base::Value> supportedSizes;
+        for (auto size : device->getAvailableBufferSizes())
+          supportedSizes.add(size);
+        openResult->setProperty("supportedBlockSizes", supportedSizes);
+        cydaw::audio::ChannelSet inputChannels;
+        cydaw::audio::ChannelSet outputChannels;
+        for (int channel = 0;
+             !arguments.contains("--output-only") &&
+             channel < std::min(2, device->getInputChannelNames().size());
+             ++channel)
+          inputChannels.setBit(channel);
+        for (int channel = 0;
+             channel < std::min(2, device->getOutputChannelNames().size());
+             ++channel)
+          outputChannels.setBit(channel);
+        const auto error = device->open(
+            inputChannels, outputChannels,
+            argumentValue(arguments, "--sample-rate", "48000").getDoubleValue(),
+            argumentValue(arguments, "--block-size", "64").getIntValue());
+        openResult->setProperty("opened", error.isEmpty());
+        openResult->setProperty("error", error);
+        openResult->setProperty("deviceName", device->getName());
+        openResult->setProperty("sampleRate", device->getCurrentSampleRate());
+        openResult->setProperty("blockSize",
+                                device->getCurrentBufferSizeSamples());
+        openResult->setProperty("inputLatencySamples",
+                                device->getInputLatencyInSamples());
+        openResult->setProperty("outputLatencySamples",
+                                device->getOutputLatencyInSamples());
+        openResult->setProperty(
+            "inputChannels", stringArrayToVar(device->getInputChannelNames()));
+        openResult->setProperty(
+            "outputChannels",
+            stringArrayToVar(device->getOutputChannelNames()));
+        const auto silentMs = cydaw::base::limit(
+            0, 5000,
+            argumentValue(arguments, "--run-silent-ms", "0").getIntValue());
+        if (error.isEmpty() && silentMs > 0) {
+          SilentCallback callback;
+          device->start(&callback);
+          cydaw::base::Thread::sleep(silentMs);
+          const bool running = device->isPlaying();
+          device->stop();
+          openResult->setProperty("silentRunMs", silentMs);
+          openResult->setProperty("callbacks",
+                                  static_cast<int>(callback.calls.load()));
+          openResult->setProperty(
+              "frames", static_cast<std::int64_t>(callback.frames.load()));
+          openResult->setProperty("streamStarted",
+                                  running && callback.calls.load() > 0);
+          openResult->setProperty("inputEnabled", !inputChannels.isZero());
+          if (!running || callback.calls.load() == 0)
+            exitCode = 33;
         }
-        report->setProperty("openTest", juce::var(openResult.get()));
+        device->close();
+        if (error.isNotEmpty())
+          exitCode = 32;
+      }
     }
+    report->setProperty("openTest", cydaw::base::Value(openResult.get()));
+  }
 
-    report->setProperty("exitCode", exitCode);
-    std::cout << juce::JSON::toString(juce::var(report.get()), true).toStdString() << '\n';
+  report->setProperty("exitCode", exitCode);
+  std::cout << cydaw::base::JSON::toString(cydaw::base::Value(report.get()),
+                                           true)
+                   .toStdString()
+            << '\n';
 
-    return exitCode;
+  return exitCode;
 }

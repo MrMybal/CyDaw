@@ -55,7 +55,7 @@ public:
     // The same for the workshop's device as the simulator plays it.
     void updateSimulation(const GraphSlot& slot);
     // Where a card runs in the engine, when it does.
-    [[nodiscard]] const app::NodeGraphComponent::EditorNativeSpan* span(std::uint64_t cardId) const;
+    [[nodiscard]] const app::GraphDocument::EditorNativeSpan* span(std::uint64_t cardId) const;
     // A card's live data, its histories copied into `histories`.
     [[nodiscard]] visual::Live live(std::uint64_t cardId, Histories& histories) const;
     // How loud a card's sound comes out now (left, right; linear), falling
@@ -107,7 +107,7 @@ private:
 
     Source source_;
     std::map<std::uint64_t, Card> cards_;
-    std::map<std::uint64_t, app::NodeGraphComponent::EditorNativeSpan> spans_;
+    std::map<std::uint64_t, app::GraphDocument::EditorNativeSpan> spans_;
     const GraphSlot* spansSlot_ {};
     std::uint64_t spansRevision_ {};
     std::optional<Target> tapped_;

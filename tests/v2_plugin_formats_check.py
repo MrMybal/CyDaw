@@ -8,13 +8,16 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--exe',required=True,type=Path)
 parser.add_argument('--output',required=True,type=Path)
 parser.add_argument('--port',type=int,default=47932)
+parser.add_argument('--backend')
+parser.add_argument('--device')
+parser.add_argument('--buffer-size',type=int)
 for fmt in ('clap','lv2','vst3'):parser.add_argument('--'+fmt,type=Path)
 a=parser.parse_args()
 folder=a.output.resolve()/uuid.uuid4().hex
 folder.mkdir(parents=True)
 locations=folder/'locations.json'
 locations.write_text(json.dumps(dict(format='CyDAW Locations',version=1,folders={k:str(folder/k) for k in ('cache','devices','pluginExports','presets','mixes','foundry','banks')})),encoding='utf8')
-env=dict(os.environ,CYDAW_NO_RECOVERY='1',CYDAW_LOCATIONS_FILE=str(locations),CYDAW_DJ_COLLECTION_FILE=str(folder/'dj.json'),CYDAW_DJ_PROCESSING_FILE=str(folder/'dj-processing.json'),CYDAW_VIRTUAL_IO_FILE=str(folder/'virtual-io.json'))
+env=dict(os.environ,APPDATA=str(folder/'Roaming'),LOCALAPPDATA=str(folder/'Local'),CYDAW_CONTROL_TOKEN='',CYDAW_NO_RECOVERY='1',CYDAW_LOCATIONS_FILE=str(locations),CYDAW_DJ_COLLECTION_FILE=str(folder/'dj.json'),CYDAW_DJ_PROCESSING_FILE=str(folder/'dj-processing.json'),CYDAW_VIRTUAL_IO_FILE=str(folder/'virtual-io.json'))
 info=subprocess.STARTUPINFO() if os.name=='nt' else None
 if info:info.dwFlags|=subprocess.STARTF_USESHOWWINDOW;info.wShowWindow=0
 process=subprocess.Popen([str(a.exe.resolve()),'--silent',f'--control-port={a.port}','--window-size=1500x900'],env=env,startupinfo=info,stdout=open(folder/'app.log','w'),stderr=subprocess.STDOUT)
@@ -52,11 +55,23 @@ def level():
 report={}
 try:
     for attempt in range(150):
+        if process.poll() is not None:
+            raise AssertionError('DAW exited during startup: '+(folder/'app.log').read_text(encoding='utf-8',errors='replace'))
         try:
             state=q(cmd='status');break
         except (OSError,AssertionError):time.sleep(.1)
     else:raise AssertionError('DAW did not start')
     assert state['speakersSilenced']
+    if a.backend:
+        q(cmd='device_channels',inputs=0,outputs=2)
+        settings=dict(cmd='set_audio_device',type=a.backend,input='',sampleRate=48000)
+        if a.device:settings['output']=a.device
+        if a.buffer_size:settings['bufferSize']=a.buffer_size
+        configured=q(**settings)
+        assert configured['type']==a.backend,configured
+        assert configured['availableOutputs']>=2,configured
+        report['audioSettings']=configured
+
     source=folder/'tone.wav'
     with wave.open(str(source),'wb') as wav:
         wav.setparams((2,2,48000,0,'NONE','not compressed'))

@@ -1,10 +1,13 @@
+#include <cydaw/base/EventLoop.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "AiModels.h"
 #include "Companion.h"
 #include "SampleLibrary.h"
 
-#include <juce_events/juce_events.h>
 
 #include <atomic>
 #include <functional>
@@ -36,7 +39,7 @@
 
 namespace cydaw::v2 {
 
-class SemanticSearch final : private juce::Timer, private app::SampleLibrary::Listener {
+class SemanticSearch final : private cydaw::base::Timer, private app::SampleLibrary::Listener {
 public:
     SemanticSearch(app::SampleLibrary& library, AiModels& models, Companion& companion);
     ~SemanticSearch() override;
@@ -52,8 +55,8 @@ public:
     // ---- The model --------------------------------------------------------------
     // The person's choice when installed, else the first installed (the
     // catalogue's default first); empty when none is.
-    [[nodiscard]] juce::String activeModel() const;
-    void setActiveModel(const juce::String& id);
+    [[nodiscard]] cydaw::base::Text activeModel() const;
+    void setActiveModel(const cydaw::base::Text& id);
     // A model installed and some sounds indexed with it: a phrase can be asked.
     [[nodiscard]] bool available() const;
     // A model was installed or removed: the index follows.
@@ -65,12 +68,12 @@ public:
         bool checked {};
         bool ready {};   // torch and transformers are there
         bool cuda {};
-        juce::String python;
-        juce::String executable;
-        juce::String torch;
-        juce::String transformers;
-        juce::String gpu;
-        juce::String error;
+        cydaw::base::Text python;
+        cydaw::base::Text executable;
+        cydaw::base::Text torch;
+        cydaw::base::Text transformers;
+        cydaw::base::Text gpu;
+        cydaw::base::Text error;
     };
     [[nodiscard]] Engine engine() const;
     void checkEngine();
@@ -80,15 +83,15 @@ public:
         bool running {};
         bool loadingModel {};
         bool workerUp {};
-        juce::String device; // "cuda" or "cpu", once loaded
+        cydaw::base::Text device; // "cuda" or "cpu", once loaded
         int indexed {};     // sounds of the library with a vector
         int total {};       // sounds of the library
         int pending {};     // of this run, still to do
         int done {};        // of this run
         int failed {};
         int classified {};  // categories given by CLAP (last run)
-        juce::String message;
-        juce::String error;
+        cydaw::base::Text message;
+        cydaw::base::Text error;
     };
     [[nodiscard]] Status status() const;
     void startIndexing();
@@ -102,17 +105,17 @@ public:
 
     // ---- Searching ----------------------------------------------------------------
     struct Hit {
-        juce::String path;
+        cydaw::base::Text path;
         float similarity {};
         float score {}; // 0..100, the model's usual range spread
     };
     struct Answer {
         int id {};
         bool failed {};
-        juce::String error;
-        juce::String query;
-        juce::String english; // what the model was asked
-        juce::String similarTo;
+        cydaw::base::Text error;
+        cydaw::base::Text query;
+        cydaw::base::Text english; // what the model was asked
+        cydaw::base::Text similarTo;
         std::vector<Hit> hits;
         // How the scores were spread, and how many were asked for.
         float low {};
@@ -124,16 +127,16 @@ public:
     // the answer is taken with takeAnswer() by whoever asked (`owner`: the
     // browser's list, the library window), the newest of each only. Returns
     // the request's id.
-    int searchText(const juce::String& text, int limit = 400, int owner = 0);
-    int searchSimilar(const juce::String& path, int limit = 400, int owner = 0);
+    int searchText(const cydaw::base::Text& text, int limit = 400, int owner = 0);
+    int searchSimilar(const cydaw::base::Text& path, int limit = 400, int owner = 0);
     [[nodiscard]] std::optional<Answer> takeAnswer(int owner = 0);
     [[nodiscard]] bool searching() const noexcept { return searching_.load() > 0; }
     // The same, waited for (the control port).
-    [[nodiscard]] Answer searchNow(const juce::String& text, int limit, int timeoutMs);
-    [[nodiscard]] Answer similarNow(const juce::String& path, int limit, int timeoutMs);
+    [[nodiscard]] Answer searchNow(const cydaw::base::Text& text, int limit, int timeoutMs);
+    [[nodiscard]] Answer similarNow(const cydaw::base::Text& path, int limit, int timeoutMs);
 
     // French words of sound into English ones; English kept as it is.
-    [[nodiscard]] static juce::String toEnglish(const juce::String& query);
+    [[nodiscard]] static cydaw::base::Text toEnglish(const cydaw::base::Text& query);
     // On the message thread, for a phrase's answer: the sounds whose name,
     // category, instrument or bank hold the phrase's words lifted a little
     // (the model hears; the names say), then the best `limit` kept.
@@ -145,8 +148,8 @@ private:
     class Indexer;
     struct Query {
         int id {};
-        juce::String text;
-        juce::String similarTo;
+        cydaw::base::Text text;
+        cydaw::base::Text similarTo;
         int limit {};
         int owner {};
     };
@@ -160,13 +163,13 @@ private:
     // The store of the active model, read when it changes.
     void openStore();
     [[nodiscard]] std::shared_ptr<Store> store() const;
-    [[nodiscard]] std::shared_ptr<Worker> workerFor(const AiModel& model, juce::String& error, const std::atomic<bool>* stop);
+    [[nodiscard]] std::shared_ptr<Worker> workerFor(const AiModel& model, cydaw::base::Text& error, const std::atomic<bool>* stop);
     [[nodiscard]] Answer run(const Query& query);
     void post(Answer answer);
     void stopWorker();
-    [[nodiscard]] juce::File storeFolder() const;
-    [[nodiscard]] juce::File storeFileOf(const AiModel& model) const;
-    [[nodiscard]] juce::File workFolder() const;
+    [[nodiscard]] cydaw::base::File storeFolder() const;
+    [[nodiscard]] cydaw::base::File storeFileOf(const AiModel& model) const;
+    [[nodiscard]] cydaw::base::File workFolder() const;
 
     app::SampleLibrary& library_;
     AiModels& models_;
@@ -174,7 +177,7 @@ private:
     bool automatic_ { true };
     bool autoIndex_ { true };
     bool autoCategories_ { true };
-    juce::String chosenModel_;
+    cydaw::base::Text chosenModel_;
 
     mutable std::mutex mutex_;
     std::mutex changeMutex_;
@@ -182,11 +185,11 @@ private:
     Engine engine_;
     Status status_;
     std::shared_ptr<Store> store_;
-    juce::String storeModel_;
+    cydaw::base::Text storeModel_;
     // Where the store was read from: read again when the cache moves.
-    juce::File storeFile_;
+    cydaw::base::File storeFile_;
     std::shared_ptr<Worker> worker_;
-    juce::String workerModel_;
+    cydaw::base::Text workerModel_;
     // One model process made at a time; closing stops one loading.
     std::mutex creating_;
     std::atomic<bool> closing_ {};
@@ -202,13 +205,14 @@ private:
     std::atomic<int> searching_ {};
     std::atomic<int> nextQuery_ { 1 };
     // Queries one at a time, the newest first; the engine check.
-    juce::ThreadPool queries_ { 1 };
-    juce::ThreadPool checks_ { 1 };
+    cydaw::base::ThreadPool queries_ { 1 };
+    cydaw::base::ThreadPool checks_ { 1 };
     // A rescan ended: new sounds to index, once things are quiet.
     bool indexOwed_ {};
     double indexOwedAt_ {};
 
-    JUCE_DECLARE_WEAK_REFERENCEABLE(SemanticSearch)
+    template<class> friend class cydaw::base::WeakReference;
+    cydaw::base::CallbackLifetime callbackLifetime_;
 };
 
 } // namespace cydaw::v2

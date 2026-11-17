@@ -1,3 +1,8 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/TextMap.h>
+#include <cydaw/base/File.h>
 #include "AiModels.h"
 
 #include "Locations.h"
@@ -29,7 +34,7 @@ constexpr std::uint32_t rotate(const std::uint32_t value, const int bits)
     return (value >> bits) | (value << (32 - bits));
 }
 
-juce::String languageText(const juce::var& value)
+cydaw::base::Text languageText(const cydaw::base::Value& value)
 {
     if (value.isString())
         return value.toString();
@@ -37,7 +42,7 @@ juce::String languageText(const juce::var& value)
     return text.isNotEmpty() ? text : value.getProperty("en", {}).toString();
 }
 
-bool makeFolder(const juce::File& folder)
+bool makeFolder(const cydaw::base::File& folder)
 {
     return folder.isDirectory() || folder.createDirectory().wasOk();
 }
@@ -114,7 +119,7 @@ void Sha256::add(const void* data, std::size_t size)
     }
 }
 
-juce::String Sha256::hex()
+cydaw::base::Text Sha256::hex()
 {
     const auto bits = length_ * 8;
     const std::uint8_t one = 0x80;
@@ -128,46 +133,46 @@ juce::String Sha256::hex()
         tail[i] = static_cast<std::uint8_t>(bits >> (56 - i * 8));
     add(tail, 8);
     length_ = savedLength;
-    juce::String out;
+    cydaw::base::Text out;
     for (const auto word : state_)
-        out << juce::String::toHexString(static_cast<juce::int64>(word)).paddedLeft('0', 8);
+        out << cydaw::base::Text::toHexString(static_cast<std::int64_t>(word)).paddedLeft('0', 8);
     return out.toLowerCase();
 }
 
-juce::String Sha256::ofFile(const juce::File& file, const std::atomic<bool>* stop)
+cydaw::base::Text Sha256::ofFile(const cydaw::base::File& file, const std::atomic<bool>* stop)
 {
-    juce::FileInputStream in(file);
+    cydaw::base::FileInputStream in(file);
     if (!in.openedOk())
         return {};
     Sha256 hash;
-    juce::HeapBlock<char> buffer(1 << 20);
+    std::vector<char> buffer(1 << 20);
     for (;;) {
         if (stop != nullptr && stop->load())
             return {};
-        const auto read = in.read(buffer.get(), 1 << 20);
+        const auto read = in.read(buffer.data(), 1 << 20);
         if (read <= 0)
             break;
-        hash.add(buffer.get(), static_cast<std::size_t>(read));
+        hash.add(buffer.data(), static_cast<std::size_t>(read));
     }
     return hash.hex();
 }
 
 // ---- The catalogue ---------------------------------------------------------------------------
 
-juce::int64 AiModel::bytes() const
+std::int64_t AiModel::bytes() const
 {
-    juce::int64 total {};
+    std::int64_t total {};
     for (const auto& file : files)
         total += file.size;
     return total;
 }
 
-juce::String AiModel::describe() const
+cydaw::base::Text AiModel::describe() const
 {
     return languageText(description);
 }
 
-juce::String AiModel::note() const
+cydaw::base::Text AiModel::note() const
 {
     return languageText(licenceNote);
 }
@@ -183,11 +188,11 @@ AiModels::~AiModels()
     job_.reset();
 }
 
-juce::File AiModels::catalogueFile() const
+cydaw::base::File AiModels::catalogueFile() const
 {
-    if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_MODELS_CATALOGUE", {});
-        other.isNotEmpty() && juce::File::isAbsolutePath(other))
-        return juce::File(other);
+    if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_MODELS_CATALOGUE", {});
+        other.isNotEmpty() && cydaw::base::File::isAbsolutePath(other))
+        return cydaw::base::File(other);
     return app::factoryContentFolder().getChildFile("models.json");
 }
 
@@ -202,7 +207,7 @@ void AiModels::loadCatalogue()
     catalogueText_ = text;
     models_.clear();
     packages_.clear();
-    const auto json = juce::JSON::parse(text);
+    const auto json = cydaw::base::JSON::parse(text);
     if (const auto* list = json.getProperty("engine", {}).getProperty("packages", {}).getArray())
         for (const auto& item : *list)
             packages_.push_back({ item.getProperty("name", {}).toString(), item.getProperty("licence", {}).toString(),
@@ -232,7 +237,7 @@ void AiModels::loadCatalogue()
             if (const auto* files = item.getProperty("files", {}).getArray())
                 for (const auto& file : *files)
                     model.files.push_back({ file.getProperty("path", {}).toString(),
-                                            static_cast<juce::int64>(file.getProperty("size", 0)),
+                                            static_cast<std::int64_t>(file.getProperty("size", 0)),
                                             file.getProperty("sha256", {}).toString().toLowerCase() });
             model.dimension = static_cast<int>(item.getProperty("dimension", 512));
             model.sampleRate = static_cast<double>(item.getProperty("sampleRate", 48'000.0));
@@ -252,7 +257,7 @@ void AiModels::loadCatalogue()
         }
 }
 
-const AiModel* AiModels::find(const juce::String& id) const
+const AiModel* AiModels::find(const cydaw::base::Text& id) const
 {
     for (const auto& model : models_)
         if (model.id == id || model.key() == id)
@@ -260,12 +265,12 @@ const AiModel* AiModels::find(const juce::String& id) const
     return nullptr;
 }
 
-juce::File AiModels::folderOf(const AiModel& model) const
+cydaw::base::File AiModels::folderOf(const AiModel& model) const
 {
     return locations::folder(Location::aiModels).getChildFile(model.id).getChildFile(model.version);
 }
 
-bool AiModels::installed(const juce::String& id) const
+bool AiModels::installed(const cydaw::base::Text& id) const
 {
     const auto* model = find(id);
     if (model == nullptr)
@@ -279,18 +284,18 @@ bool AiModels::installed(const juce::String& id) const
     return true;
 }
 
-juce::var AiModels::receiptOf(const juce::String& id) const
+cydaw::base::Value AiModels::receiptOf(const cydaw::base::Text& id) const
 {
     const auto* model = find(id);
-    return model != nullptr ? juce::JSON::parse(folderOf(*model).getChildFile("receipt.json")) : juce::var();
+    return model != nullptr ? cydaw::base::JSON::parse(folderOf(*model).getChildFile("receipt.json")) : cydaw::base::Value();
 }
 
 // ---- The download -----------------------------------------------------------------------------
 
-class AiModels::Job final : public juce::Thread {
+class AiModels::Job final : public cydaw::base::Thread {
 public:
-    Job(AiModels& owner, AiModel model, juce::File target, juce::File from, const bool accepted)
-        : juce::Thread("CyDAW model install"),
+    Job(AiModels& owner, AiModel model, cydaw::base::File target, cydaw::base::File from, const bool accepted)
+        : cydaw::base::Thread("CyDAW model install"),
           owner_(owner), model_(std::move(model)), target_(std::move(target)), from_(std::move(from)), accepted_(accepted)
     {
     }
@@ -305,48 +310,48 @@ public:
 
     void run() override
     {
-        juce::String error;
+        cydaw::base::Text error;
         const auto ok = install(error);
         const std::scoped_lock lock(owner_.mutex_);
         owner_.progress_.running = false;
-        owner_.progress_.error = ok ? juce::String() : error;
+        owner_.progress_.error = ok ? cydaw::base::Text() : error;
         owner_.finished_ = Finished { model_.id, ok, stop_.load() && !ok, error };
     }
 
 private:
-    void step(const juce::String& name, const juce::String& file)
+    void step(const cydaw::base::Text& name, const cydaw::base::Text& file)
     {
         const std::scoped_lock lock(owner_.mutex_);
         owner_.progress_.step = name;
         owner_.progress_.file = file;
     }
 
-    void addDone(const juce::int64 bytes)
+    void addDone(const std::int64_t bytes)
     {
         const std::scoped_lock lock(owner_.mutex_);
         owner_.progress_.done += bytes;
-        const auto elapsed = juce::Time::getMillisecondCounterHiRes() * 0.001 - started_;
+        const auto elapsed = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 - started_;
         if (elapsed > 0.5)
-            owner_.progress_.bytesPerSecond = static_cast<double>(transferred_ += std::max<juce::int64>(0, bytes)) / elapsed;
+            owner_.progress_.bytesPerSecond = static_cast<double>(transferred_ += std::max<std::int64_t>(0, bytes)) / elapsed;
     }
 
-    bool install(juce::String& error)
+    bool install(cydaw::base::Text& error)
     {
         if (!makeFolder(target_)) {
             error = "cannot make " + target_.getFullPathName();
             return false;
         }
         const auto partials = locations::folder(Location::downloads).getChildFile("models").getChildFile(model_.id + "-" + model_.version);
-        if (from_ == juce::File {} && !makeFolder(partials)) {
+        if (from_ == cydaw::base::File {} && !makeFolder(partials)) {
             error = "cannot make " + partials.getFullPathName();
             return false;
         }
-        juce::Array<juce::var> files;
+        cydaw::base::Array<cydaw::base::Value> files;
         for (const auto& file : model_.files) {
             if (stop_)
                 return fail(error);
             const auto destination = target_.getChildFile(file.path);
-            juce::String hash;
+            cydaw::base::Text hash;
             // Already there and whole (a run stopped after it): checked again.
             if (destination.getSize() == file.size) {
                 step("verify", file.path);
@@ -362,29 +367,29 @@ private:
                 error = "cannot make " + destination.getParentDirectory().getFullPathName();
                 return false;
             }
-            const auto ok = from_ != juce::File {} ? copy(file, destination, hash, error)
+            const auto ok = from_ != cydaw::base::File {} ? copy(file, destination, hash, error)
                                                    : download(file, partials.getChildFile(file.path + ".part"), destination, hash, error);
             if (!ok)
                 return stop_ ? fail(error) : false;
             files.add(entry(file, hash));
         }
         // The receipt last: without it, the model is not installed.
-        auto* receipt = new juce::DynamicObject();
+        auto* receipt = new cydaw::base::Object();
         receipt->setProperty("model", model_.key());
         receipt->setProperty("title", model_.title);
         receipt->setProperty("revision", model_.revision);
-        receipt->setProperty("source", from_ != juce::File {} ? from_.getFullPathName() : model_.baseUrl);
-        receipt->setProperty("installed", juce::Time::getCurrentTime().toISO8601(true));
-        auto* licence = new juce::DynamicObject();
+        receipt->setProperty("source", from_ != cydaw::base::File {} ? from_.getFullPathName() : model_.baseUrl);
+        receipt->setProperty("installed", cydaw::base::Time::getCurrentTime().toISO8601(true));
+        auto* licence = new cydaw::base::Object();
         licence->setProperty("name", model_.licence);
         licence->setProperty("url", model_.licenceUrl);
         licence->setProperty("page", model_.licencePage);
         licence->setProperty("requiresAcceptance", model_.requiresAcceptance);
         // Ticked by the person, never by CyDAW: said for the record.
         licence->setProperty("acceptedByPerson", accepted_);
-        receipt->setProperty("licence", juce::var(licence));
+        receipt->setProperty("licence", cydaw::base::Value(licence));
         receipt->setProperty("files", files);
-        if (!target_.getChildFile("receipt.json").replaceWithText(juce::JSON::toString(juce::var(receipt)))) {
+        if (!target_.getChildFile("receipt.json").replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(receipt)))) {
             error = "cannot write the receipt in " + target_.getFullPathName();
             return false;
         }
@@ -392,25 +397,25 @@ private:
         return true;
     }
 
-    static juce::var entry(const AiModel::File& file, const juce::String& hash)
+    static cydaw::base::Value entry(const AiModel::File& file, const cydaw::base::Text& hash)
     {
-        auto* object = new juce::DynamicObject();
+        auto* object = new cydaw::base::Object();
         object->setProperty("path", file.path);
         object->setProperty("size", file.size);
         object->setProperty("sha256", hash);
-        return juce::var(object);
+        return cydaw::base::Value(object);
     }
 
-    bool fail(juce::String& error)
+    bool fail(cydaw::base::Text& error)
     {
         error = "cancelled";
         return false;
     }
 
-    bool verify(const AiModel::File& file, const juce::File& written, const juce::String& hash, juce::String& error)
+    bool verify(const AiModel::File& file, const cydaw::base::File& written, const cydaw::base::Text& hash, cydaw::base::Text& error)
     {
         if (written.getSize() != file.size) {
-            error = file.path + ": " + juce::String(written.getSize()) + " bytes of " + juce::String(file.size);
+            error = file.path + ": " + cydaw::base::Text(written.getSize()) + " bytes of " + cydaw::base::Text(file.size);
             return false;
         }
         if (file.sha256.isNotEmpty() && hash != file.sha256) {
@@ -420,7 +425,7 @@ private:
         return true;
     }
 
-    bool copy(const AiModel::File& file, const juce::File& destination, juce::String& hash, juce::String& error)
+    bool copy(const AiModel::File& file, const cydaw::base::File& destination, cydaw::base::Text& hash, cydaw::base::Text& error)
     {
         const auto source = from_.getChildFile(file.path);
         step("verify", file.path);
@@ -447,19 +452,19 @@ private:
         return true;
     }
 
-    bool download(const AiModel::File& file, const juce::File& partial, const juce::File& destination, juce::String& hash,
-                  juce::String& error)
+    bool download(const AiModel::File& file, const cydaw::base::File& partial, const cydaw::base::File& destination, cydaw::base::Text& hash,
+                  cydaw::base::Text& error)
     {
         if (!makeFolder(partial.getParentDirectory())) {
             error = "cannot make " + partial.getParentDirectory().getFullPathName();
             return false;
         }
-        const auto url = model_.baseUrl + juce::URL::addEscapeChars(file.path, false).replace("%2F", "/").replace("%2f", "/");
+        const auto url = model_.baseUrl + cydaw::base::Url::addEscapeChars(file.path, false).replace("%2F", "/").replace("%2f", "/");
         for (auto attempt = 0; attempt < 4; ++attempt) {
             if (stop_)
                 return false;
             if (attempt > 0)
-                juce::Thread::sleep(1'500 * attempt);
+                cydaw::base::Thread::sleep(1'500 * attempt);
             // Where a stopped download got to: asked for from there.
             auto have = partial.existsAsFile() ? partial.getSize() : 0;
             if (have > file.size) {
@@ -468,20 +473,20 @@ private:
             }
             step("download", file.path);
             auto status = 0;
-            juce::StringPairArray headers;
-            const auto options = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+            cydaw::base::TextMap headers;
+            const auto options = cydaw::base::Url::InputStreamOptions(cydaw::base::Url::ParameterHandling::inAddress)
                                      .withConnectionTimeoutMs(30'000)
                                      .withNumRedirectsToFollow(8)
                                      .withStatusCode(&status)
                                      .withResponseHeaders(&headers);
-            std::unique_ptr<juce::InputStream> stream;
+            std::unique_ptr<cydaw::base::InputStream> stream;
             if (have > 0 && have < file.size)
-                stream = juce::URL(url).createInputStream(options.withExtraHeaders("Range: bytes=" + juce::String(have) + "-"));
+                stream = cydaw::base::Url(url).createInputStream(options.withExtraHeaders("Range: bytes=" + cydaw::base::Text(have) + "-"));
             else if (have != file.size)
-                stream = juce::URL(url).createInputStream(options);
+                stream = cydaw::base::Url(url).createInputStream(options);
             if (have != file.size) {
                 if (stream == nullptr || status >= 400) {
-                    error = file.path + ": HTTP " + juce::String(status) + " (" + model_.host + ")";
+                    error = file.path + ": HTTP " + cydaw::base::Text(status) + " (" + model_.host + ")";
                     if (status == 416)
                         (void) partial.deleteFile();
                     continue;
@@ -490,7 +495,7 @@ private:
                 const auto resumed = status == 206 && have > 0;
                 if (!resumed)
                     have = 0;
-                juce::FileOutputStream out(partial);
+                cydaw::base::FileOutputStream out(partial);
                 if (!out.openedOk()) {
                     error = "cannot write " + partial.getFullPathName();
                     return false;
@@ -500,17 +505,17 @@ private:
                     out.truncate();
                 }
                 addDone(have);
-                juce::HeapBlock<char> buffer(1 << 16);
+                std::vector<char> buffer(1 << 16);
                 auto written = have;
                 while (!stop_) {
-                    const auto read = stream->read(buffer.get(), 1 << 16);
+                    const auto read = stream->read(buffer.data(), 1 << 16);
                     if (read <= 0)
                         break;
                     if (written + read > file.size) {
-                        error = file.path + ": more than " + juce::String(file.size) + " bytes";
+                        error = file.path + ": more than " + cydaw::base::Text(file.size) + " bytes";
                         break;
                     }
-                    if (!out.write(buffer.get(), static_cast<std::size_t>(read))) {
+                    if (!out.write(buffer.data(), static_cast<std::size_t>(read))) {
                         error = "cannot write " + partial.getFullPathName();
                         break;
                     }
@@ -524,7 +529,7 @@ private:
                     // Kept: the next attempt goes on from there.
                     addDone(-written);
                     if (error.isEmpty())
-                        error = file.path + ": " + juce::String(written) + " bytes of " + juce::String(file.size);
+                        error = file.path + ": " + cydaw::base::Text(written) + " bytes of " + cydaw::base::Text(file.size);
                     if (written > file.size)
                         (void) partial.deleteFile();
                     continue;
@@ -554,15 +559,15 @@ private:
 
     AiModels& owner_;
     AiModel model_;
-    juce::File target_;
-    juce::File from_;
+    cydaw::base::File target_;
+    cydaw::base::File from_;
     bool accepted_ {};
     std::atomic<bool> stop_ {};
-    double started_ { juce::Time::getMillisecondCounterHiRes() * 0.001 };
-    juce::int64 transferred_ {};
+    double started_ { cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 };
+    std::int64_t transferred_ {};
 };
 
-bool AiModels::start(const juce::String& id, const bool licenceAccepted, const juce::File& from, juce::String& error)
+bool AiModels::start(const cydaw::base::Text& id, const bool licenceAccepted, const cydaw::base::File& from, cydaw::base::Text& error)
 {
     const auto* model = find(id);
     if (model == nullptr) {
@@ -582,7 +587,7 @@ bool AiModels::start(const juce::String& id, const bool licenceAccepted, const j
             return false;
         }
     }
-    if (from != juce::File {} && !from.isDirectory()) {
+    if (from != cydaw::base::File {} && !from.isDirectory()) {
         error = ui::Ls("Pas de dossier ", "No folder ") + from.getFullPathName();
         return false;
     }
@@ -597,7 +602,7 @@ bool AiModels::start(const juce::String& id, const bool licenceAccepted, const j
         existing = existing.getParentDirectory();
     if (const auto free = existing.getBytesFreeOnVolume(); free > 0 && free < needed) {
         error = ui::Ls("Pas assez de place sur le disque : il faut ", "Not enough disk space: it needs ")
-                + juce::File::descriptionOfSizeInBytes(needed);
+                + cydaw::base::File::descriptionOfSizeInBytes(needed);
         return false;
     }
     job_.reset();
@@ -607,20 +612,20 @@ bool AiModels::start(const juce::String& id, const bool licenceAccepted, const j
         progress_.running = true;
         progress_.id = model->id;
         progress_.total = model->bytes();
-        progress_.step = from == juce::File {} ? "download" : "copy";
+        progress_.step = from == cydaw::base::File {} ? "download" : "copy";
         finished_.reset();
     }
     job_ = std::make_unique<Job>(*this, *model, target, from, licenceAccepted);
-    job_->startThread(juce::Thread::Priority::low);
+    job_->startThread(cydaw::base::Thread::Priority::low);
     return true;
 }
 
-bool AiModels::install(const juce::String& id, const bool licenceAccepted, juce::String& error)
+bool AiModels::install(const cydaw::base::Text& id, const bool licenceAccepted, cydaw::base::Text& error)
 {
     return start(id, licenceAccepted, {}, error);
 }
 
-bool AiModels::importFrom(const juce::String& id, const juce::File& folder, const bool licenceAccepted, juce::String& error)
+bool AiModels::importFrom(const cydaw::base::Text& id, const cydaw::base::File& folder, const bool licenceAccepted, cydaw::base::Text& error)
 {
     return start(id, licenceAccepted, folder, error);
 }
@@ -631,7 +636,7 @@ void AiModels::cancel()
         job_->cancel();
 }
 
-bool AiModels::remove(const juce::String& id, juce::String& error)
+bool AiModels::remove(const cydaw::base::Text& id, cydaw::base::Text& error)
 {
     const auto* model = find(id);
     if (model == nullptr) {

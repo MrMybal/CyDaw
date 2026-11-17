@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -36,7 +37,7 @@ private:
     // where its notes also go.
     void drawMidiInputs(const TrackRef& track);
     void drawMidiOutput(const TrackRef& track);
-    void report(const juce::String& error);
+    void report(const cydaw::base::Text& error);
 
     Studio& studio_;
     UiState& state_;

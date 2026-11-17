@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "date": "2026-11-13",
+  "branch": "CyDSP-CORE",
+  "status": "Windows production desktop and plugin worker JUCE retirement complete",
+  "architecture": "CyDaw -> CyAudioCore -> CyDSP numerical library; CyUI/ImGui native Windows UI",
+  "dependencies": [
+    {
+      "name": "CyAudioCore",
+      "role": "application audio services",
+      "base_commit": "bb26e93604d43de2069694b0791bc0bcf5a53ea6",
+      "working_tree_dirty": false,
+      "working_tree_entries": 0,
+      "source_tree_sha256": "629c835b9818142a7887b5301f6ecb1e5ff10fbb10de85fe96dbbedc2040877e",
+      "source_tree_file_count": 774,
+      "hash_scope": [
+        "CMakeLists.txt",
+        "LICENSE",
+        "include/**",
+        "src/**",
+        "cmake/**",
+        "third_party/**"
+      ]
+    },
+    {
+      "name": "CyDSP",
+      "role": "numerical dependency managed by CyAudioCore",
+      "base_commit": "fda6bd30c5b622795cc08e8bd2750188a6c5a0c0",
+      "working_tree_dirty": false,
+      "working_tree_entries": 0,
+      "source_tree_sha256": "64778114f55faf3f96cadbe1e5a38c8e8f20365f11530f1c48e7004a56be3c50",
+      "source_tree_file_count": 240,
+      "hash_scope": [
+        "CMakeLists.txt",
+        "LICENSE",
+        "include/**",
+        "src/**",
+        "cmake/**",
+        "third_party/**"
+      ]
+    }
+  ],
+  "production": {
+    "build": "build/cyaudio-native-desktop",
+    "configuration": "Release x64",
+    "juce_fetch": false,
+    "legacy_juce_fixtures": false,
+    "asio": true,
+    "generated_dependency_projects": 41,
+    "juce_includes_and_links": 0,
+    "configure_log": "output/cyaudio-complete-final-configure.log",
+    "build_log": "output/cyaudio-complete-final-build.log"
+  },
+  "checks": [
+    {
+      "name": "native_full_suite",
+      "registered": 119,
+      "failed": 0,
+      "skipped": [
+        "Batterie without isolated-profile bank; separately passed below"
+      ],
+      "log": "output/cyaudio-release-acceptance-suite.log"
+    },
+    {
+      "name": "installed_bank_strict_sampler_and_batterie",
+      "passed": 2,
+      "failed": 0,
+      "log": "output/cyaudio-final-installed-banks.log"
+    },
+    {
+      "name": "final_native_contracts",
+      "passed": 5,
+      "failed": 0,
+      "log": "output/cyaudio-final-native-contracts.log"
+    },
+    {
+      "name": "four_formats_unicode_actual_application",
+      "result": "passed",
+      "evidence": "output/cyaudio-formats-é/e64e45fb76ad416aa9ea8be0a032897d/checks.json"
+    },
+    {
+      "name": "four_formats_actual_asio_application",
+      "result": "passed",
+      "rate": 48000,
+      "frames": 1024,
+      "inputs_enabled": false,
+      "silent_output": true,
+      "evidence": "output/cyaudio-asio-formats/3335fcd2813f46119b910d8ebc091ba9/checks.json"
+    },
+    {
+      "name": "native_lv2_export_audio_state_gui",
+      "result": "passed",
+      "log": "output/cyaudio-final-lv2-validation.log"
+    },
+    {
+      "name": "native_clap_export_audio_state_parameters_gui",
+      "result": "passed",
+      "log": "output/cyaudio-final-clap-validation.log"
+    },
+    {
+      "name": "native_vst3_export_audio_parameters_editor_lifecycle",
+      "result": "passed",
+      "log": "output/cyaudio-final-vst3-validation.log"
+    },
+    {
+      "name": "official_vst3_validator",
+      "passed": 47,
+      "failed": 0,
+      "log": "output/cyaudio-final-vst3-official-validation.log"
+    },
+    {
+      "name": "native_worker_ipc_external_vst3_fixture",
+      "result": "passed",
+      "log": "output/cyaudio-final-native-ipc.log"
+    },
+    {
+      "name": "vst3_pinned_controls_save_restore_and_modulation",
+      "result": "passed",
+      "log": "output/cyaudio-final-editing-vst3-pins.log"
+    },
+    {
+      "name": "plugin_windows",
+      "passed": 5,
+      "failed": 0,
+      "log": "output/cyaudio-final-plugin-windows.log"
+    },
+    {
+      "name": "actual_asio_device_factory",
+      "result": "passed",
+      "log": "output/cyaudio-final-asio-factory.log"
+    },
+    {
+      "name": "actual_wasapi_device_factory",
+      "result": "passed",
+      "log": "output/cyaudio-final-wasapi-factory.log"
+    },
+    {
+      "name": "asio_probe_supported_quantum",
+      "result": "passed",
+      "rate": 48000,
+      "frames": 1024,
+      "callbacks": 15,
+      "rendered_frames": 15360,
+      "duration_ms": 300,
+      "input_enabled": false,
+      "log": "output/cyaudio-final-asio-hardware.json"
+    },
+    {
+      "name": "asio_probe_unsupported_quantum",
+      "result": "rejected as expected",
+      "requested_frames": 64,
+      "exit_code": 32,
+      "log": "output/cyaudio-final-asio-unsupported-quantum.json"
+    },
+    {
+      "name": "package_unit_checks",
+      "passed": 8,
+      "failed": 0,
+      "log": "output/cyaudio-native-package-tests.log"
+    },
+    {
+      "name": "final_rebuilt_desktop_four_formats_unicode_asio",
+      "result": "passed",
+      "evidence": "output/cyaudio-final-formats-é/d60b0990fe474be39ff57e56787ec448/checks.json",
+      "log": "output/cyaudio-complete-final-formats.log",
+      "silent_output": true,
+      "inputs_enabled": false,
+      "profile_isolation": "APPDATA/LOCALAPPDATA/Locations.json"
+    },
+    {
+      "name": "final_rebuilt_base_contracts",
+      "result": "passed",
+      "log": "output/cyaudio-complete-final-base.log"
+    }
+  ],
+  "test_dependencies": {
+    "python_minimum": "3.12",
+    "requirements": "tests/requirements-native.txt"
+  },
+  "fixture_boundary": "Historical external VST3 comparison plugins may themselves use JUCE; production host and worker do not. New native format exports were separately built and validated without JUCE.",
+  "limits": [
+    "Windows x64 acceptance only; native desktop UI/dialog/editor porting remains for Linux/macOS",
+    "Silent buffer and meter assertions are not human listening or analog latency measurements",
+    "Microphone capture, physical MIDI, hotplug and broader installed third-party plugin matrix remain hardware acceptance",
+    "No VST2 provider; native supported hosts are VST3/CLAP/LV2/JSFX",
+    "Private sibling repositories not modified; API gaps and application workarounds are listed in the integration report"
+  ],
+  "publication": "Local only; no push or release publication performed",
+  "package": {
+    "archive": "output/cyaudio-native-package/CyDAW2-0.78.0-Windows-x64-Alpha.zip",
+    "bytes": 274318940,
+    "sha256": "1cbdcbd638034fca19172af33bf45c5f449c1b63798f611446a0ee244613422a",
+    "entry_count": 2268,
+    "matches_final_app_and_worker": true,
+    "juce_license_required": false,
+    "examples_or_local_output_folders": false,
+    "log": "output/cyaudio-final-package.log"
+  }
+}

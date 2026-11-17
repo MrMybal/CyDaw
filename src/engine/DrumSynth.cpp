@@ -1,4 +1,5 @@
 #include <cydaw/engine/DrumSynth.h>
+#include <cydaw/engine/DspSampleBiquad.h>
 
 #include <cydaw/engine/BiquadDesign.h>
 #include <cydaw/engine/KickSynth.h>
@@ -14,22 +15,11 @@ namespace {
 
 constexpr double kTwoPi = 2.0 * std::numbers::pi;
 
-struct Biquad {
-    BiquadCoefficients c;
-    double z1 {};
-    double z2 {};
-    double operator()(const double x) noexcept
-    {
-        const auto y = c.b0 * x + z1;
-        z1 = c.b1 * x - c.a1 * y + z2;
-        z2 = c.b2 * x - c.a2 * y;
-        return y;
-    }
-};
+using Biquad = DspSampleBiquad;
 
 Biquad filter(const EqBandType type, const double hz, const double q, const double rate, const double gainDb = 0.0)
 {
-    return { designEqBand(type, std::clamp(hz, 10.0, rate * 0.45), gainDb, q, 0, 0, rate) };
+    return Biquad{designEqBand(type, std::clamp(hz, 10.0, rate * 0.45), gainDb, q, 0, 0, rate)};
 }
 
 class Noise {
@@ -263,8 +253,8 @@ std::vector<float> sweep(const Values& v, const std::size_t frames, const double
     for (std::size_t i = 0; i < frames; ++i) {
         const auto t = static_cast<double>(i) / static_cast<double>(std::max<std::size_t>(1, frames - 1));
         if (i % 32 == 0) {
-            const auto c = filter(EqBandType::bandPass, from * std::pow(to / from, t), q, rate);
-            band.c = c.c;
+            band.setCoefficients(
+                designEqBand(EqBandType::bandPass, std::clamp(from * std::pow(to / from, t), 10., rate * .45), 0., q, 0, 0, rate));
         }
         const auto envelope = rising ? t * t : (1.0 - t) * (1.0 - t);
         out[i] = static_cast<float>(band(noise()) * envelope * 2.0);

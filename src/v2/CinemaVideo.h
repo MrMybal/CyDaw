@@ -1,6 +1,9 @@
+#include <cydaw/base/Image.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
-#include <juce_graphics/juce_graphics.h>
-#include <juce_core/juce_core.h>
+
+
 #include <memory>
 #include <functional>
 namespace cydaw::v2 {
@@ -8,9 +11,9 @@ namespace cydaw::v2 {
 class CinemaVideo final {
 public:
     struct Snapshot {
-        juce::Image image;
-        juce::String file,error;
-        juce::String backend{"FFmpeg"},codec;
+        cydaw::base::Image image;
+        cydaw::base::Text file,error;
+        cydaw::base::Text backend{"FFmpeg"},codec;
         double duration{},fps{25},time{};
         int width{},height{};
         std::uint64_t revision{};
@@ -18,9 +21,9 @@ public:
     };
     explicit CinemaVideo(int maximumWidth = 960);
     ~CinemaVideo();
-    void request(const juce::File&,double seconds);
+    void request(const cydaw::base::File&,double seconds);
     Snapshot snapshot() const;
-    static juce::Result extractAudio(const juce::File& source,const juce::File& wav,const std::function<bool()>& cancel,bool* hasAudio = nullptr);
+    static cydaw::base::Result extractAudio(const cydaw::base::File& source,const cydaw::base::File& wav,const std::function<bool()>& cancel,bool* hasAudio = nullptr);
 private:
     class Worker;
     std::unique_ptr<Worker> worker_;

@@ -1,3 +1,8 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Process.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "PluginFiles.h"
 #include "Theme.h"
@@ -13,15 +18,15 @@ static std::vector<JsfxView *> &scriptEditors()
     return editors;
 }
 
-class JsfxView::Compiler final : public juce::Thread
+class JsfxView::Compiler final : public cydaw::base::Thread
 {
   public:
-    juce::File source, result;
-    juce::String message, compiled;
+    cydaw::base::File source, result;
+    cydaw::base::Text message, compiled;
     bool success{};
     std::atomic<bool> done{};
-    explicit Compiler(juce::File f)
-        : juce::Thread("CyDAW JSFX compile"), source(std::move(f)),
+    explicit Compiler(cydaw::base::File f)
+        : cydaw::base::Thread("CyDAW JSFX compile"), source(std::move(f)),
           result(source.withFileExtension("diagnostics.json"))
     {
     }
@@ -37,15 +42,15 @@ class JsfxView::Compiler final : public juce::Thread
         auto launch = app::WindowsPluginBridge::workerLaunchFor(source);
         auto args = launch.command;
         args.addArray({"--probe-plugin", source.getFullPathName(), "--output", result.getFullPathName()});
-        juce::ChildProcess child;
+        cydaw::base::ChildProcess child;
         if (!launch.isValid() || !child.start(args, 0))
         {
             message = "Cannot start JSFX compiler: " + launch.error;
             done = true;
             return;
         }
-        double until = juce::Time::getMillisecondCounterHiRes() + 30000;
-        while (child.isRunning() && !threadShouldExit() && juce::Time::getMillisecondCounterHiRes() < until)
+        double until = cydaw::base::Time::getMillisecondCounterHiRes() + 30000;
+        while (child.isRunning() && !threadShouldExit() && cydaw::base::Time::getMillisecondCounterHiRes() < until)
             wait(20);
         if (child.isRunning())
         {
@@ -54,7 +59,7 @@ class JsfxView::Compiler final : public juce::Thread
             done = true;
             return;
         }
-        auto data = juce::JSON::parse(result);
+        auto data = cydaw::base::JSON::parse(result);
         if (auto *list = data.getArray(); list && !list->isEmpty())
         {
             const auto &item = list->getFirst();
@@ -64,8 +69,8 @@ class JsfxView::Compiler final : public juce::Thread
             {
                 success = true;
                 message = item.getProperty("name", {}).toString() + " — " +
-                          juce::String(int(item.getProperty("inputs", 0))) + " → " +
-                          juce::String(int(item.getProperty("outputs", 0))) + " channels";
+                          cydaw::base::Text(int(item.getProperty("inputs", 0))) + " → " +
+                          cydaw::base::Text(int(item.getProperty("outputs", 0))) + " channels";
             }
         }
         else
@@ -117,7 +122,7 @@ void JsfxView::fresh()
     error_ = false;
     status_.clear();
 }
-void JsfxView::load(const juce::File &file)
+void JsfxView::load(const cydaw::base::File &file)
 {
     compiler_.reset();
     if (!file.existsAsFile() || file.getSize() > 8 * 1024 * 1024)
@@ -136,12 +141,12 @@ void JsfxView::load(const juce::File &file)
 }
 bool JsfxView::save()
 {
-    if (file_ == juce::File())
+    if (file_ == cydaw::base::File())
     {
         choose(true);
         return false;
     }
-    if (!file_.replaceWithText(juce::String::fromUTF8(code_.data()), false, false, "\n"))
+    if (!file_.replaceWithText(cydaw::base::Text::fromUTF8(code_.data()), false, false, "\n"))
     {
         status_ = "Cannot write " + file_.getFullPathName();
         error_ = true;
@@ -154,18 +159,18 @@ bool JsfxView::save()
 void JsfxView::choose(bool saving)
 {
     (void)plugin_files::scripts().createDirectory();
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         saving ? "Save JSFX" : "Open JSFX",
-        file_ == juce::File() ? plugin_files::scripts().getChildFile("CyDAW Gain.jsfx") : file_,
+        file_ == cydaw::base::File() ? plugin_files::scripts().getChildFile("CyDAW Gain.jsfx") : file_,
         saving ? "*.jsfx" : "*");
     chooser_->launchAsync(
-        (saving ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
-                : juce::FileBrowserComponent::openMode) |
-            juce::FileBrowserComponent::canSelectFiles,
-        [this, saving](const juce::FileChooser &chooser)
+        (saving ? cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting
+                : cydaw::base::FileDialogFlags::openMode) |
+            cydaw::base::FileDialogFlags::canSelectFiles,
+        [this, saving](const cydaw::base::FileDialog &chooser)
         {
             auto file = chooser.getResult();
-            if (file == juce::File())
+            if (file == cydaw::base::File())
                 return;
             if (saving)
             {
@@ -192,29 +197,29 @@ void JsfxView::compile(bool apply, bool insert)
 {
     if (compiler_ && !compiler_->done.load())
         return;
-    if ((apply || insert) && file_ == juce::File())
+    if ((apply || insert) && file_ == cydaw::base::File())
     {
         status_ = "Save this script before applying it to a track";
         error_ = true;
         choose(true);
         return;
     }
-    auto folder = file_ == juce::File() ? plugin_files::scripts() : file_.getParentDirectory();
+    auto folder = file_ == cydaw::base::File() ? plugin_files::scripts() : file_.getParentDirectory();
     if (!folder.createDirectory())
     {
         status_ = "Cannot create compiler workspace";
         error_ = true;
         return;
     }
-    auto source = folder.getChildFile(".cydaw-jsfx-" + juce::Uuid().toString() + ".jsfx");
-    if (!source.replaceWithText(juce::String::fromUTF8(code_.data())))
+    auto source = folder.getChildFile(".cydaw-jsfx-" + cydaw::base::Uuid().toString() + ".jsfx");
+    if (!source.replaceWithText(cydaw::base::Text::fromUTF8(code_.data())))
     {
         status_ = "Cannot write compiler source";
         error_ = true;
         return;
     }
     compiler_ = std::make_unique<Compiler>(source);
-    compiler_->compiled = juce::String::fromUTF8(code_.data());
+    compiler_->compiled = cydaw::base::Text::fromUTF8(code_.data());
     applyAfterCompile_ = apply;
     insertAfterCompile_ = insert;
     status_ = "Compiling JSFX…";
@@ -230,7 +235,7 @@ void JsfxView::poll()
     error_ = !job.success;
     if (job.success && (applyAfterCompile_ || insertAfterCompile_))
     {
-        if (job.compiled != juce::String::fromUTF8(code_.data()))
+        if (job.compiled != cydaw::base::Text::fromUTF8(code_.data()))
         {
             status_ = "The source changed during compilation; compile again before applying";
             error_ = true;
@@ -293,7 +298,7 @@ void JsfxView::draw()
     if (drawnFrame_ == frame)
         return;
     drawnFrame_ = frame;
-    if (state_.jsfxFileToOpen != juce::File())
+    if (state_.jsfxFileToOpen != cydaw::base::File())
     {
         auto file = state_.jsfxFileToOpen;
         state_.jsfxFileToOpen = {};
@@ -304,7 +309,7 @@ void JsfxView::draw()
         return;
     ImGui::SetNextWindowSize(ImVec2(ui::dp(1000), ui::dp(720)), ImGuiCond_FirstUseEver);
     const auto title =
-        ui::Ls("Éditeur JSFX", "JSFX editor") + "###jsfxEditor" + juce::String(state_.deviceWindowNamespace);
+        ui::Ls("Éditeur JSFX", "JSFX editor") + "###jsfxEditor" + cydaw::base::Text(state_.deviceWindowNamespace);
     if (ImGui::Begin(title.toRawUTF8(), &state_.showJsfx, ImGuiWindowFlags_NoDocking))
     {
         if (ImGui::Button(ui::L("Nouveau", "New")))
@@ -331,7 +336,7 @@ void JsfxView::draw()
         ImGui::EndDisabled();
         ImGui::TextDisabled(
             "%s%s",
-            (file_ == juce::File() ? juce::String("Unsaved JSFX") : file_.getFullPathName()).toRawUTF8(),
+            (file_ == cydaw::base::File() ? cydaw::base::Text("Unsaved JSFX") : file_.getFullPathName()).toRawUTF8(),
             changed_ ? " *" : "");
         if (pending_)
             ImGui::OpenPopup("jsfxUnsaved");
@@ -387,13 +392,13 @@ void JsfxView::draw()
     }
     ImGui::End();
 }
-juce::var JsfxView::command(const juce::var &request)
+cydaw::base::Value JsfxView::command(const cydaw::base::Value &request)
 {
     poll();
     state_.showJsfx = true;
     auto action = request.getProperty("action", "info").toString();
     if (action == "open")
-        load(juce::File(request.getProperty("file", {}).toString()));
+        load(cydaw::base::File(request.getProperty("file", {}).toString()));
     else if (action == "source")
     {
         auto text = request.getProperty("source", {}).toString().toStdString();
@@ -409,12 +414,12 @@ juce::var JsfxView::command(const juce::var &request)
         save();
     else if (action == "new")
         fresh();
-    auto result = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto result = cydaw::base::Object::Ptr(new cydaw::base::Object());
     result->setProperty("file", file_.getFullPathName());
     result->setProperty("changed", changed_);
     result->setProperty("compiling", compiler_ != nullptr);
     result->setProperty("error", error_);
     result->setProperty("diagnostics", status_);
-    return juce::var(result.get());
+    return cydaw::base::Value(result.get());
 }
 } // namespace cydaw::v2

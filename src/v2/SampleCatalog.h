@@ -1,8 +1,10 @@
+#include <cydaw/base/EventLoop.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "SampleLibrary.h"
 
-#include <juce_events/juce_events.h>
 
 #include <array>
 #include <atomic>
@@ -26,7 +28,7 @@
 
 namespace cydaw::v2 {
 
-class SampleCatalog final : private app::SampleLibrary::Listener, private juce::Timer {
+class SampleCatalog final : private app::SampleLibrary::Listener, private cydaw::base::Timer {
 public:
     enum Facet { category, group, source, type, key, tempo, length, facetCount };
     enum Column {
@@ -49,21 +51,21 @@ public:
     // A facet's value: its key ("kick", "bank:vcsl", a label), what is shown,
     // and for a category its family's index (categoryFamilies()).
     struct Value {
-        juce::String key;
-        juce::String label;
+        cydaw::base::Text key;
+        cydaw::base::Text label;
         int family { -1 };
     };
     struct Item {
-        juce::String path;
-        juce::String label; // the name, or "01 · its folder"
-        juce::String categoryText;
-        juce::String groupText;
-        juce::String sourceText;
-        juce::String typeText;
-        juce::String keyText;
-        juce::String lengthText;
-        juce::String bpmText;
-        juce::String rateText;
+        cydaw::base::Text path;
+        cydaw::base::Text label; // the name, or "01 · its folder"
+        cydaw::base::Text categoryText;
+        cydaw::base::Text groupText;
+        cydaw::base::Text sourceText;
+        cydaw::base::Text typeText;
+        cydaw::base::Text keyText;
+        cydaw::base::Text lengthText;
+        cydaw::base::Text bpmText;
+        cydaw::base::Text rateText;
         std::array<std::uint16_t, facetCount> facets {};
         int family {};
         float length {};
@@ -77,8 +79,8 @@ public:
     // The quick list's tree: family › category › instrument or bank, and the
     // sources; counts of the whole library.
     struct TreeNode {
-        juce::String key;
-        juce::String label;
+        cydaw::base::Text key;
+        cydaw::base::Text label;
         int count {};
         std::vector<TreeNode> children;
     };
@@ -92,21 +94,21 @@ public:
         std::vector<int> nameRank;
         std::vector<TreeNode> categoryTree;
         std::vector<TreeNode> sourceTree;
-        std::unordered_map<juce::String, int> byPath;
+        std::unordered_map<cydaw::base::Text, int> byPath;
         int generation {};
         double buildMs {};
         double extractMs {};
-        [[nodiscard]] int find(const juce::String& path) const;
-        [[nodiscard]] int valueOf(Facet facet, const juce::String& key) const;
+        [[nodiscard]] int find(const cydaw::base::Text& path) const;
+        [[nodiscard]] int valueOf(Facet facet, const cydaw::base::Text& key) const;
     };
 
     struct Query {
         // Per facet, per value: kept (1) or not (0); empty: the whole column.
         std::array<std::vector<char>, facetCount> selected;
-        juce::String text;
+        cydaw::base::Text text;
         bool favouritesOnly {};
         // A semantic answer, best first: only these, in this order.
-        const std::vector<std::pair<juce::String, float>>* ranked {};
+        const std::vector<std::pair<cydaw::base::Text, float>>* ranked {};
         int sortColumn { colName };
         bool ascending { true };
     };
@@ -132,7 +134,7 @@ public:
 
     [[nodiscard]] static Result run(const Data& data, const Query& query);
     // Small letters without accents, as plain bytes.
-    [[nodiscard]] static std::string fold(const juce::String& text);
+    [[nodiscard]] static std::string fold(const cydaw::base::Text& text);
     // For the performance check: `count` sounds made from the library's.
     [[nodiscard]] std::shared_ptr<const Data> synthetic(int count) const;
 
@@ -157,9 +159,10 @@ private:
     double changedAt_ {};
     double builtAt_ {};
     int generation_ {};
-    juce::ThreadPool pool_ { 1 };
+    cydaw::base::ThreadPool pool_ { 1 };
 
-    JUCE_DECLARE_WEAK_REFERENCEABLE(SampleCatalog)
+    template<class> friend class cydaw::base::WeakReference;
+    cydaw::base::CallbackLifetime callbackLifetime_;
 };
 
 } // namespace cydaw::v2

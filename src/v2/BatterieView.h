@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "PresetMenu.h"
@@ -22,9 +23,9 @@ class BatterieView final {
 public:
     BatterieView(Studio& studio, UiState& state);
 
-    [[nodiscard]] static bool handles(const juce::String& typeKey) { return typeKey == "batterie"; }
+    [[nodiscard]] static bool handles(const cydaw::base::Text& typeKey) { return typeKey == "batterie"; }
     [[nodiscard]] static float paneWidth();
-    void drawPane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
+    void drawPane(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
                   ImU32 colour);
     // `detached`: in a window of its own out of the studio's, as a plug-in's;
     // `mics`: on its kit's controls.
@@ -40,11 +41,11 @@ public:
 private:
     struct Card {
         TrackRef track;
-        app::NodeGraphComponent* graph {};
+        app::GraphDocument* graph {};
         std::uint64_t nodeId {};
         engine::drum::Values values {};
     };
-    [[nodiscard]] bool bind(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId);
+    [[nodiscard]] bool bind(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId);
     [[nodiscard]] float value(int index) const;
     void set(int index, float value);
     bool knob(int index, const char* label, float diameter = 32.0f);
@@ -79,7 +80,7 @@ private:
     int groove_ {};
     int bars_ { 4 };
     int fill_ { -1 };
-    juce::String grooveReport_;
+    cydaw::base::Text grooveReport_;
 };
 
 } // namespace cydaw::v2

@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Theme.h"
@@ -22,28 +24,28 @@ public:
     void applySaved();
     // Every theme, the built-in ones first.
     [[nodiscard]] const std::vector<theme::Theme>& themes();
-    [[nodiscard]] const juce::String& currentKey() const noexcept { return current_; }
+    [[nodiscard]] const cydaw::base::Text& currentKey() const noexcept { return current_; }
     // Picked (applied, remembered). False when there is no such theme.
-    bool choose(const juce::String& key);
+    bool choose(const cydaw::base::Text& key);
     // A theme of one's own, a copy of `from` named `name`: its key.
-    juce::String createFrom(const juce::String& from, const juce::String& name);
+    cydaw::base::Text createFrom(const cydaw::base::Text& from, const cydaw::base::Text& name);
     // A theme of one's own changed (a colour, its name): saved.
-    bool save(const juce::String& key, const juce::String& name, const theme::Palette& palette);
-    bool remove(const juce::String& key);
-    [[nodiscard]] static juce::File folder();
+    bool save(const cydaw::base::Text& key, const cydaw::base::Text& name, const theme::Palette& palette);
+    bool remove(const cydaw::base::Text& key);
+    [[nodiscard]] static cydaw::base::File folder();
 
 private:
     void reload();
-    [[nodiscard]] const theme::Theme* find(const juce::String& key);
+    [[nodiscard]] const theme::Theme* find(const cydaw::base::Text& key);
 
     Studio& studio_;
     UiState& state_;
     std::vector<theme::Theme> themes_;
     bool loaded_ {};
     int language_ { -1 };
-    juce::String current_;
+    cydaw::base::Text current_;
     // The theme shown on the right (its colours), and its name being typed.
-    juce::String shown_;
+    cydaw::base::Text shown_;
     char name_[64] {};
 };
 

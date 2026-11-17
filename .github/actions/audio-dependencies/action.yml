@@ -1,0 +1,28 @@
+name: Pinned CyAudioCore and numerical dependency
+description: Read-only source checkouts; no credentials in packaged artifacts.
+inputs:
+  token:
+    description: Read token for private dependencies (or the job token for public repositories)
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: MrMybal/CyAudioCore
+        ref: 8716ce67b0c3467017369cdc7745e8ff8ef147f2
+        path: .dependencies/CyAudioCore
+        token: ${{ inputs.token }}
+        persist-credentials: false
+    - uses: actions/checkout@v4
+      with:
+        repository: MrMybal/CyDSP
+        ref: c1d9a52fce7ac90515b0e264545903fdad2901b4
+        path: .dependencies/CyDSP
+        token: ${{ inputs.token }}
+        persist-credentials: false
+    - name: Export explicit dependency paths
+      shell: bash
+      run: |
+        echo "CYDAW_CYAUDIOCORE_SOURCE_DIR=${GITHUB_WORKSPACE}/.dependencies/CyAudioCore" >> "$GITHUB_ENV"
+        echo "CYDAW_CYDSP_SOURCE_DIR=${GITHUB_WORKSPACE}/.dependencies/CyDSP" >> "$GITHUB_ENV"

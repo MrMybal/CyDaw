@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <numbers>
+#include <stdexcept>
 
 namespace cydaw::engine {
 
@@ -11,24 +12,6 @@ namespace {
 
 constexpr int kernelZeroCrossings = 16;
 constexpr int kernelResolution = 512; // table points per zero crossing
-
-void transform(std::complex<float>* data, const std::size_t size, const std::vector<std::complex<float>>& twiddles,
-               const std::vector<std::size_t>& reversed) noexcept
-{
-    for (std::size_t i = 0; i < size; ++i)
-        if (i < reversed[i])
-            std::swap(data[i], data[reversed[i]]);
-    for (std::size_t length = 2; length <= size; length <<= 1) {
-        const auto half = length / 2;
-        const auto stride = size / length;
-        for (std::size_t start = 0; start < size; start += length)
-            for (std::size_t k = 0; k < half; ++k) {
-                const auto t = twiddles[k * stride] * data[start + k + half];
-                data[start + k + half] = data[start + k] - t;
-                data[start + k] += t;
-            }
-    }
-}
 
 std::int64_t floorDivide(const std::int64_t value, const std::int64_t by) noexcept
 {
@@ -125,20 +108,8 @@ void TimeStretcher::prepare(const StretchSettings& settings)
     norm_ = sum / hop_;
     // Random phases add up as powers, not as amplitudes.
     textureGain_ = std::sqrt(norm_ / (sum / size_));
-    twiddles_.resize(static_cast<std::size_t>(size_ / 2));
-    for (int k = 0; k < size_ / 2; ++k)
-        twiddles_[static_cast<std::size_t>(k)] = std::polar(1.0f, static_cast<float>(-2.0 * std::numbers::pi * k / size_));
-    reversed_.resize(static_cast<std::size_t>(size_));
-    auto bits = 0;
-    while ((1 << bits) < size_)
-        ++bits;
-    for (int i = 0; i < size_; ++i) {
-        std::size_t r = 0;
-        for (auto bit = 0; bit < bits; ++bit)
-            if ((i >> bit) & 1)
-                r |= std::size_t { 1 } << (bits - 1 - bit);
-        reversed_[static_cast<std::size_t>(i)] = r;
-    }
+    if (fft_.prepare(static_cast<std::size_t>(size_)) != cydsp::Status::ok)
+        throw std::runtime_error("CyDSP FFT preparation failed");
     const auto channels = static_cast<std::size_t>(settings_.channels);
     const auto bins = static_cast<std::size_t>(size_ / 2 + 1);
     read_.assign(channels, std::vector<float>(static_cast<std::size_t>(size_)));
@@ -490,7 +461,7 @@ void TimeStretcher::synthesiseFrame(StretchSource& source)
         const auto& samples = read_[static_cast<std::size_t>(channel)];
         for (int n = 0; n < size_; ++n)
             spectrum[static_cast<std::size_t>(n)] = samples[static_cast<std::size_t>(n)] * window_[static_cast<std::size_t>(n)];
-        transform(spectrum.data(), static_cast<std::size_t>(size_), twiddles_, reversed_);
+        (void) fft_.process(spectrum, spectrum, cydsp::FftDirection::forward);
     }
     // The phases follow the channels' sum, so they keep their differences.
     for (int j = 0; j <= bins; ++j) {
@@ -582,7 +553,7 @@ void TimeStretcher::synthesiseFrame(StretchSource& source)
         }
         for (int j = 1; j < bins; ++j)
             spectrum[static_cast<std::size_t>(size_ - j)] = std::conj(spectrum[static_cast<std::size_t>(j)]);
-        transform(spectrum.data(), static_cast<std::size_t>(size_), twiddles_, reversed_);
+        (void) fft_.process(spectrum, spectrum, cydsp::FftDirection::forward);
         auto* into = stretched_[static_cast<std::size_t>(channel)].data() + (centre - size_ / 2 - base_);
         for (int n = 0; n < size_; ++n)
             into[n] += spectrum[static_cast<std::size_t>(n)].real() * window_[static_cast<std::size_t>(n)] * scale;

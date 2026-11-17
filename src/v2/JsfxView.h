@@ -1,3 +1,5 @@
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/File.h>
 #pragma once
 #include "SourceEditor.h"
 #include "Studio.h"
@@ -10,7 +12,7 @@ class JsfxView final
     JsfxView(Studio &, UiState &);
     ~JsfxView();
     void draw();
-    juce::var command(const juce::var &);
+    cydaw::base::Value command(const cydaw::base::Value &);
     static bool askBeforeQuit(const std::function<void()> &next);
     static void drawQuitPrompts();
 
@@ -20,16 +22,16 @@ class JsfxView final
     Studio &studio_;
     UiState &state_;
     std::unique_ptr<Compiler> compiler_;
-    std::unique_ptr<juce::FileChooser> chooser_;
-    juce::File file_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
+    cydaw::base::File file_;
     std::vector<char> code_;
     bool changed_{}, applyAfterCompile_{}, insertAfterCompile_{};
-    juce::String status_;
+    cydaw::base::Text status_;
     bool error_{};
     std::function<void()> pending_;
     bool quitting_{};
     int drawnFrame_{-1};
-    void load(const juce::File &);
+    void load(const cydaw::base::File &);
     void fresh();
     bool save();
     void choose(bool saving);

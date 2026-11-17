@@ -12,17 +12,24 @@
     </td>
     <td width="300" align="right" valign="top">
       <p><sub>Application license</sub><br><a href="LICENSE"><strong>AGPL-3.0</strong></a></p>
-      <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.78.0 · Alpha 1</strong></a><br><strong>ALPHA</strong></p>
-      <p><a href="https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/CyDAW2-0.78.0-Windows-x64-Alpha.zip"><strong>Download</strong></a><br><sub>Windows x64 · portable ZIP</sub></p>
+      <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.79.0 · Alpha 1</strong></a><br><strong>ALPHA</strong></p>
+      <p><a href="https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/CyDAW2-0.79.0-Windows-x64-Alpha.zip"><strong>Download</strong></a><br><sub>Windows x64 · portable ZIP</sub></p>
     </td>
   </tr>
 </table>
 
 <h1 align="center">CyDaw</h1>
 
+> **Native audio engine:** the audio integration now uses **CyAudioCore**, which manages
+> **CyDSP** internally for numerical DSP, including the internal/exported plugins.
+> The Windows desktop and isolated plugin worker build without JUCE. Audio/MIDI,
+> files and VST3/CLAP/LV2/JSFX hosting use CyAudioCore; the interface uses CyUI. See the
+> [build and integration guide](docs/CyAudioCoreIntegration.md) and the
+> [current validation and remaining limits (French)](docs/NativeRelease.fr.md).
+
 **CyDaw** is an open-source digital audio workstation for musicians, sound designers and audio creators. Compose and arrange music, perform a DJ set, edit recordings, work to picture or build your own instruments and effects.
 
-> **ALPHA · 0.78.0 · Alpha 1**
+> **ALPHA · 0.79.0 · Alpha 1**
 >
 > Experimental Windows x64 release for testing and feedback. Some features may be incomplete. Read the [version notes, source updates and known limitations](VERSION.md). The current sources and online manual can be newer than the downloadable Alpha 1 package.
 
@@ -83,17 +90,17 @@ Open **Help > User manual** or **Ctrl+F1** for the bundled manual. Source builds
 
 The published application package is **Windows 10/11 x64 · Alpha 1**. Source build/export targets do not imply downloadable Linux or macOS application packages.
 
-1. [Download CyDaw 0.78.0 Alpha 1](https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/CyDAW2-0.78.0-Windows-x64-Alpha.zip). [Release notes](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.78.0-alpha.1) and [SHA-256 checksums](https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/SHA256SUMS.txt) accompany it.
+1. [Download CyDaw 0.79.0 Alpha 1](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/CyDAW2-0.79.0-Windows-x64-Alpha.zip). [Release notes](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.1) and [SHA-256 checksums](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/SHA256SUMS.txt) accompany it.
 2. Extract the complete ZIP to a writable folder. Keep the DLLs, plugin worker, fonts, translations and license folders beside the executable.
 3. Start **`CyDAW 2.exe`** (the internal executable name), select **Windows Audio / WASAPI** in audio settings and choose the output channels connected to your speakers.
-4. Download any wanted sound banks in **Options > Sound banks**. The published ZIP does not enable ASIO or VST2.
+4. Download any wanted sound banks in **Options > Sound banks**. The Windows Alpha includes WASAPI and ASIO (PortAudio with the GPL SDK). VST2 is not supported.
 
 ## Source, build and required libraries
 
 <details>
 <summary><strong>Windows source build</strong></summary>
 
-Requirements: **Visual Studio 2022** with C++ tools/Windows SDK, **CMake 3.24+**, **Git/Git LFS**, **Python 3.11+** and **Node.js 22+/npm** for documentation. CMake fetches pinned JUCE 8.0.15 and CyUI sources; CyUI checkout requires access if its repository is restricted. Prepare the shared FFmpeg SDK separately. NASM enables native EEL2 code generation; without it ysfx uses its portable interpreter.
+Requirements: **Visual Studio 2022** with C++ tools/Windows SDK, **CMake 3.24+**, **Git/Git LFS**, **Python 3.12+** and **Node.js 22+/npm** for documentation. CMake fetches pinned CyUI sources; CyAudioCore manages the CyDSP dependency. CyUI checkout requires access if its repository is restricted. Prepare the shared FFmpeg SDK separately. NASM enables native EEL2 code generation; without it ysfx uses its portable interpreter.
 
 ```powershell
 git lfs install
@@ -126,12 +133,12 @@ CyDaw is distributed under the [GNU Affero General Public License v3](LICENSE) (
 
 | Library · source | License · terms | Use / scope |
 | --- | --- | --- |
-| [JUCE 8.0.15](https://github.com/juce-framework/JUCE/tree/8.0.15) | [AGPLv3 / commercial licensing](https://github.com/juce-framework/JUCE/blob/8.0.15/LICENSE.md) | Audio I/O, codecs and plugin hosting; this project uses the AGPL route. JUCE component notices also apply. |
+| [CyAudioCore](https://github.com/MrMybal/CyAudioCore) / [CyDSP](https://github.com/MrMybal/CyDSP) | MIT (original library sources); third-party components retain their own terms | Audio/MIDI, file codecs, sources, plugin hosts and internal numerical DSP. ASIO SDK integration stays in the application. |
 | [Dear ImGui](https://github.com/ocornut/imgui) | [MIT](third_party/imgui/LICENSE.txt) | Native UI; bundled stb helpers retain their notices. |
 | [CyUI](https://github.com/MrMybal/CyUI) | [MIT](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE) | Shared UI controls and audio views. Source access depends on repository permissions. |
 | [CyUI editor components](https://github.com/MrMybal/CyUI) | [MIT and permissive component terms](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/THIRD_PARTY_NOTICES.md) | ImGuiColorTextEdit, Lexilla, Scintilla headers and SciTE language data; notices in Licenses/CyUI. |
 | [CLAP](https://github.com/free-audio/clap) | [MIT](third_party/clap/LICENSE) | Plugin worker host API and native CLAP export. |
-| [LV2](https://lv2plug.in/) | [ISC](third_party/lv2/COPYING) | Native export API/metadata; JUCE’s LV2 host stack has additional component notices. |
+| [LV2](https://lv2plug.in/) | [ISC](third_party/lv2/COPYING) | Native export API/metadata; CyAudioCore supplies the LV2 host runtime and its notices. |
 | [ysfx](https://github.com/jpcima/ysfx) | [Apache-2.0](third_party/ysfx/LICENSE) | JSFX compiler/runtime inside the isolated worker. |
 | [WDL](https://www.cockos.com/wdl/) | [zlib-style](third_party/ysfx/thirdparty/WDL/LICENSE.txt) | EEL2 and LICE used by ysfx. |
 | [stb](https://github.com/nothings/stb) / [dr_libs](https://github.com/mackron/dr_libs) | [Public domain or MIT](third_party/ysfx/thirdparty/stb/LICENSE); [public domain or MIT-0](third_party/ysfx/thirdparty/dr_libs/LICENSE) | JSFX image/audio helpers. |
@@ -143,12 +150,12 @@ CyDaw is distributed under the [GNU Affero General Public License v3](LICENSE) (
 | [Pugl](https://github.com/lv2/pugl) | [ISC](third_party/pugl/COPYING) | Linux X11/OpenGL native plugin editors; export dependency, not a Linux application release. |
 | [CyDoc 0.1.0](https://github.com/MrMybal/CyDoc) | [MIT](https://github.com/MrMybal/CyDoc/blob/6ddf9a582defb2f11fbb3f992afef6f98dcadc93/LICENSE) | Offline HTML reader; Node.js, marked, Prism and esbuild are documentation build tools. |
 
-This table indexes the main components; it does not replace their transitive notices. Keep `LICENSE`, `JUCE_LICENSE.md` and the archive’s `Licenses/` directory, including `Licenses/CyUI`, `Licenses/FFmpeg` and `Licenses/PluginFormats`. Fonts and codecs also retain their notices. Optional dependencies and build tools do not change CyDaw’s license. See the [format dependencies](third_party/PLUGIN_FORMAT_DEPENDENCIES.md), [transport dependencies](third_party/TRANSPORT_DEPENDENCIES.md) and [FFmpeg terms](third_party/FFMPEG.md).
+This table indexes the main components; it does not replace their transitive notices. Keep `LICENSE` and the archive’s `Licenses/` directory, including `Licenses/CyUI`, `Licenses/FFmpeg` and `Licenses/PluginFormats`. Fonts and codecs also retain their notices. Optional dependencies and build tools do not change CyDaw’s license. See the [format dependencies](third_party/PLUGIN_FORMAT_DEPENDENCIES.md), [transport dependencies](third_party/TRANSPORT_DEPENDENCIES.md) and [FFmpeg terms](third_party/FFMPEG.md).
 
 ## References and links
 
 - [Product website](https://mrmybal.github.io/CyDaw/) · [English manual](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/welcome) · [Manuel en français](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/welcome).
-- [Version notes](VERSION.md) · [Published Alpha 1](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.78.0-alpha.1) · [All releases](https://github.com/MrMybal/CyDaw/releases).
+- [Version notes](VERSION.md) · [Published Alpha 1](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.1) · [All releases](https://github.com/MrMybal/CyDaw/releases).
 - [Source repository](https://github.com/MrMybal/CyDaw) · [Issue tracker](https://github.com/MrMybal/CyDaw/issues).
 
 <details>

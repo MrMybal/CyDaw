@@ -1,6 +1,7 @@
+#include <cydaw/base/File.h>
 #pragma once
 
-#include "NodeGraphComponent.h"
+#include "GraphDocument.h"
 
 #include <cstdint>
 #include <functional>
@@ -67,26 +68,27 @@ public:
     enum class Owner { audioTrack, midiTrack, bus, module, workshop, master, modulation, plugin };
     GraphSlot(Owner owner, std::function<void(GraphSlot&, bool structural)> changed);
     ~GraphSlot();
+    static void processPending();
 
-    [[nodiscard]] app::NodeGraphComponent& graph() noexcept { return *graph_; }
-    [[nodiscard]] const app::NodeGraphComponent& graph() const noexcept { return *graph_; }
+    [[nodiscard]] app::GraphDocument& graph() noexcept { return *graph_; }
+    [[nodiscard]] const app::GraphDocument& graph() const noexcept { return *graph_; }
     [[nodiscard]] Owner owner() const noexcept { return owner_; }
     // Bumped by every change, so a view can tell when to refresh caches.
     [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
     // A change made around the editor's notifications (the control port's).
     void touch() noexcept { ++revision_; }
     // Restoring does not notify: the caller publishes once afterwards.
-    void restore(const juce::var& stateWithLibrary);
-    [[nodiscard]] juce::var serialise() const;
-    [[nodiscard]] juce::String lastCompileError() const { return lastError_; }
-    void setLastCompileError(juce::String error) { lastError_ = std::move(error); }
+    void restore(const cydaw::base::Value& stateWithLibrary);
+    [[nodiscard]] cydaw::base::Value serialise() const;
+    [[nodiscard]] cydaw::base::Text lastCompileError() const { return lastError_; }
+    void setLastCompileError(cydaw::base::Text error) { lastError_ = std::move(error); }
 
 private:
     Owner owner_;
-    std::unique_ptr<app::NodeGraphComponent> graph_;
+    std::unique_ptr<app::GraphDocument> graph_;
     std::uint64_t revision_ { 1 };
     bool restoring_ {};
-    juce::String lastError_;
+    cydaw::base::Text lastError_;
 };
 
 // What has settings, as a preset holds it and puts it back:
@@ -94,9 +96,9 @@ private:
 // card's model, a wavetable's table; one undo step), a hosted plug-in
 // (its whole state), a track's whole chain (an instrument and its effects).
 struct PresetHolder {
-    juce::String kind;   // "device", "plugin", "chain"
-    juce::String target; // the card's type, the plug-in's name, the chain's role
-    juce::String key;    // which one it is in the session (its last preset's name)
+    cydaw::base::Text kind;   // "device", "plugin", "chain"
+    cydaw::base::Text target; // the card's type, the plug-in's name, the chain's role
+    cydaw::base::Text key;    // which one it is in the session (its last preset's name)
 };
 
 } // namespace cydaw::v2

@@ -1,3 +1,4 @@
+#include <cydaw/engine/DspHistory.h>
 #include <cydaw/engine/ProEffects.h>
 
 #include <cydaw/engine/AmpEffects.h>
@@ -5,6 +6,9 @@
 #include <cydaw/engine/AudioBuffer.h>
 #include <cydaw/engine/ProEffectsDesign.h>
 
+#include <cydsp/math/DspMath.h>
+#include <cydsp/processors/Diffusion.h>
+#include <cassert>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -21,12 +25,12 @@ constexpr double kPi = std::numbers::pi;
 
 double dbToGain(const double db) noexcept
 {
-    return std::pow(10.0, db / 20.0);
+    return cydsp::decibelsToGain(db, -std::numeric_limits<double>::infinity());
 }
 
 double gainToDb(const double gain) noexcept
 {
-    return 20.0 * std::log10(std::max(gain, 1.0e-12));
+    return cydsp::gainToDecibels(std::max(gain, 1.0e-12), -240.0);
 }
 
 // The coefficient of a one-pole smoother of that many milliseconds.
@@ -59,69 +63,47 @@ std::size_t powerOfTwoAtLeast(const std::size_t value) noexcept
 // A delay line read at any fraction of a sample (four-point Hermite).
 class FractionalDelay {
 public:
-    void prepare(const std::size_t maximumSamples)
-    {
-        buffer_.assign(powerOfTwoAtLeast(maximumSamples + 8), 0.0f);
-        mask_ = buffer_.size() - 1;
-        write_ = 0;
-    }
-    void clear() noexcept { std::fill(buffer_.begin(), buffer_.end(), 0.0f); }
-    void push(const double value) noexcept
-    {
-        buffer_[write_] = static_cast<float>(value);
-        write_ = (write_ + 1) & mask_;
-    }
-    // The sample written `delay` samples before the last one pushed.
-    [[nodiscard]] double read(const double delay) const noexcept
-    {
-        const auto position = static_cast<double>(write_) - 1.0 - std::max(2.0, delay);
-        const auto whole = std::floor(position);
-        const auto t = position - whole;
-        const auto index = static_cast<std::int64_t>(whole);
-        const auto at = [this, index](const std::int64_t offset) {
-            return static_cast<double>(buffer_[static_cast<std::size_t>(index + offset) & mask_]);
-        };
-        const auto xm1 = at(-1);
-        const auto x0 = at(0);
-        const auto x1 = at(1);
-        const auto x2 = at(2);
-        const auto c1 = 0.5 * (x1 - xm1);
-        const auto c2 = xm1 - 2.5 * x0 + 2.0 * x1 - 0.5 * x2;
-        const auto c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
-        return ((c3 * t + c2) * t + c1) * t + x0;
-    }
-    [[nodiscard]] double readWhole(const std::size_t delay) const noexcept
-    {
-        return static_cast<double>(buffer_[(write_ - 1 - delay) & mask_]);
-    }
+  void prepare(std::size_t maximumSamples) { history_.prepare(1, powerOfTwoAtLeast(maximumSamples + 8)); }
+  void clear() noexcept { history_.reset(); }
+  void push(double value) noexcept
+  {
+      const double rounded = static_cast<float>(value);
+      history_.push({&rounded, 1});
+  }
+  [[nodiscard]] double read(double delay) const noexcept
+  {
+      return history_.read(0, std::max(2.0, delay), cydsp::HistoryInterpolation::catmullRom);
+  }
+  [[nodiscard]] double readWhole(std::size_t delay) const noexcept
+  {
+      return history_.read(0, double(delay), cydsp::HistoryInterpolation::nearest);
+  }
 
 private:
-    std::vector<float> buffer_ { 0.0f };
-    std::size_t mask_ {};
-    std::size_t write_ {};
+  DspHistory<double> history_;
 };
 
 // A Schroeder allpass of a whole delay.
 class Allpass {
 public:
-    void prepare(const std::size_t delay)
-    {
-        buffer_.assign(std::max<std::size_t>(1, delay), 0.0f);
-        index_ = 0;
-    }
-    void clear() noexcept { std::fill(buffer_.begin(), buffer_.end(), 0.0f); }
-    double process(const double x, const double g) noexcept
-    {
-        const auto delayed = static_cast<double>(buffer_[index_]);
-        const auto y = delayed - g * x;
-        buffer_[index_] = static_cast<float>(x + g * y);
-        index_ = (index_ + 1) % buffer_.size();
-        return y;
-    }
+  void prepare(std::size_t delay)
+  {
+      delay_ = std::max<std::size_t>(1, delay);
+      history_.prepare(1, delay_);
+  }
+  void clear() noexcept { history_.reset(); }
+  double process(double x, double g) noexcept
+  {
+      const auto delayed = history_.read(0, double(delay_ - 1), cydsp::HistoryInterpolation::nearest);
+      const auto y = delayed - g * x;
+      const double rounded = static_cast<float>(x + g * y);
+      history_.push({&rounded, 1});
+      return y;
+  }
 
 private:
-    std::vector<float> buffer_ { 0.0f };
-    std::size_t index_ {};
+  DspHistory<double> history_;
+  std::size_t delay_{1};
 };
 
 // ---- Réverbe Pro ------------------------------------------------------------------------------
@@ -311,16 +293,9 @@ private:
     // every other.
     static void hadamard(std::array<double, pro::reverbLines>& v) noexcept
     {
-        for (std::size_t span = 1; span < v.size(); span <<= 1)
-            for (std::size_t start = 0; start < v.size(); start += span << 1)
-                for (std::size_t i = start; i < start + span; ++i) {
-                    const auto a = v[i];
-                    const auto b = v[i + span];
-                    v[i] = a + b;
-                    v[i + span] = a - b;
-                }
-        for (auto& value : v)
-            value *= 0.25;
+        const auto status = cydsp::orthogonalMix<double>(v, v);
+        assert(status == cydsp::Status::ok);
+        (void) status;
     }
 
     void designIfChanged(const double space, const double decay, const double brightness) noexcept
@@ -352,6 +327,9 @@ private:
     double rate_ { 48'000.0 };
     std::array<FractionalDelay, pro::reverbLines> lines_;
     std::array<pro::ReverbLoop, pro::reverbLines> loops_ {};
+    // The SDK block bank was measured at +54% in this sample-recursive FDN.
+    // Keep its kernel until a prepared sample-bank API is available; coefficient
+    // design and orthogonal mixing already use public CyDSP APIs.
     std::array<std::array<BiquadState, 3>, pro::reverbLines> loopStates_ {};
     std::array<double, pro::reverbLines> lengths_ {};
     std::array<double, pro::reverbLines> phase_ {};

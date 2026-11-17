@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Utilitaire, Stéréoscope
 // (UtilityDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -9,25 +10,25 @@ namespace utilityd = engine::utility;
 constexpr ImU32 kUtilityInPhase = IM_COL32(96, 214, 128, 255);
 constexpr ImU32 kUtilityOutOfPhase = IM_COL32(255, 92, 92, 255);
 
-juce::String utilitaireModeName(const int index)
+cydaw::base::Text utilitaireModeName(const int index)
 {
     const auto& mode = utilityd::utilitaireChannelModes[static_cast<std::size_t>(std::clamp(index, 0, utilityd::utilitaireChannelModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.french : mode.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.french : mode.english);
 }
-juce::String utilitaireModeHint(const int index)
+cydaw::base::Text utilitaireModeHint(const int index)
 {
     const auto& mode = utilityd::utilitaireChannelModes[static_cast<std::size_t>(std::clamp(index, 0, utilityd::utilitaireChannelModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
 }
-juce::String stereoscopeModeName(const int index)
+cydaw::base::Text stereoscopeModeName(const int index)
 {
     const auto& mode = utilityd::stereoscopeDisplayModes[static_cast<std::size_t>(std::clamp(index, 0, utilityd::stereoscopeDisplayModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.french : mode.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.french : mode.english);
 }
-juce::String stereoscopeModeHint(const int index)
+cydaw::base::Text stereoscopeModeHint(const int index)
 {
     const auto& mode = utilityd::stereoscopeDisplayModes[static_cast<std::size_t>(std::clamp(index, 0, utilityd::stereoscopeDisplayModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
 }
 
 // The processor's readings when they are there and fresh.
@@ -290,6 +291,9 @@ struct StereoscopeMemory {
     int newest { -1 };
     int stored {};
     double fingerprint {};
+    std::uint64_t sequence {}, densityRevision {};
+    std::array<cyui::Point, utilityd::stereoscopePairCount> densityPoints {};
+    std::map<std::pair<ImGuiContext*, ImGuiID>, cyui::StereoDensityState> densityViews;
     double lastAdded {};
     std::array<float, utilityd::stereoscopeAngleBins> angles {};
     std::array<float, historySize> history {};
@@ -300,9 +304,9 @@ struct StereoscopeMemory {
 };
 StereoscopeMemory& stereoscopeMemoryOf(std::vector<Param>& parameters, const Pane& pane)
 {
-    static std::map<juce::String, StereoscopeMemory> memories;
+    static std::map<cydaw::base::Text, StereoscopeMemory> memories;
     const auto* first = at(parameters, pane, 0);
-    return memories[first != nullptr ? first->binding : juce::String("?")];
+    return memories[first != nullptr ? first->binding : cydaw::base::Text("?")];
 }
 
 // The newest readings into the memory: a new set of pairs (at most ~70 a
@@ -318,7 +322,15 @@ void stereoscopeFeed(StereoscopeMemory& memory, const Live& live)
     auto fingerprint = static_cast<double>(readings[utilityd::stereoscopeReadingCorrelation]);
     for (int index = 0; index < values; index += 7)
         fingerprint += static_cast<double>(pairs[index]) * (index + 1);
-    if (fingerprint != memory.fingerprint && now - memory.lastAdded >= 1.0 / 70.0) {
+    const auto sequence = live.afterFrame != nullptr ? live.afterFrame->sequence : 0;
+    if ((memory.stored == 0 || sequence != memory.sequence || fingerprint != memory.fingerprint)
+        && now - memory.lastAdded >= 1.0 / 70.0) {
+        memory.sequence = sequence;
+        ++memory.densityRevision;
+        // CyDaw's side axis is R-L. Swap input channels for CyUI's L-R
+        // projection to preserve the existing left/right screen orientation.
+        for (int pair = 0; pair < utilityd::stereoscopePairCount; ++pair)
+            memory.densityPoints[pair] = {pairs[2 * pair + 1], pairs[2 * pair]};
         memory.fingerprint = fingerprint;
         memory.lastAdded = now;
         memory.newest = (memory.newest + 1) % utilityd::stereoscopeTrailMost;
@@ -376,7 +388,7 @@ void stereoscopeCorrelationBar(ImDrawList* list, const Box& bar, const float now
 // The goniometer (or its polar view), its trail fading by the persistence;
 // the wheel zooms.
 bool stereoscopeScope(std::vector<Param>& parameters, const Pane& pane, const Box& square,
-                      const std::array<float, utilityd::stereoscopeParameterCount>& values, const StereoscopeMemory& memory, const ImU32 colour,
+                      const std::array<float, utilityd::stereoscopeParameterCount>& values, StereoscopeMemory& memory, const ImU32 colour,
                       const Setter& set, const bool large)
 {
     const auto& p = theme::palette();
@@ -387,6 +399,34 @@ bool stereoscopeScope(std::vector<Param>& parameters, const Pane& pane, const Bo
     list->AddRectFilled(square.min, square.max, theme::alpha(kDark, 0.55f), dp(3.0f));
     const auto polar = whole(values[utilityd::stereoscopeDisplayMode], utilityd::stereoscopeDisplayModeCount) == 1;
     const auto zoom = std::clamp(values[utilityd::stereoscopeZoom], 0.5f, 4.0f);
+    if (!polar) {
+        auto& state = memory.densityViews[{ImGui::GetCurrentContext(), ImGui::GetID("##stereoscopeScope")}];
+        const double extent = 1.0 / zoom;
+        state.view.x.range = state.view.y.range = {-extent, extent};
+        cyui::StereoDensityOptions options;
+        options.persistence.resolution = large ? 96 : 64;
+        options.persistence.navigation = false;
+        options.persistence.halfLife = utilityd::stereoscopeTrailSecondsOf(values[utilityd::stereoscopePersistence]) * .25;
+        options.persistence.pointRadius = large ? 1.1f : .8f;
+        const cyui::ArrayView<cyui::Point> points {memory.densityPoints.data(), memory.stored ? memory.densityPoints.size() : 0};
+        const auto cursor = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorScreenPos(square.min);
+        const auto result = cyui::stereoDensity("##stereoscopeScope", state, points, memory.densityRevision,
+                                               ImVec2(std::max(1.0f, square.width()), std::max(1.0f, square.height())), options);
+        ImGui::SetCursorScreenPos(cursor);
+        bool changed = false;
+        if (result.hovered) {
+            auto* parameter = at(parameters, pane, utilityd::stereoscopeZoom);
+            if (io.MouseWheel != 0 && parameter != nullptr) {
+                changed |= apply(parameter, parameter->value * std::exp(io.MouseWheel * .1), set);
+                ui::takeWheel();
+            }
+            if (ImGui::IsMouseDoubleClicked(0) && parameter != nullptr)
+                changed |= apply(parameter, parameter->defaultValue, set);
+            ImGui::SetTooltip("%s", L("Molette : zoom  ·  double clic : zoom d'origine", "Wheel: zoom  ·  double click: zoom back"));
+        }
+        return changed;
+    }
     const auto size = square.width();
     // Where a pair goes: the middle up from `origin`, the side across.
     ImVec2 origin((square.min.x + square.max.x) * 0.5f, (square.min.y + square.max.y) * 0.5f);
@@ -666,7 +706,7 @@ bool utilityLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& par
 // The values a card shows as knobs (pane indices).
 std::vector<int> utilityCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     if (kind == PaneKind::utilitaire)
         return { utilityd::utilitaireGain, utilityd::utilitairePan, utilityd::utilitaireWidth, utilityd::utilitaireMonoBass };
     if (kind == PaneKind::stereoscope)
@@ -675,7 +715,7 @@ std::vector<int> utilityCardFields(const PaneKind kind, std::vector<Param>& para
 }
 
 // A value as these effects show it; empty for none of theirs.
-juce::String utilityFormat(const juce::String& binding, const double value)
+cydaw::base::Text utilityFormat(const cydaw::base::Text& binding, const double value)
 {
     if (binding.contains("utilitaire.")) {
         const auto suffix = binding.fromLastOccurrenceOf("utilitaire.", false, false);
@@ -688,17 +728,17 @@ juce::String utilityFormat(const juce::String& binding, const double value)
         if (suffix == "mute")
             return value >= 0.5 ? ui::Ls("Muet", "Muted") : ui::Ls("Joue", "Playing");
         if (suffix == "monoBass")
-            return utilityd::utilitaireMonoBassOn(static_cast<float>(value)) ? juce::String(juce::roundToInt(value)) + " Hz"
+            return utilityd::utilitaireMonoBassOn(static_cast<float>(value)) ? cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz"
                                                                               : ui::Ls("Coupé", "Off");
         if (suffix == "pan") {
             if (std::abs(value) < 0.005)
                 return "C";
-            return juce::String(juce::roundToInt(std::abs(value) * 100.0)) + (value < 0.0 ? ui::Ls(" G", " L") : ui::Ls(" D", " R"));
+            return cydaw::base::Text(cydaw::base::roundToInt(std::abs(value) * 100.0)) + (value < 0.0 ? ui::Ls(" G", " L") : ui::Ls(" D", " R"));
         }
         if (suffix == "width")
-            return value < 0.005 ? juce::String("Mono") : percent(value);
+            return value < 0.005 ? cydaw::base::Text("Mono") : percent(value);
         if (suffix == "delay")
-            return value <= 0.0 ? ui::Ls("Aucun", "None") : juce::String(value, 2) + " ms";
+            return value <= 0.0 ? ui::Ls("Aucun", "None") : cydaw::base::Text(value, 2) + " ms";
         return {};
     }
     if (binding.contains("stereoscope.")) {
@@ -706,7 +746,7 @@ juce::String utilityFormat(const juce::String& binding, const double value)
         if (suffix == "displayMode")
             return stereoscopeModeName(whole(static_cast<float>(value), utilityd::stereoscopeDisplayModeCount));
         if (suffix == "zoom")
-            return juce::String::fromUTF8("\xc3\x97") + juce::String(value, 2);
+            return cydaw::base::Text::fromUTF8("\xc3\x97") + cydaw::base::Text(value, 2);
         if (suffix == "persistence")
             return percent(value);
         return {};
@@ -715,7 +755,7 @@ juce::String utilityFormat(const juce::String& binding, const double value)
 }
 
 // A parameter of theirs that takes whole steps (a choice, a switch).
-bool utilityStepped(const juce::String& binding)
+bool utilityStepped(const cydaw::base::Text& binding)
 {
     for (const auto* suffix : { "utilitaire.channelMode", "utilitaire.invertLeft", "utilitaire.invertRight", "utilitaire.dcFilter",
                                 "utilitaire.mute", "stereoscope.displayMode" })

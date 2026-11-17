@@ -1,4 +1,7 @@
 #include "cydaw/engine/Loudness.h"
+#include <array>
+#include <cydsp/processors/Biquad.h>
+#include <stdexcept>
 
 #include <algorithm>
 #include <cmath>
@@ -11,15 +14,7 @@ namespace {
 
 struct Biquad {
     double b0 {}, b1 {}, b2 {}, a1 {}, a2 {};
-    double z1 {}, z2 {};
 
-    double process(const double x) noexcept
-    {
-        const auto y = b0 * x + z1;
-        z1 = b1 * x - a1 * y + z2;
-        z2 = b2 * x - a2 * y;
-        return y;
-    }
 };
 
 // The two stages of the K-weighting at any rate (the standard gives them
@@ -83,10 +78,29 @@ double integratedLoudness(const float* const* channels, const int channelCount, 
         if (weight <= 0.0 || channels[channel] == nullptr)
             continue;
         auto [shelf, highPass] = kWeighting(sampleRate);
-        const auto* data = channels[channel];
-        for (std::int64_t i = 0; i < frames; ++i) {
-            const auto y = highPass.process(shelf.process(static_cast<double>(data[i])));
-            sums[static_cast<std::size_t>(i / step)] += weight * y * y;
+        cydsp::Biquad<double> shelfFilter, highPassFilter;
+        constexpr std::size_t blockSize = 1024;
+        if (shelfFilter.prepare({sampleRate, blockSize, 1}) != cydsp::Status::ok ||
+            highPassFilter.prepare({sampleRate, blockSize, 1}) != cydsp::Status::ok)
+            throw std::bad_alloc();
+        const auto configure = [](auto& processor, const Biquad& c)
+        {
+            if (processor.setCoefficients({c.b0, c.b1, c.b2, c.a1, c.a2}) != cydsp::Status::ok)
+                throw std::runtime_error("K weighting coefficients");
+        };
+        configure(shelfFilter, shelf);
+        configure(highPassFilter, highPass);
+        std::array<double, blockSize> scratch{};
+        double* pointer = scratch.data();
+        for (std::int64_t at = 0; at < frames; at += blockSize)
+        {
+            const auto count = std::min<std::int64_t>(blockSize, frames - at);
+            std::copy_n(channels[channel] + at, count, scratch.begin());
+            const cydsp::AudioBlock<double> block(&pointer, 1, static_cast<std::size_t>(count));
+            if (shelfFilter.process(block, block) != cydsp::Status::ok || highPassFilter.process(block, block) != cydsp::Status::ok)
+                throw std::runtime_error("K weighting filter");
+            for (std::int64_t i = 0; i < count; ++i)
+                sums[static_cast<std::size_t>((at + i) / step)] += weight * scratch[i] * scratch[i];
         }
     }
     // Blocks of four steps (400 ms), one step apart; a sound shorter than a

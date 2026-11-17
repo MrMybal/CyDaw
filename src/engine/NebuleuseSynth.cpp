@@ -271,6 +271,7 @@ private:
         }
         case 3: {
             // Strings: five saws apart, slowly moving, softened.
+            const PhaseWaveforms oscillator;
             static constexpr std::array<double, 5> cents { -12.0, -5.0, 0.0, 6.0, 11.0 };
             std::array<double, 5> phases {};
             auto soft = 0.0;

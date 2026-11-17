@@ -1,3 +1,4 @@
+#include "DspParts.h"
 #include <cydaw/engine/AmpEffects.h>
 
 #include <cydaw/engine/AmpDesign.h>
@@ -101,124 +102,10 @@ struct OnePole {
     double highPass(const double x) noexcept { return x - lowPass(x); }
 };
 
-double besselI0(const double x) noexcept
-{
-    auto sum = 1.0;
-    auto term = 1.0;
-    for (int k = 1; k < 32; ++k) {
-        term *= (x / (2.0 * k)) * (x / (2.0 * k));
-        sum += term;
-    }
-    return sum;
-}
-
-// Up and down by 2 or 4: a linear-phase windowed-sinc filter of 16 taps a
-// factor and one, so the way there and back delays the sound 16 samples.
-class Oversampler {
-public:
-    void prepare(const int factor)
-    {
-        factor_ = std::max(1, factor);
-        taps_ = 16 * factor_ + 1;
-        coefficients_.assign(static_cast<std::size_t>(taps_), 0.0);
-        const auto cutoff = 0.45 / static_cast<double>(factor_);
-        const auto middle = (taps_ - 1) * 0.5;
-        constexpr auto beta = 7.0;
-        auto sum = 0.0;
-        for (int n = 0; n < taps_; ++n) {
-            const auto t = n - middle;
-            const auto sinc = t == 0.0 ? 2.0 * cutoff : std::sin(2.0 * kPi * cutoff * t) / (kPi * t);
-            const auto ratio = 2.0 * n / (taps_ - 1) - 1.0;
-            const auto window = besselI0(beta * std::sqrt(std::max(0.0, 1.0 - ratio * ratio))) / besselI0(beta);
-            coefficients_[static_cast<std::size_t>(n)] = sinc * window;
-            sum += sinc * window;
-        }
-        for (auto& c : coefficients_)
-            c /= sum;
-        upHistory_.assign(static_cast<std::size_t>((taps_ + factor_ - 1) / factor_ + 1), 0.0);
-        downHistory_.assign(static_cast<std::size_t>(taps_), 0.0);
-    }
-    void reset() noexcept
-    {
-        std::fill(upHistory_.begin(), upHistory_.end(), 0.0);
-        std::fill(downHistory_.begin(), downHistory_.end(), 0.0);
-    }
-    [[nodiscard]] int factor() const noexcept { return factor_; }
-    [[nodiscard]] int latency() const noexcept { return factor_ > 1 ? 16 : 0; }
-    // One sample in, `factor` out.
-    void up(const double x, double* out) noexcept
-    {
-        if (factor_ == 1) {
-            out[0] = x;
-            return;
-        }
-        std::copy_backward(upHistory_.begin(), upHistory_.end() - 1, upHistory_.end());
-        upHistory_[0] = x;
-        for (int phase = 0; phase < factor_; ++phase) {
-            auto sum = 0.0;
-            for (int k = 0, j = phase; j < taps_; ++k, j += factor_)
-                sum += coefficients_[static_cast<std::size_t>(j)] * upHistory_[static_cast<std::size_t>(k)];
-            out[phase] = sum * factor_;
-        }
-    }
-    // `factor` samples in, one out.
-    double down(const double* in) noexcept
-    {
-        if (factor_ == 1)
-            return in[0];
-        for (int phase = 0; phase < factor_; ++phase) {
-            std::copy_backward(downHistory_.begin(), downHistory_.end() - 1, downHistory_.end());
-            downHistory_[0] = in[phase];
-        }
-        auto sum = 0.0;
-        for (int n = 0; n < taps_; ++n)
-            sum += coefficients_[static_cast<std::size_t>(n)] * downHistory_[static_cast<std::size_t>(n)];
-        return sum;
-    }
-
-private:
-    int factor_ { 1 };
-    int taps_ { 1 };
-    std::vector<double> coefficients_;
-    std::vector<double> upHistory_;
-    std::vector<double> downHistory_;
-};
-
-// A delay line read between samples (linear).
-class Delay {
-public:
-    void prepare(const std::size_t samples)
-    {
-        std::size_t size = 1;
-        while (size < samples + 4)
-            size <<= 1;
-        buffer_.assign(size, 0.0);
-        mask_ = size - 1;
-        write_ = 0;
-    }
-    void reset() noexcept { std::fill(buffer_.begin(), buffer_.end(), 0.0); }
-    void push(const double x) noexcept
-    {
-        buffer_[write_] = x;
-        write_ = (write_ + 1) & mask_;
-    }
-    // The sample pushed `delay` samples before the last one.
-    [[nodiscard]] double read(const double delay) const noexcept
-    {
-        const auto position = static_cast<double>(write_) - 1.0 - std::clamp(delay, 0.0, static_cast<double>(mask_ - 2));
-        const auto whole = std::floor(position);
-        const auto t = position - whole;
-        const auto index = static_cast<std::int64_t>(whole);
-        const auto a = buffer_[static_cast<std::size_t>(index) & mask_];
-        const auto b = buffer_[static_cast<std::size_t>(index + 1) & mask_];
-        return a + (b - a) * t;
-    }
-
-private:
-    std::vector<double> buffer_;
-    std::size_t mask_ {};
-    std::size_t write_ {};
-};
+// Shared SDK-backed host adapters preserve the amp's original 16-frame
+// latency, polyphase tuning and feedback topology.
+using Oversampler = dsp::Oversampler;
+using Delay = dsp::Delay;
 
 // The early reflections of a small live room: taps of a line, alternate
 // signs, the right side's a little later.

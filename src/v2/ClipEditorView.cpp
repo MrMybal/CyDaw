@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Text.h>
 #include "ClipEditorView.h"
 
 #include "AudioEditorView.h"
@@ -310,7 +312,7 @@ void ClipEditorView::drawMidiToolbar(const TrackRef& track, const MidiClip& clip
     std::snprintf(name, sizeof(name), "%s", clip.name.toRawUTF8());
     ImGui::SetNextItemWidth(dp(150.0f));
     if (ImGui::InputText("##clipName", name, sizeof(name), ImGuiInputTextFlags_EnterReturnsTrue))
-        (void) engine.setMidiClipPresentation(track.midiId, clip.id, juce::String::fromUTF8(name), 0);
+        (void) engine.setMidiClipPresentation(track.midiId, clip.id, cydaw::base::Text::fromUTF8(name), 0);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", studio_.trackName(track).toRawUTF8());
 
@@ -566,7 +568,7 @@ void ClipEditorView::drawNoteBar(const TrackRef& track, const MidiClip& clip)
     ImGui::DragFloat("##velocityRandom", &velocityRandom_, 0.25f, 0.0f, 127.0f, "%.0f");
     ImGui::SameLine(0.0f, dp(2.0f));
     if (ImGui::SmallButton(L("Hasard vél.", "Random vel."))) {
-        auto& random = juce::Random::getSystemRandom();
+        auto& random = cydaw::base::Random::getSystemRandom();
         const auto amount = velocityRandom_ / 127.0f;
         apply([&random, amount](MidiNote& note, std::size_t) { note.velocity += (random.nextFloat() * 2.0f - 1.0f) * amount; });
     }
@@ -576,7 +578,7 @@ void ClipEditorView::drawNoteBar(const TrackRef& track, const MidiClip& clip)
     ImGui::DragFloat("##timingRandom", &timingRandom_, 0.25f, 0.0f, 200.0f, "%.0f ms");
     ImGui::SameLine(0.0f, dp(2.0f));
     if (ImGui::SmallButton(L("Hasard temps", "Random time"))) {
-        auto& random = juce::Random::getSystemRandom();
+        auto& random = cydaw::base::Random::getSystemRandom();
         const auto beats = timingRandom_ / 1'000.0 / (60.0 / std::max(1.0, engine.tempo()));
         apply([&random, beats](MidiNote& note, std::size_t) { note.startBeats += (random.nextDouble() * 2.0 - 1.0) * beats; });
     }
@@ -687,7 +689,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         if (clip.lengthBeats > visibleBeats * 0.95)
             pixelsPerBeat_ = std::clamp(static_cast<float>((gridMax_.x - gridMin_.x) / ImGui::GetStyle().FontScaleDpi
                                                            / (clip.lengthBeats + 0.5)),
-                                        8.0f, 400.0f);
+                                        1.0e-6f, 600.0f);
     }
     scrollY_ = std::clamp(scrollY_, 0.0f, std::max(0.0f, 128.0f * rowH - (gridMax_.y - gridMin_.y)));
 
@@ -1060,13 +1062,13 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     if ((hovered || (gesture && ImGui::IsItemActive())) && io.MouseWheel != 0.0f) {
         if (io.KeyCtrl) {
             const auto before = xToBeat(mouse.x);
-            pixelsPerBeat_ = std::clamp(pixelsPerBeat_ * (io.MouseWheel > 0.0f ? 1.15f : 1.0f / 1.15f), 6.0f, 600.0f);
+            pixelsPerBeat_ = std::clamp(pixelsPerBeat_ * (io.MouseWheel > 0.0f ? 1.15f : 1.0f / 1.15f), 1.0e-6f, 600.0f);
             scrollBeats_ = before - static_cast<double>(mouse.x - gridMin_.x) / (pixelsPerBeat_ * ImGui::GetStyle().FontScaleDpi);
         } else if (io.KeyShift) {
             scrollBeats_ -= io.MouseWheel * 40.0 / ppb;
         } else if (io.KeyAlt) {
             const auto noteAtMouse = yToNote(mouse.y);
-            rowHeight_ = std::clamp(rowHeight_ + io.MouseWheel, 6.0f, 30.0f);
+            rowHeight_ = std::clamp(rowHeight_ + io.MouseWheel, 1.0f, 30.0f);
             scrollY_ = (127 - noteAtMouse) * dp(rowHeight_) - (mouse.y - gridMin_.y);
         } else {
             scrollY_ -= io.MouseWheel * rowH * 3.0f;
@@ -1353,16 +1355,16 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         auto position = scrollBeats_;
         auto zoom = static_cast<double>(ppb);
         if (ui::timelineBand("##timeBand", ImVec2(gridMin_.x, origin.y), ImVec2(gridMax_.x, origin.y + navigatorHeight), position, zoom,
-                             6.0 * ImGui::GetStyle().FontScaleDpi, 600.0 * ImGui::GetStyle().FontScaleDpi, 1.0,
+                             1.0e-6 * ImGui::GetStyle().FontScaleDpi, 600.0 * ImGui::GetStyle().FontScaleDpi, 1.0,
                              studio_.engine().beatsPerBar(), -1.0e6)) {
             // Double click: the whole clip.
-            zoom = std::clamp((gridMax_.x - gridMin_.x) / (clip.lengthBeats + 0.5), 6.0 * ImGui::GetStyle().FontScaleDpi,
+            zoom = std::clamp((gridMax_.x - gridMin_.x) / (clip.lengthBeats + 0.5), 1.0e-6 * ImGui::GetStyle().FontScaleDpi,
                               600.0 * ImGui::GetStyle().FontScaleDpi);
             position = -0.25;
         }
         scrollBeats_ = position;
         pixelsPerBeat_ = static_cast<float>(zoom / ImGui::GetStyle().FontScaleDpi);
-        if (ui::rowsBand("##rowsBand", ImVec2(keysRight, gridMin_.y), ImVec2(gridMin_.x, gridMax_.y), scrollY_, rowHeight_, 6.0f, 30.0f,
+        if (ui::rowsBand("##rowsBand", ImVec2(keysRight, gridMin_.y), ImVec2(gridMin_.x, gridMax_.y), scrollY_, rowHeight_, 1.0f, 30.0f,
                          true)) {
             rowHeight_ = 13.0f;
             scrollY_ = -1.0f;
@@ -1370,7 +1372,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         if (ui::bandCorner("##bandCorner", ImVec2(keysRight, origin.y), ImVec2(gridMin_.x, origin.y + navigatorHeight))) {
             // The whole clip, the rows at their size round its notes.
             pixelsPerBeat_ = std::clamp(static_cast<float>((gridMax_.x - gridMin_.x) / (clip.lengthBeats + 0.5) / ImGui::GetStyle().FontScaleDpi),
-                                        6.0f, 600.0f);
+                                        1.0e-6f, 600.0f);
             scrollBeats_ = -0.25;
             rowHeight_ = 13.0f;
             scrollY_ = -1.0f;
@@ -1393,8 +1395,9 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         // Before the clip too, as the audio editor counts them: -1, -2…
         // (dimmer).
         const auto barBeats = std::max(1.0, static_cast<double>(studio_.engine().beatsPerBar()));
-        const auto bar = static_cast<int>(std::floor(beat / barBeats + 1.0e-9));
-        std::snprintf(text, sizeof(text), "%d.%d", bar >= 0 ? bar + 1 : bar, static_cast<int>(beat - bar * barBeats + 1.0e-9) + 1);
+        const auto bar = static_cast<std::int64_t>(std::floor(beat / barBeats + 1.0e-9));
+        std::snprintf(text, sizeof(text), "%lld.%d", static_cast<long long>(bar >= 0 ? bar + 1 : bar),
+                      static_cast<int>(beat - static_cast<double>(bar) * barBeats + 1.0e-9) + 1);
         list->AddLine(ImVec2(x, gridMin_.y - dp(5.0f)), ImVec2(x, gridMin_.y), p.textFaint);
         list->AddText(ImVec2(x + dp(2.0f), rulerTop + dp(2.0f)), beat < 0.0 ? p.textFaint : p.textDim, text);
     }
@@ -1829,7 +1832,7 @@ void ClipEditorView::drawClipBar(const TrackRef& track, const MidiClip& clip, co
 
 // ---- The velocity lane ----------------------------------------------------------------------
 
-void ClipEditorView::report(const juce::String& text)
+void ClipEditorView::report(const cydaw::base::Text& text)
 {
     state_.status = text;
     state_.statusIsError = false;
@@ -2115,7 +2118,7 @@ void ClipEditorView::copyVelocities(const MidiClip& clip)
     const auto chance = laneKind_ == LaneKind::chance;
     for (const auto& note : picked)
         values.push_back(chance ? note.chance : note.velocity);
-    report(juce::String(static_cast<int>(values.size())) + (chance ? ui::Ls(" chances copiées", " chances copied")
+    report(cydaw::base::Text(static_cast<int>(values.size())) + (chance ? ui::Ls(" chances copiées", " chances copied")
                                                                    : ui::Ls(" vélocités copiées", " velocities copied")));
 }
 
@@ -2141,7 +2144,7 @@ void ClipEditorView::pasteVelocities(const TrackRef& track, const MidiClip& clip
     }
     (void) engine.endMidiEdit();
     studio_.markDirty();
-    report(juce::String(static_cast<int>(picked.size())) + ui::Ls(" vélocités collées", " velocities pasted"));
+    report(cydaw::base::Text(static_cast<int>(picked.size())) + ui::Ls(" vélocités collées", " velocities pasted"));
 }
 
 void ClipEditorView::nudgeVelocities(const TrackRef& track, const MidiClip& clip, const float amount)
@@ -2179,7 +2182,7 @@ void ClipEditorView::copyNotes(const MidiClip& clip)
     copied.notes = std::move(picked);
     copied.span = std::max(grid, std::ceil((last - first) / grid - 1.0e-9) * grid);
     pasteNext_ = first + copied.span;
-    report(juce::String(static_cast<int>(copied.notes.size())) + ui::Ls(" notes copiées", " notes copied"));
+    report(cydaw::base::Text(static_cast<int>(copied.notes.size())) + ui::Ls(" notes copiées", " notes copied"));
 }
 
 void ClipEditorView::pasteNotes(const TrackRef& track, const MidiClip& clip)
@@ -2203,7 +2206,7 @@ void ClipEditorView::pasteNotes(const TrackRef& track, const MidiClip& clip)
     selection_ = pasted;
     pasteNext_ = at + copied.span;
     studio_.markDirty();
-    report(juce::String(static_cast<int>(pasted.size())) + ui::Ls(" notes collées", " notes pasted"));
+    report(cydaw::base::Text(static_cast<int>(pasted.size())) + ui::Ls(" notes collées", " notes pasted"));
 }
 
 void ClipEditorView::drawMidiPopups(const TrackRef& track, const MidiClip& clip)
@@ -2375,7 +2378,7 @@ void ClipEditorView::applyShape(const TrackRef& track, const MidiClip& clip, con
                 step = 1.0 / (4.0 * rate);
             for (auto time = onset; time <= seconds + 1.0e-9; time += step) {
                 const auto depthNow = depth * std::min(1.0, (time - onset) / rise);
-                add.push_back({ at(time), static_cast<float>(depthNow * std::sin(2.0 * juce::MathConstants<double>::pi * rate * (time - onset))) });
+                add.push_back({ at(time), static_cast<float>(depthNow * std::sin(2.0 * cydaw::base::MathConstants<double>::pi * rate * (time - onset))) });
             }
             break;
         }

@@ -1,8 +1,12 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "Vst3Build.h"
 
 #include "Locations.h"
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
  #ifndef NOMINMAX
   #define NOMINMAX
  #endif
@@ -20,52 +24,52 @@ namespace {
 // What the compiler writes: UTF-8, else the console's code page (Visual
 // Studio's French messages come in CP850). Control characters other than
 // tabs are dropped.
-juce::String fromConsole(const char* data, const int size)
+cydaw::base::Text fromConsole(const char* data, const int size)
 {
-    juce::String text;
-    if (juce::CharPointer_UTF8::isValidString(data, size)) {
-        text = juce::String::fromUTF8(data, size);
+    cydaw::base::Text text;
+    if (cydaw::base::Text::isValidUTF8(data, size)) {
+        text = cydaw::base::Text::fromUTF8(data, size);
     } else {
-#if JUCE_WINDOWS
+#if defined(_WIN32)
         const auto wide = MultiByteToWideChar(CP_OEMCP, 0, data, size, nullptr, 0);
         std::wstring converted(static_cast<std::size_t>(std::max(0, wide)), L'\0');
         if (wide > 0)
             MultiByteToWideChar(CP_OEMCP, 0, data, size, converted.data(), wide);
-        text = juce::String(converted.c_str());
+        text = cydaw::base::Text(converted.c_str());
 #else
-        text = juce::String(juce::CharPointer_ASCII(data), static_cast<size_t>(size));
+        text = cydaw::base::Text::fromUTF8(data,size);
 #endif
     }
-    juce::String clean;
+    cydaw::base::Text clean;
     for (const auto character : text)
         if (character >= 0x20 || character == '\t' || character == '\n')
-            clean += juce::String::charToString(character);
+            clean += cydaw::base::Text::charToString(character);
     return clean;
 }
 constexpr auto kLogLines = 400;
 
-juce::File cmakeOnPath()
+cydaw::base::File cmakeOnPath()
 {
-    const auto path = juce::SystemStats::getEnvironmentVariable("PATH", {});
-    for (const auto& folder : juce::StringArray::fromTokens(path, ";", "\""))
-        if (const auto candidate = juce::File(folder.trim()).getChildFile("cmake.exe"); folder.isNotEmpty() && candidate.existsAsFile())
+    const auto path = cydaw::base::SystemStats::getEnvironmentVariable("PATH", {});
+    for (const auto& folder : cydaw::base::TextList::fromTokens(path, ";", "\""))
+        if (const auto candidate = cydaw::base::File(folder.trim()).getChildFile("cmake.exe"); folder.isNotEmpty() && candidate.existsAsFile())
             return candidate;
     return {};
 }
 
-juce::File executableOnPath(const juce::String& name)
+cydaw::base::File executableOnPath(const cydaw::base::Text& name)
 {
-    for(const auto& folder:juce::StringArray::fromTokens(juce::SystemStats::getEnvironmentVariable("PATH",{}),";","\""))
+    for(const auto& folder:cydaw::base::TextList::fromTokens(cydaw::base::SystemStats::getEnvironmentVariable("PATH",{}),";","\""))
         if(folder.trim().isNotEmpty())
-            if(auto file=juce::File(folder.trim()).getChildFile(name);file.existsAsFile()&&!file.getFullPathName().containsIgnoreCase("WindowsApps"))return file;
+            if(auto file=cydaw::base::File(folder.trim()).getChildFile(name);file.existsAsFile()&&!file.getFullPathName().containsIgnoreCase("WindowsApps"))return file;
     return {};
 }
 
-juce::File visualStudioCmake()
+cydaw::base::File visualStudioCmake()
 {
     for (const auto* root : { "C:\\Program Files\\Microsoft Visual Studio\\2022", "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022" })
         for (const auto* edition : { "Community", "Professional", "Enterprise", "BuildTools" }) {
-            const auto candidate = juce::File(root).getChildFile(edition).getChildFile(
+            const auto candidate = cydaw::base::File(root).getChildFile(edition).getChildFile(
                 "Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake.exe");
             if (candidate.existsAsFile())
                 return candidate;
@@ -75,27 +79,27 @@ juce::File visualStudioCmake()
 
 } // namespace
 
-bool Vst3Build::isSourceRoot(const juce::File& folder)
+bool Vst3Build::isSourceRoot(const cydaw::base::File& folder)
 {
     const auto lists = folder.getChildFile("CMakeLists.txt");
     return lists.existsAsFile() && lists.getSize() < 2 * 1024 * 1024
            && folder.getChildFile("src/native_plugin/NativePlugin.cmake").existsAsFile();
 }
 
-Vst3Build::Tools Vst3Build::findTools(const juce::File& sourceRootHint)
+Vst3Build::Tools Vst3Build::findTools(const cydaw::base::File& sourceRootHint)
 {
     Tools tools;
     tools.cmake = cmakeOnPath();
     if (!tools.cmake.existsAsFile())
         tools.cmake = visualStudioCmake();
-    if (sourceRootHint != juce::File() && isSourceRoot(sourceRootHint)) {
+    if (sourceRootHint != cydaw::base::File() && isSourceRoot(sourceRootHint)) {
         tools.sourceRoot = sourceRootHint;
-    } else if (const auto fromEnvironment = juce::SystemStats::getEnvironmentVariable("CYDAW_SOURCE_ROOT", {});
-               fromEnvironment.isNotEmpty() && isSourceRoot(juce::File(fromEnvironment))) {
-        tools.sourceRoot = juce::File(fromEnvironment);
+    } else if (const auto fromEnvironment = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_SOURCE_ROOT", {});
+               fromEnvironment.isNotEmpty() && isSourceRoot(cydaw::base::File(fromEnvironment))) {
+        tools.sourceRoot = cydaw::base::File(fromEnvironment);
     } else {
         // Run from a build folder of the sources: they are a few levels up.
-        auto folder = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+        auto folder = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile).getParentDirectory();
         for (auto level = 0; level < 7 && folder.exists(); ++level, folder = folder.getParentDirectory()) {
             if (isSourceRoot(folder)) {
                 tools.sourceRoot = folder;
@@ -112,23 +116,23 @@ Vst3Build::Tools Vst3Build::findTools(const juce::File& sourceRootHint)
     }
     tools.python=executableOnPath("python.exe");
     if(!tools.python.existsAsFile()) {
-        const auto local=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getSiblingFile("Local").getChildFile("Programs/Python");
-        for(const auto& folder:local.findChildFiles(juce::File::findDirectories,false,"Python*"))
+        const auto local=cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory).getSiblingFile("Local").getChildFile("Programs/Python");
+        for(const auto& folder:local.findChildFiles(cydaw::base::File::findDirectories,false,"Python*"))
             if(folder.getChildFile("python.exe").existsAsFile())tools.python=folder.getChildFile("python.exe");
     }
-    const auto configured=juce::SystemStats::getEnvironmentVariable("CYDAW_PLUGIN_TOOLCHAINS",{});
-    tools.linuxToolchain=(configured.isNotEmpty()?juce::File(configured):locations::folder(Location::cache).getChildFile("plugin-toolchains")).getChildFile("linux/linux-x86_64.cmake");
+    const auto configured=cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_PLUGIN_TOOLCHAINS",{});
+    tools.linuxToolchain=(configured.isNotEmpty()?cydaw::base::File(configured):locations::folder(Location::cache).getChildFile("plugin-toolchains")).getChildFile("linux/linux-x86_64.cmake");
     if (tools.sourceRoot.isDirectory())
         tools.vst3Sdk = tools.sourceRoot.getChildFile("build/native-vst3-sdk");
     return tools;
 }
 
-juce::File Vst3Build::workFolder()
+cydaw::base::File Vst3Build::workFolder()
 {
     return locations::folder(Location::cache).getChildFile("vst3-native");
 }
 
-Vst3Build::Vst3Build() : juce::Thread("CyDAW VST3 build") {}
+Vst3Build::Vst3Build() : cydaw::base::Thread("CyDAW VST3 build") {}
 
 Vst3Build::~Vst3Build()
 {
@@ -136,8 +140,8 @@ Vst3Build::~Vst3Build()
     stopThread(15'000);
 }
 
-bool Vst3Build::start(const juce::File& project, const juce::File& destination, const juce::String& productName,
-                      const Tools& tools, const juce::String& format)
+bool Vst3Build::start(const cydaw::base::File& project, const cydaw::base::File& destination, const cydaw::base::Text& productName,
+                      const Tools& tools, const cydaw::base::Text& format)
 {
     return startBatch({Job{project,destination,productName,format,"Windows"}},tools);
 }
@@ -149,10 +153,10 @@ bool Vst3Build::startBatch(const std::vector<Job>& jobs,const Tools& tools)
         if((job.format!="VST3"&&job.format!="CLAP"&&job.format!="LV2")||(job.platform!="Windows"&&job.platform!="Linux"))return false;
     {
         const std::scoped_lock lock(mutex_);
-        jobs_=jobs;tools_=tools;results_.clear();log_.clear();bundle_=juce::File();failure_.clear();
-        started_=juce::Time::getMillisecondCounterHiRes()*.001;finished_=0;
+        jobs_=jobs;tools_=tools;results_.clear();log_.clear();bundle_=cydaw::base::File();failure_.clear();
+        started_=cydaw::base::Time::getMillisecondCounterHiRes()*.001;finished_=0;
     }
-    phase_=Phase::configuring;startThread(juce::Thread::Priority::low);return true;
+    phase_=Phase::configuring;startThread(cydaw::base::Thread::Priority::low);return true;
 }
 std::vector<Vst3Build::JobResult> Vst3Build::results()const
 {
@@ -164,19 +168,19 @@ void Vst3Build::cancel()
     signalThreadShouldExit();
 }
 
-juce::StringArray Vst3Build::log() const
+cydaw::base::TextList Vst3Build::log() const
 {
     const std::scoped_lock lock(mutex_);
     return log_;
 }
 
-juce::File Vst3Build::bundle() const
+cydaw::base::File Vst3Build::bundle() const
 {
     const std::scoped_lock lock(mutex_);
     return bundle_;
 }
 
-juce::String Vst3Build::failure() const
+cydaw::base::Text Vst3Build::failure() const
 {
     const std::scoped_lock lock(mutex_);
     return failure_;
@@ -185,11 +189,11 @@ juce::String Vst3Build::failure() const
 double Vst3Build::elapsedSeconds() const
 {
     const std::scoped_lock lock(mutex_);
-    const auto end = finished_ > 0.0 ? finished_ : juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto end = finished_ > 0.0 ? finished_ : cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     return started_ > 0.0 ? end - started_ : 0.0;
 }
 
-void Vst3Build::addLine(const juce::String& line)
+void Vst3Build::addLine(const cydaw::base::Text& line)
 {
     const std::scoped_lock lock(mutex_);
     log_.add(line);
@@ -198,34 +202,34 @@ void Vst3Build::addLine(const juce::String& line)
         log_.removeRange(0, log_.size() - kLogLines);
 }
 
-void Vst3Build::finish(const Phase phase, const juce::String& failure)
+void Vst3Build::finish(const Phase phase, const cydaw::base::Text& failure)
 {
     {
         const std::scoped_lock lock(mutex_);
         failure_ = failure;
-        finished_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        finished_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     }
     phase_ = phase;
 }
 
-bool Vst3Build::runStep(const juce::StringArray& command)
+bool Vst3Build::runStep(const cydaw::base::TextList& command)
 {
     addLine("> " + command.joinIntoString(" "));
-    juce::ChildProcess process;
-    const auto windows=juce::SystemStats::getEnvironmentVariable("SystemRoot","C:/Windows");
-    const auto path=windows+"/System32;"+windows+";"+juce::SystemStats::getEnvironmentVariable("PATH",{});
-    juce::StringArray clean {tools_.cmake.getFullPathName(), "-E", "env", "--unset=PATH", "--unset=Path", "Path="+path, "--"};
+    cydaw::base::ChildProcess process;
+    const auto windows=cydaw::base::SystemStats::getEnvironmentVariable("SystemRoot","C:/Windows");
+    const auto path=windows+"/System32;"+windows+";"+cydaw::base::SystemStats::getEnvironmentVariable("PATH",{});
+    cydaw::base::TextList clean {tools_.cmake.getFullPathName(), "-E", "env", "--unset=PATH", "--unset=Path", "Path="+path, "--"};
     // MSBuild uses the mixed-case Path property for post-build tools; an
     // uppercase PATH is replaced by an empty property in VC targets.
     // SDK post-build commands also contain paths relative to the build directory.
     if(command.size()>2 && command[1]=="--build")
         clean.addArray({command[0],"-E","chdir",command[2]});
     clean.addArray(command);
-    if (!process.start(clean, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+    if (!process.start(clean, cydaw::base::ChildProcess::wantStdOut | cydaw::base::ChildProcess::wantStdErr)) {
         addLine("could not start " + command[0]);
         return false;
     }
-    juce::String pending;
+    cydaw::base::Text pending;
     char buffer[4096];
     for (;;) {
         if (threadShouldExit()) {
@@ -249,14 +253,14 @@ bool Vst3Build::runStep(const juce::StringArray& command)
         addLine(pending.trimEnd());
     const auto code = process.getExitCode();
     if (code != 0)
-        addLine("exit code " + juce::String(static_cast<int>(code)));
+        addLine("exit code " + cydaw::base::Text(static_cast<int>(code)));
     return code == 0;
 }
 
 void Vst3Build::run()
 {
     (void)workFolder().createDirectory();
-    (void)workFolder().getChildFile("build.log").replaceWithText(juce::String());
+    (void)workFolder().getChildFile("build.log").replaceWithText(cydaw::base::Text());
     bool failed=false;
     for(const auto& job:jobs_) {
         if(threadShouldExit()){finish(Phase::cancelled);return;}
@@ -265,17 +269,17 @@ void Vst3Build::run()
         const auto success=runJob(job);
         {
             const std::scoped_lock lock(mutex_);
-            results_.push_back({job.format,job.platform,success?bundle_:juce::File(),success?juce::String():failure_});
+            results_.push_back({job.format,job.platform,success?bundle_:cydaw::base::File(),success?cydaw::base::Text():failure_});
         }
         failed|=!success;
         if(threadShouldExit()){finish(Phase::cancelled);return;}
     }
-    finish(failed?Phase::failed:Phase::done,failed?"Certaines cibles ont échoué ; voir les résultats et le journal.":juce::String());
+    finish(failed?Phase::failed:Phase::done,failed?"Certaines cibles ont échoué ; voir les résultats et le journal.":cydaw::base::Text());
 }
 
 bool Vst3Build::runJob(const Job& job)
 {
-    const auto jobFailed = [this](Phase, const juce::String& message) {
+    const auto jobFailed = [this](Phase, const cydaw::base::Text& message) {
         const std::scoped_lock lock(mutex_);
         failure_=message;
         for(auto i=log_.size()-1;i>=0;--i)
@@ -311,7 +315,7 @@ bool Vst3Build::runJob(const Job& job)
         jobFailed(Phase::failed, "could not prepare " + source.getFullPathName());
         return false;
     }
-    juce::StringArray configure { tools.cmake.getFullPathName(), "-S", source.getFullPathName(), "-B", output.getFullPathName(),
+    cydaw::base::TextList configure { tools.cmake.getFullPathName(), "-S", source.getFullPathName(), "-B", output.getFullPathName(),
                                   "-DCYDAW_SOURCE_ROOT=" + tools.sourceRoot.getFullPathName().replaceCharacter('\\', '/'),
                                   "-DCYDAW_EXPORT_FORMAT=" + format,
                                   "-DCYDAW_BUILD_TESTS=OFF", "-DCYDAW_BUILD_GRAPH_EDITOR=OFF",
@@ -332,7 +336,7 @@ bool Vst3Build::runJob(const Job& job)
     // there go first, so the one found next is this device's.
     const auto built = output.getChildFile(format).getChildFile("Release");
     const auto extension = "." + format.toLowerCase();
-    const auto bundleType = format == "CLAP" ? juce::File::findFiles : juce::File::findDirectories;
+    const auto bundleType = format == "CLAP" ? cydaw::base::File::findFiles : cydaw::base::File::findDirectories;
     if(!(linuxTarget&&format=="LV2")) for (const auto& old : built.findChildFiles(bundleType, false, "*" + extension))
         (void) old.deleteRecursively();
     if (!runStep({ tools.cmake.getFullPathName(), "--build", output.getFullPathName(), "--config", "Release", "--target", "CyDAWGeneratedGraphPlugin_" + format,
@@ -353,7 +357,7 @@ bool Vst3Build::runJob(const Job& job)
             made = bundle;
         else if (made.getFileNameWithoutExtension() != productName && bundle.getLastModificationTime() > made.getLastModificationTime())
             made = bundle;
-    auto name = juce::File::createLegalFileName(productName).trim();
+    auto name = cydaw::base::File::createLegalFileName(productName).trim();
     if (name.isEmpty())
         name = made.getFileNameWithoutExtension();
     const auto target = destination.getChildFile(name + extension);

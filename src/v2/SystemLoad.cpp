@@ -1,8 +1,8 @@
+#include <cydaw/base/File.h>
 #include "SystemLoad.h"
 
-#include <juce_core/juce_core.h>
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
  #ifndef NOMINMAX
   #define NOMINMAX
  #endif
@@ -21,15 +21,15 @@ Reading read()
 {
     static Reading last;
     static double readAt = -1.0e9;
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     static unsigned long long lastBusy {};
     static unsigned long long lastWall {};
 #endif
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (now - readAt < 0.5)
         return last;
     readAt = now;
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     const auto ticks = [](const FILETIME& time) {
         return (static_cast<unsigned long long>(time.dwHighDateTime) << 32) | time.dwLowDateTime;
     };
@@ -39,7 +39,7 @@ Reading read()
         const auto busy = ticks(kernel) + ticks(user);
         const auto wallNow = ticks(wall);
         if (lastWall != 0 && wallNow > lastWall) {
-            const auto cores = std::max(1, juce::SystemStats::getNumCpus());
+            const auto cores = std::max(1, cydaw::base::SystemStats::getNumCpus());
             last.cpuPercent = std::clamp(static_cast<double>(busy - lastBusy) / static_cast<double>(wallNow - lastWall) / cores * 100.0,
                                          0.0, 100.0);
         }

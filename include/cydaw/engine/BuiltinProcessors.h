@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cydaw/engine/WavetableShape.h>
+#include <cydsp/processors/Generators.h>
 
 #include <cydaw/engine/AudioProcessor.h>
 
@@ -70,6 +71,7 @@ private:
     std::atomic<float> level_ { 1.0f };
     double sampleRate_ { 48'000.0 };
     double phase_ {};
+    cydsp::Oscillator<double> oscillator_;
 };
 
 class NoiseProcessor final : public AudioProcessor {
@@ -401,8 +403,8 @@ private:
     std::atomic<float> thresholdDb_ { -16.0f };
     std::atomic<float> ratio_ { 4.0f };
     std::atomic<float> gainReductionDb_ {};
-    double sampleRate_ { 48'000.0 };
-    float envelope_ {};
+    struct NumericalState;
+    std::shared_ptr<NumericalState> numerical_; // prepared CyDSP dynamics and pointer/scratch adapters
 };
 
 class ToneProcessor final : public AudioProcessor {

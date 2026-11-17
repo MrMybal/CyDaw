@@ -1,0 +1,1469 @@
+{
+  "date": "2026-11-14",
+  "baselineCommit": "bc7c300",
+  "engineCampaign": "output\\cyaudio-engine-pair\\2026-11-14-root",
+  "cacheCampaign": "output\\cyaudio-cache-window\\2026-11-14-final",
+  "engine": {
+    "audio32": {
+      "JUCE": {
+        "renderUs": 984.1134146341462,
+        "renderValuesUs": [
+          984.1134146341462,
+          981.7424242424242,
+          997.106707317073
+        ],
+        "audioThreadMcyclesPerBlock": 4.875777204556099,
+        "parentCpu": 5.378483714591644,
+        "workerCpu": 0,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.0897271268057785,
+            "callsPerSecond": 1591.6949604530437,
+            "exclusiveElapsedPercent": 0.014357119931480101
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 0.2845613143631437,
+            "callsPerSecond": 3370.6481515476216,
+            "exclusiveElapsedPercent": 0.04805865158293307
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 7.480707994579946,
+            "callsPerSecond": 1685.3240757738108,
+            "exclusiveElapsedPercent": 0.5250852096313774
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 7.084756097560975,
+            "callsPerSecond": 46.814557660383635,
+            "exclusiveElapsedPercent": 0.033166972283902287
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 23.961696230598672,
+            "callsPerSecond": 1544.8804027926599,
+            "exclusiveElapsedPercent": 1.7026956370179271
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 8.59868810051737,
+            "callsPerSecond": 1544.8804027926599,
+            "exclusiveElapsedPercent": 0.02105227821617861
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 4.196692392502757,
+            "callsPerSecond": 1544.8804027926599,
+            "exclusiveElapsedPercent": 0.6512525020383573
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 970.1628048780489,
+            "callsPerSecond": 46.814557660383635,
+            "exclusiveElapsedPercent": 0.0027746189052373716
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 1.9254545454545455,
+            "callsPerSecond": 46.814557660383635,
+            "exclusiveElapsedPercent": 0.009066302926319278
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.3475101626016259,
+            "callsPerSecond": 1685.3240757738108,
+            "exclusiveElapsedPercent": 0.0585667243608592
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 8.873069105691059,
+            "callsPerSecond": 1685.3240757738108,
+            "exclusiveElapsedPercent": 0.08025261910417081
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 949.4121951219512,
+            "callsPerSecond": 46.814557660383635,
+            "exclusiveElapsedPercent": 0.7096687304846326
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 984.1134146341462,
+            "callsPerSecond": 46.814557660383635,
+            "exclusiveElapsedPercent": 0.02540546116935454
+          },
+          "addAudio": {
+            "meanUs": 0.11703082655826558,
+            "callsPerSecond": 3370.6481515476216,
+            "exclusiveElapsedPercent": 0.03942549754969142
+          },
+          "clearAudio": {
+            "meanUs": 0.3744573393509564,
+            "callsPerSecond": 18491.750275851537,
+            "exclusiveElapsedPercent": 0.6961077137280878
+          },
+          "copyAudio": {
+            "meanUs": 0.14323256612847818,
+            "callsPerSecond": 6647.667187774477,
+            "exclusiveElapsedPercent": 0.05591770548836921
+          }
+        }
+      },
+      "native": {
+        "renderUs": 1113.6621951219513,
+        "renderValuesUs": [
+          1159.9012195121954,
+          1113.6621951219513,
+          971.8060975609758
+        ],
+        "audioThreadMcyclesPerBlock": 5.6370158038426865,
+        "parentCpu": 5.431858042343172,
+        "workerCpu": 0,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.05534433285509326,
+            "callsPerSecond": 1591.0860828935952,
+            "exclusiveElapsedPercent": 0.008805759777276963
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 0.28278285907859085,
+            "callsPerSecond": 3369.3587637746723,
+            "exclusiveElapsedPercent": 0.05806834939296017
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 8.986703929539294,
+            "callsPerSecond": 1684.6793818873361,
+            "exclusiveElapsedPercent": 0.6061012412430263
+          },
+          "AudioTransportSource::getCurrentPosition": {
+            "meanUs": 0.41303013392857146,
+            "callsPerSecond": 1022.6779987608761,
+            "exclusiveElapsedPercent": 0.04225254502870574
+          },
+          "AudioTransportSource::getNextAudioBlock": {
+            "meanUs": 7.7071877309682195,
+            "callsPerSecond": 1544.2894333967247,
+            "exclusiveElapsedPercent": 0.9979455723979106
+          },
+          "BufferingAudioSource::getNextAudioBlock": {
+            "meanUs": 1.2859565548780487,
+            "callsPerSecond": 1497.4927838998544,
+            "exclusiveElapsedPercent": 0.19262970386761225
+          },
+          "DeviceManager::callback": {
+            "meanUs": 1140.5012195121953,
+            "callsPerSecond": 46.79664949687045,
+            "exclusiveElapsedPercent": 0.06219855493619717
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 13.476829268292683,
+            "callsPerSecond": 46.79664949687045,
+            "exclusiveElapsedPercent": 0.06308624942406635
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 26.671027346637107,
+            "callsPerSecond": 1544.2894333967247,
+            "exclusiveElapsedPercent": 0.45461945935972964
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 10.395565410199557,
+            "callsPerSecond": 1544.2894333967247,
+            "exclusiveElapsedPercent": 0.026151308353239342
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 5.329046563192904,
+            "callsPerSecond": 1544.2894333967247,
+            "exclusiveElapsedPercent": 0.8232096201201757
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 1094.2524390243902,
+            "callsPerSecond": 46.79664949687045,
+            "exclusiveElapsedPercent": 0.005869555366772104
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 2.374390243902439,
+            "callsPerSecond": 46.79664949687045,
+            "exclusiveElapsedPercent": 0.011111350801269116
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.42244241192411924,
+            "callsPerSecond": 1684.6793818873361,
+            "exclusiveElapsedPercent": 0.07118967273937377
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 10.857774390243904,
+            "callsPerSecond": 1684.6793818873361,
+            "exclusiveElapsedPercent": 0.1117610214550411
+          },
+          "ReadAheadCache::fillOne": {
+            "meanUs": 0.8048293936965814,
+            "callsPerSecond": 50896.49254547432,
+            "exclusiveElapsedPercent": 4.128421591291919
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 1066.5823170731708,
+            "callsPerSecond": 46.79664949687045,
+            "exclusiveElapsedPercent": 0.8096487310144961
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 1113.6621951219513,
+            "callsPerSecond": 46.79664949687045,
+            "exclusiveElapsedPercent": 0.041039457706054924
+          },
+          "addAudio": {
+            "meanUs": 0.11330453929539296,
+            "callsPerSecond": 3369.3587637746723,
+            "exclusiveElapsedPercent": 0.03818798891704749
+          },
+          "clearAudio": {
+            "meanUs": 0.7345367781741059,
+            "callsPerSecond": 11839.552322708223,
+            "exclusiveElapsedPercent": 0.8699234721731244
+          },
+          "copyAudio": {
+            "meanUs": 0.11209635863964272,
+            "callsPerSecond": 6645.124228555604,
+            "exclusiveElapsedPercent": 0.07451210484188091
+          }
+        }
+      }
+    },
+    "effects16": {
+      "JUCE": {
+        "renderUs": 11375.013333333332,
+        "renderValuesUs": [
+          12238.758181818179,
+          11375.013333333332,
+          11314.932121212121
+        ],
+        "audioThreadMcyclesPerBlock": 53.88954106296328,
+        "parentCpu": 54.90096204304618,
+        "workerCpu": 0,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.0867478025693036,
+            "callsPerSecond": 844.166566529158,
+            "exclusiveElapsedPercent": 0.007325229125374848
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 121.04061742922406,
+            "callsPerSecond": 4127.258437978144,
+            "exclusiveElapsedPercent": 0.07959188052662648
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 548.6193244065734,
+            "callsPerSecond": 938.5968245626664,
+            "exclusiveElapsedPercent": 0.730257572598635
+          },
+          "CompressorPro::process": {
+            "meanUs": 73.21950476190476,
+            "callsPerSecond": 750.0215962842705,
+            "exclusiveElapsedPercent": 5.47982949479718
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 6.940000000000003,
+            "callsPerSecond": 47.08227973646926,
+            "exclusiveElapsedPercent": 0.03267510213710968
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 661.5768183446793,
+            "callsPerSecond": 797.3793691953351,
+            "exclusiveElapsedPercent": 0.9276093684249193
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 645.3234324614833,
+            "callsPerSecond": 797.3793691953351,
+            "exclusiveElapsedPercent": 0.011870441436588617
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 4.29863994273443,
+            "callsPerSecond": 797.3793691953351,
+            "exclusiveElapsedPercent": 0.3428641149158302
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 11361.413333333334,
+            "callsPerSecond": 47.08227973646926,
+            "exclusiveElapsedPercent": 0.0027491019671613314
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 1.9551515151515146,
+            "callsPerSecond": 47.08227973646926,
+            "exclusiveElapsedPercent": 0.009209348853647407
+          },
+          "ModulatedDelay::process": {
+            "meanUs": 32.452000000000005,
+            "callsPerSecond": 750.0215962842705,
+            "exclusiveElapsedPercent": 2.4263667386541985
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.37729762629336583,
+            "callsPerSecond": 938.5968245626664,
+            "exclusiveElapsedPercent": 0.03537733964683309
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 550.1346013390139,
+            "callsPerSecond": 938.5968245626664,
+            "exclusiveElapsedPercent": 0.05447389796196526
+          },
+          "ReverbPro::process": {
+            "meanUs": 558.2162985529322,
+            "callsPerSecond": 750.3068840728913,
+            "exclusiveElapsedPercent": 41.82405083829839
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 11338.251515151516,
+            "callsPerSecond": 47.08227973646926,
+            "exclusiveElapsedPercent": 0.3868108894858366
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 11375.013333333332,
+            "callsPerSecond": 47.08227973646926,
+            "exclusiveElapsedPercent": 0.025475582507733883
+          },
+          "addAudio": {
+            "meanUs": 0.11904380555778009,
+            "callsPerSecond": 7127.344823115226,
+            "exclusiveElapsedPercent": 0.08487102957809593
+          },
+          "clearAudio": {
+            "meanUs": 0.38681619110816207,
+            "callsPerSecond": 21526.104802599217,
+            "exclusiveElapsedPercent": 0.8316899239799851
+          },
+          "copyAudio": {
+            "meanUs": 0.15965570799896456,
+            "callsPerSecond": 4409.693348712806,
+            "exclusiveElapsedPercent": 0.03883284949044195
+          }
+        }
+      },
+      "native": {
+        "renderUs": 11738.150000000001,
+        "renderValuesUs": [
+          11738.150000000001,
+          11881.90243902439,
+          11352.177439024392
+        ],
+        "audioThreadMcyclesPerBlock": 56.1920049813954,
+        "parentCpu": 55.063367940452125,
+        "workerCpu": 0,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.052565833896016184,
+            "callsPerSecond": 843.5222074484307,
+            "exclusiveElapsedPercent": 0.0044417799470278544
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 123.89004844290659,
+            "callsPerSecond": 4123.442455219832,
+            "exclusiveElapsedPercent": 0.08789353014756127
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 565.0595006090134,
+            "callsPerSecond": 937.1200707918289,
+            "exclusiveElapsedPercent": 0.881169665103597
+          },
+          "AudioTransportSource::getCurrentPosition": {
+            "meanUs": 0.39062500000000006,
+            "callsPerSecond": 511.3639363151514,
+            "exclusiveElapsedPercent": 0.019984074976102138
+          },
+          "AudioTransportSource::getNextAudioBlock": {
+            "meanUs": 7.594412607449858,
+            "callsPerSecond": 796.7232757767315,
+            "exclusiveElapsedPercent": 0.5128306833199839
+          },
+          "BufferingAudioSource::getNextAudioBlock": {
+            "meanUs": 1.2299086757990865,
+            "callsPerSecond": 749.9243441050323,
+            "exclusiveElapsedPercent": 0.09223384570077188
+          },
+          "CompressorPro::process": {
+            "meanUs": 76.10396341463415,
+            "callsPerSecond": 749.6389847655707,
+            "exclusiveElapsedPercent": 5.6953014955893
+          },
+          "DeviceManager::callback": {
+            "meanUs": 11762.775609756098,
+            "callsPerSecond": 46.79893167169913,
+            "exclusiveElapsedPercent": 0.05914072310341245
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 12.428048780487803,
+            "callsPerSecond": 46.79893167169913,
+            "exclusiveElapsedPercent": 0.05816194056905923
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 681.4531350770333,
+            "callsPerSecond": 796.4379164372699,
+            "exclusiveElapsedPercent": 0.2981149019355126
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 664.3822285919026,
+            "callsPerSecond": 796.4379164372699,
+            "exclusiveElapsedPercent": 0.013985461227012034
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 5.279792189179509,
+            "callsPerSecond": 796.4379164372699,
+            "exclusiveElapsedPercent": 0.42050266903719
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 11718.720731707317,
+            "callsPerSecond": 46.79893167169913,
+            "exclusiveElapsedPercent": 0.0053818771422454005
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 2.253048780487805,
+            "callsPerSecond": 46.79893167169913,
+            "exclusiveElapsedPercent": 0.010544027593105383
+          },
+          "ModulatedDelay::process": {
+            "meanUs": 34.500038066235255,
+            "callsPerSecond": 749.6389847655707,
+            "exclusiveElapsedPercent": 2.5809125706064986
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.4132460414129111,
+            "callsPerSecond": 937.1200707918289,
+            "exclusiveElapsedPercent": 0.03872611595833103
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 567.0464068209501,
+            "callsPerSecond": 937.1200707918289,
+            "exclusiveElapsedPercent": 0.07857654771414069
+          },
+          "ReadAheadCache::fillOne": {
+            "meanUs": 0.8438436948853621,
+            "callsPerSecond": 31659.021926869835,
+            "exclusiveElapsedPercent": 2.622601514885204
+          },
+          "ReverbPro::process": {
+            "meanUs": 568.229920060906,
+            "callsPerSecond": 749.6389847655707,
+            "exclusiveElapsedPercent": 42.591499402095565
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 11691.64695121951,
+            "callsPerSecond": 46.79893167169913,
+            "exclusiveElapsedPercent": 0.4463276892584627
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 11738.150000000001,
+            "callsPerSecond": 46.79893167169913,
+            "exclusiveElapsedPercent": 0.04410799310057641
+          },
+          "addAudio": {
+            "meanUs": 0.11216746794871793,
+            "callsPerSecond": 7122.569112961038,
+            "exclusiveElapsedPercent": 0.07989205426905856
+          },
+          "clearAudio": {
+            "meanUs": 0.5896728340479487,
+            "callsPerSecond": 17104.153447987646,
+            "exclusiveElapsedPercent": 1.008585463766587
+          },
+          "copyAudio": {
+            "meanUs": 0.13682062576925566,
+            "callsPerSecond": 4405.092123268411,
+            "exclusiveElapsedPercent": 0.06027074608768031
+          }
+        }
+      }
+    },
+    "plugins8Stopped": {
+      "JUCE": {
+        "renderUs": 287.22865853658413,
+        "renderValuesUs": [
+          352.3707317073169,
+          287.22865853658413,
+          247.8727272727247
+        ],
+        "audioThreadMcyclesPerBlock": 1.5838571506339836,
+        "parentCpu": 2.3349327685075134,
+        "workerCpu": 0.3891554614179189,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.10158536585365857,
+            "callsPerSecond": 468.08118708332313,
+            "exclusiveElapsedPercent": 0.004755019863907418
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 0.5490091463415252,
+            "callsPerSecond": 1123.3948489999755,
+            "exclusiveElapsedPercent": 0.045983268323776964
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 9.088160569105577,
+            "callsPerSecond": 561.6974244999877,
+            "exclusiveElapsedPercent": 0.20279902845742945
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 7.95609756097561,
+            "callsPerSecond": 46.808118708332316,
+            "exclusiveElapsedPercent": 0.03724099590892195
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 20.519105691056865,
+            "callsPerSecond": 421.2730683749908,
+            "exclusiveElapsedPercent": 0.1421853688837191
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 9.347086720867274,
+            "callsPerSecond": 421.2730683749908,
+            "exclusiveElapsedPercent": 0.009198936987619217
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 4.562601626016261,
+            "callsPerSecond": 421.2730683749908,
+            "exclusiveElapsedPercent": 0.1922101186764593
+          },
+          "IsolatedPluginHost::pollWorkerHealth": {
+            "meanUs": 1.0275485436893206,
+            "callsPerSecond": 237.42103681645705,
+            "exclusiveElapsedPercent": 0.02416611835996645
+          },
+          "IsolatedPluginHost::processBlock": {
+            "meanUs": 2.767911585365854,
+            "callsPerSecond": 374.4649496666585,
+            "exclusiveElapsedPercent": 0.10364858724957854
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 271.06463414634084,
+            "callsPerSecond": 46.808118708332316,
+            "exclusiveElapsedPercent": 0.004070023004761091
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 2.0359756097560977,
+            "callsPerSecond": 46.808118708332316,
+            "exclusiveElapsedPercent": 0.009530018802873269
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.43373983739837374,
+            "callsPerSecond": 561.6974244999877,
+            "exclusiveElapsedPercent": 0.024363054956971
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 10.858384146341425,
+            "callsPerSecond": 561.6974244999877,
+            "exclusiveElapsedPercent": 0.036413291370786825
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 245.36768292682797,
+            "callsPerSecond": 46.808118708332316,
+            "exclusiveElapsedPercent": 0.24686430557559672
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 287.22865853658413,
+            "callsPerSecond": 46.808118708332316,
+            "exclusiveElapsedPercent": 0.030887650040339755
+          },
+          "addAudio": {
+            "meanUs": 0.12197662601626033,
+            "callsPerSecond": 1123.3948489999755,
+            "exclusiveElapsedPercent": 0.013702791336506325
+          },
+          "clearAudio": {
+            "meanUs": 0.4373906162725749,
+            "callsPerSecond": 6131.863550791533,
+            "exclusiveElapsedPercent": 0.2682019577380048
+          },
+          "copyAudio": {
+            "meanUs": 0.14644750795334036,
+            "callsPerSecond": 2153.1734605832867,
+            "exclusiveElapsedPercent": 0.018449248739674396
+          }
+        }
+      },
+      "native": {
+        "renderUs": 350.83841463414376,
+        "renderValuesUs": [
+          367.13719512195223,
+          350.83841463414376,
+          304.95548780487746
+        ],
+        "audioThreadMcyclesPerBlock": 1.9509557039012257,
+        "parentCpu": 1.5424476788795847,
+        "workerCpu": 0.7738008321844242,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.06640243902439023,
+            "callsPerSecond": 467.95067195013104,
+            "exclusiveElapsedPercent": 0.003108982690328078
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 0.5121951219512804,
+            "callsPerSecond": 1123.0816126803145,
+            "exclusiveElapsedPercent": 0.04506878575275803
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 9.135823170731667,
+            "callsPerSecond": 561.5408063401572,
+            "exclusiveElapsedPercent": 0.2059480193660087
+          },
+          "AudioTransportSource::getCurrentPosition": {
+            "meanUs": 0.40848214285714285,
+            "callsPerSecond": 255.66085491909598,
+            "exclusiveElapsedPercent": 0.010443289386204143
+          },
+          "AudioTransportSource::getNextAudioBlock": {
+            "meanUs": 3.870121951219515,
+            "callsPerSecond": 421.1556047551179,
+            "exclusiveElapsedPercent": 0.16297299629075632
+          },
+          "DeviceManager::callback": {
+            "meanUs": 376.14939024390134,
+            "callsPerSecond": 46.795067195013104,
+            "exclusiveElapsedPercent": 0.05887489717724989
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 13.059756097560982,
+            "callsPerSecond": 46.795067195013104,
+            "exclusiveElapsedPercent": 0.061113216413584824
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 26.64640921409209,
+            "callsPerSecond": 421.1556047551179,
+            "exclusiveElapsedPercent": 0.18868725526820104
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 9.198577235772364,
+            "callsPerSecond": 421.1556047551179,
+            "exclusiveElapsedPercent": 0.006120452386177014
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 5.244850948509482,
+            "callsPerSecond": 421.1556047551179,
+            "exclusiveElapsedPercent": 0.22086360196160204
+          },
+          "IsolatedPluginHost::pollWorkerHealth": {
+            "meanUs": 0.889047619047619,
+            "callsPerSecond": 239.68205148665248,
+            "exclusiveElapsedPercent": 0.02130634484007085
+          },
+          "IsolatedPluginHost::processBlock": {
+            "meanUs": 3.5364329268292685,
+            "callsPerSecond": 374.36053756010483,
+            "exclusiveElapsedPercent": 0.13237436902646055
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 333.0774390243887,
+            "callsPerSecond": 46.795067195013104,
+            "exclusiveElapsedPercent": 0.004944868990790103
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 2.1890243902439033,
+            "callsPerSecond": 46.795067195013104,
+            "exclusiveElapsedPercent": 0.010242337704319013
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.38287601626016293,
+            "callsPerSecond": 561.5408063401572,
+            "exclusiveElapsedPercent": 0.02149749710363337
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 11.025609756097564,
+            "callsPerSecond": 561.5408063401572,
+            "exclusiveElapsedPercent": 0.04264407288759231
+          },
+          "ReadAheadCache::fillOne": {
+            "meanUs": 0.5873495957886817,
+            "callsPerSecond": 12182.696274135851,
+            "exclusiveElapsedPercent": 0.7130521504464469
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 307.04817073170466,
+            "callsPerSecond": 46.795067195013104,
+            "exclusiveElapsedPercent": 0.2529201218629192
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 350.83841463414376,
+            "callsPerSecond": 46.795067195013104,
+            "exclusiveElapsedPercent": 0.03555717404148406
+          },
+          "addAudio": {
+            "meanUs": 0.11679369918699198,
+            "callsPerSecond": 1123.0816126803145,
+            "exclusiveElapsedPercent": 0.013115327695474799
+          },
+          "clearAudio": {
+            "meanUs": 0.6654519368723092,
+            "callsPerSecond": 3977.5807115761136,
+            "exclusiveElapsedPercent": 0.26465744144942827
+          },
+          "copyAudio": {
+            "meanUs": 0.11068398727465545,
+            "callsPerSecond": 2152.5730909706026,
+            "exclusiveElapsedPercent": 0.023822707473833925
+          }
+        }
+      }
+    },
+    "plugins8Playing": {
+      "JUCE": {
+        "renderUs": 384.8457317073162,
+        "renderValuesUs": [
+          449.20000000000215,
+          384.8457317073162,
+          355.986666666663
+        ],
+        "audioThreadMcyclesPerBlock": 2.0578619989404463,
+        "parentCpu": 2.7227426266793744,
+        "workerCpu": 0.0,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.10152439024390242,
+            "callsPerSecond": 470.76914491175864,
+            "exclusiveElapsedPercent": 0.004752189988964196
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 0.5517784552844828,
+            "callsPerSecond": 1129.8459477882207,
+            "exclusiveElapsedPercent": 0.04570379477074094
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 8.969563008129999,
+            "callsPerSecond": 564.9229738941103,
+            "exclusiveElapsedPercent": 0.1988070832920727
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 7.89146341463414,
+            "callsPerSecond": 47.07691449117586,
+            "exclusiveElapsedPercent": 0.036938644346651395
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 31.397831978319726,
+            "callsPerSecond": 423.69223042058275,
+            "exclusiveElapsedPercent": 0.609938590289272
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 9.177168021680359,
+            "callsPerSecond": 423.69223042058275,
+            "exclusiveElapsedPercent": 0.0060765240159187895
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 4.540176151761522,
+            "callsPerSecond": 423.69223042058275,
+            "exclusiveElapsedPercent": 0.1912663710092841
+          },
+          "IsolatedPluginHost::pollWorkerHealth": {
+            "meanUs": 1.0256009615384616,
+            "callsPerSecond": 237.3817748888383,
+            "exclusiveElapsedPercent": 0.024354616922421312
+          },
+          "IsolatedPluginHost::processBlock": {
+            "meanUs": 2.7621951219512195,
+            "callsPerSecond": 376.6153159294069,
+            "exclusiveElapsedPercent": 0.1034350541742117
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 368.7274390243937,
+            "callsPerSecond": 47.07691449117586,
+            "exclusiveElapsedPercent": 0.0038673978588867775
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 2.13719512195122,
+            "callsPerSecond": 47.07691449117586,
+            "exclusiveElapsedPercent": 0.010003859406197906
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.4388211382113825,
+            "callsPerSecond": 564.9229738941103,
+            "exclusiveElapsedPercent": 0.024648596243059963
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 10.762957317073152,
+            "callsPerSecond": 564.9229738941103,
+            "exclusiveElapsedPercent": 0.03679308177041287
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 343.2048780487794,
+            "callsPerSecond": 47.07691449117586,
+            "exclusiveElapsedPercent": 0.24683417094630752
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 384.8457317073162,
+            "callsPerSecond": 47.07691449117586,
+            "exclusiveElapsedPercent": 0.030665182727586372
+          },
+          "addAudio": {
+            "meanUs": 0.12459349593495939,
+            "callsPerSecond": 1129.8459477882207,
+            "exclusiveElapsedPercent": 0.013996840664192448
+          },
+          "clearAudio": {
+            "meanUs": 0.43337832805809,
+            "callsPerSecond": 6167.075798344038,
+            "exclusiveElapsedPercent": 0.26574303501651025
+          },
+          "copyAudio": {
+            "meanUs": 0.14872746553552466,
+            "callsPerSecond": 2165.5380665940897,
+            "exclusiveElapsedPercent": 0.018863197379618214
+          }
+        }
+      },
+      "native": {
+        "renderUs": 399.9884146341456,
+        "renderValuesUs": [
+          449.57256097560986,
+          399.9884146341456,
+          344.75670731707237
+        ],
+        "audioThreadMcyclesPerBlock": 2.2120320567465717,
+        "parentCpu": 1.9422073668385158,
+        "workerCpu": 1.5537658934708127,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.09493902439024386,
+            "callsPerSecond": 467.9169064031489,
+            "exclusiveElapsedPercent": 0.004442388512240535
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 0.5022103658537003,
+            "callsPerSecond": 1123.0005753675575,
+            "exclusiveElapsedPercent": 0.043989584576406934
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 9.23856707317088,
+            "callsPerSecond": 561.5002876837788,
+            "exclusiveElapsedPercent": 0.2064934264255628
+          },
+          "AudioTransportSource::getCurrentPosition": {
+            "meanUs": 0.4393973214285718,
+            "callsPerSecond": 255.6424074007448,
+            "exclusiveElapsedPercent": 0.011232051007024721
+          },
+          "AudioTransportSource::getNextAudioBlock": {
+            "meanUs": 7.188685636856365,
+            "callsPerSecond": 421.12521576283405,
+            "exclusiveElapsedPercent": 0.2581517316285594
+          },
+          "BufferingAudioSource::getNextAudioBlock": {
+            "meanUs": 1.1904725609756082,
+            "callsPerSecond": 374.3335251225191,
+            "exclusiveElapsedPercent": 0.04456017390874238
+          },
+          "DeviceManager::callback": {
+            "meanUs": 425.8926829268257,
+            "callsPerSecond": 46.79169064031489,
+            "exclusiveElapsedPercent": 0.05970361478892717
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 13.195121951219518,
+            "callsPerSecond": 46.79169064031489,
+            "exclusiveElapsedPercent": 0.0617377657587033
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 31.976151761517638,
+            "callsPerSecond": 421.12521576283405,
+            "exclusiveElapsedPercent": 0.2598207054256405
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 9.378726287262605,
+            "callsPerSecond": 421.12521576283405,
+            "exclusiveElapsedPercent": 0.006538953748565064
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 5.300271002710029,
+            "callsPerSecond": 421.12521576283405,
+            "exclusiveElapsedPercent": 0.22319172323636208
+          },
+          "IsolatedPluginHost::pollWorkerHealth": {
+            "meanUs": 0.8954761904761904,
+            "callsPerSecond": 239.66475693819822,
+            "exclusiveElapsedPercent": 0.021459864789138906
+          },
+          "IsolatedPluginHost::processBlock": {
+            "meanUs": 3.6564024390243914,
+            "callsPerSecond": 374.3335251225191,
+            "exclusiveElapsedPercent": 0.13686155725399787
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 381.7390243902447,
+            "callsPerSecond": 46.79169064031489,
+            "exclusiveElapsedPercent": 0.005451981070465895
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 2.2268292682926827,
+            "callsPerSecond": 46.79169064031489,
+            "exclusiveElapsedPercent": 0.010418961208446596
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.4018292682926827,
+            "callsPerSecond": 561.5002876837788,
+            "exclusiveElapsedPercent": 0.022561102200546447
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 11.162093495934993,
+            "callsPerSecond": 561.5002876837788,
+            "exclusiveElapsedPercent": 0.04315367120453536
+          },
+          "ReadAheadCache::fillOne": {
+            "meanUs": 0.933461365678345,
+            "callsPerSecond": 12818.64071395163,
+            "exclusiveElapsedPercent": 1.1856190148199897
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 355.8182926829276,
+            "callsPerSecond": 46.79169064031489,
+            "exclusiveElapsedPercent": 0.25657690507131325
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 399.9884146341456,
+            "callsPerSecond": 46.79169064031489,
+            "exclusiveElapsedPercent": 0.03786145514712347
+          },
+          "addAudio": {
+            "meanUs": 0.1185721544715444,
+            "callsPerSecond": 1123.0005753675575,
+            "exclusiveElapsedPercent": 0.013314702070049323
+          },
+          "clearAudio": {
+            "meanUs": 0.6865494978479183,
+            "callsPerSecond": 3977.293704426766,
+            "exclusiveElapsedPercent": 0.2730412602558542
+          },
+          "copyAudio": {
+            "meanUs": 0.112221633085896,
+            "callsPerSecond": 2152.417769454485,
+            "exclusiveElapsedPercent": 0.024153046437762546
+          }
+        }
+      }
+    },
+    "dj4": {
+      "JUCE": {
+        "renderUs": 560.7327272727287,
+        "renderValuesUs": [
+          603.2915151515151,
+          560.7327272727287,
+          549.1199999999969
+        ],
+        "audioThreadMcyclesPerBlock": 2.8731791419893695,
+        "parentCpu": 3.1136371703531838,
+        "workerCpu": 0,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.11363636363636383,
+            "callsPerSecond": 282.5749876949054,
+            "exclusiveElapsedPercent": 0.003211079405623931
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 0.9508771929824952,
+            "callsPerSecond": 894.8207943672005,
+            "exclusiveElapsedPercent": 0.0730920515405302
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 9.96707070707049,
+            "callsPerSecond": 423.8624815423581,
+            "exclusiveElapsedPercent": 0.1481394282120948
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 242.6909090909091,
+            "callsPerSecond": 94.19166256496848,
+            "exclusiveElapsedPercent": 1.7389063201442945
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 17.640606060605926,
+            "callsPerSecond": 235.4791564124212,
+            "exclusiveElapsedPercent": 0.10015831853683152
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 7.752242424242762,
+            "callsPerSecond": 235.4791564124212,
+            "exclusiveElapsedPercent": 0.0033191090152916575
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 4.0105454545454515,
+            "callsPerSecond": 235.4791564124212,
+            "exclusiveElapsedPercent": 0.09442765261303081
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 330.5021212121197,
+            "callsPerSecond": 94.19166256496848,
+            "exclusiveElapsedPercent": 0.0070020621115723086
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 1.7381818181818185,
+            "callsPerSecond": 94.19166256496848,
+            "exclusiveElapsedPercent": 0.016370085392702426
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.41892255892255925,
+            "callsPerSecond": 423.8624815423581,
+            "exclusiveElapsedPercent": 0.01775777757688193
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 11.747407407407472,
+            "callsPerSecond": 423.8624815423581,
+            "exclusiveElapsedPercent": 0.028496366106737222
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 307.36090909091126,
+            "callsPerSecond": 94.19166256496848,
+            "exclusiveElapsedPercent": 0.19375131181617672
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 560.7327272727287,
+            "callsPerSecond": 47.09583128248424,
+            "exclusiveElapsedPercent": 0.031516415725181365
+          },
+          "addAudio": {
+            "meanUs": 0.12190909090909076,
+            "callsPerSecond": 941.9166256496848,
+            "exclusiveElapsedPercent": 0.011483610222117966
+          },
+          "clearAudio": {
+            "meanUs": 0.4275876411170539,
+            "callsPerSecond": 4803.774790813392,
+            "exclusiveElapsedPercent": 0.20541760934980813
+          },
+          "copyAudio": {
+            "meanUs": 0.14463458110516939,
+            "callsPerSecond": 1601.258263604464,
+            "exclusiveElapsedPercent": 0.013575950836786744
+          }
+        }
+      },
+      "native": {
+        "renderUs": 572.3634146341426,
+        "renderValuesUs": [
+          637.1951515151497,
+          572.3634146341426,
+          545.1390243902453
+        ],
+        "audioThreadMcyclesPerBlock": 3.02426361920332,
+        "parentCpu": 2.3101240651179125,
+        "workerCpu": 0,
+        "scopes": {
+          "AudioDelayLine::process": {
+            "meanUs": 0.07967479674796743,
+            "callsPerSecond": 281.48529340642517,
+            "exclusiveElapsedPercent": 0.002236659006583409
+          },
+          "AudioRenderPlan::nodeDispatch": {
+            "meanUs": 0.9783055198972885,
+            "callsPerSecond": 890.4184889803652,
+            "exclusiveElapsedPercent": 0.07763831403719512
+          },
+          "AudioRenderPlan::process": {
+            "meanUs": 10.487533875338704,
+            "callsPerSecond": 421.94245806764343,
+            "exclusiveElapsedPercent": 0.16094530338826984
+          },
+          "AudioTransportSource::getNextAudioBlock": {
+            "meanUs": 0.1871951219511867,
+            "callsPerSecond": 46.819054887072745,
+            "exclusiveElapsedPercent": 0.0008758345854859524
+          },
+          "DeviceManager::callback": {
+            "meanUs": 597.3957317073185,
+            "callsPerSecond": 46.819054887072745,
+            "exclusiveElapsedPercent": 0.05712039110945538
+          },
+          "DjEngine::getNextAudioBlock": {
+            "meanUs": 250.37743902439027,
+            "callsPerSecond": 93.63810977414549,
+            "exclusiveElapsedPercent": 1.741381680694482
+          },
+          "GainPanAudioSource::getNextAudioBlock": {
+            "meanUs": 18.767439024390036,
+            "callsPerSecond": 234.38075647735806,
+            "exclusiveElapsedPercent": 0.10727975163719707
+          },
+          "GainPanAudioSource::processNativeDspGraph": {
+            "meanUs": 8.22634146341452,
+            "callsPerSecond": 234.38075647735806,
+            "exclusiveElapsedPercent": 0.0038742129221176853
+          },
+          "GainPanAudioSource::publishAnalysisFrame": {
+            "meanUs": 4.7082825822168015,
+            "callsPerSecond": 234.38075647735806,
+            "exclusiveElapsedPercent": 0.11035308333291428
+          },
+          "MasterOutputAudioSource::getNextAudioBlock": {
+            "meanUs": 341.8021341463412,
+            "callsPerSecond": 93.63810977414549,
+            "exclusiveElapsedPercent": 0.009112103146718627
+          },
+          "MasterOutputAudioSource::publishAnalysisFrame": {
+            "meanUs": 1.9371951219512178,
+            "callsPerSecond": 93.63810977414549,
+            "exclusiveElapsedPercent": 0.018127208326315022
+          },
+          "NativeDspRuntime::captureTaps": {
+            "meanUs": 0.41436314363143534,
+            "callsPerSecond": 421.94245806764343,
+            "exclusiveElapsedPercent": 0.01744822255645932
+          },
+          "NativeDspRuntime::process": {
+            "meanUs": 12.439024390243857,
+            "callsPerSecond": 421.94245806764343,
+            "exclusiveElapsedPercent": 0.032343116272495
+          },
+          "ReadAheadCache::fillOne": {
+            "meanUs": 0.6214869668246447,
+            "callsPerSecond": 4815.663779480607,
+            "exclusiveElapsedPercent": 0.2992872275556707
+          },
+          "TrackMixer::getNextAudioBlock": {
+            "meanUs": 317.38140243902524,
+            "callsPerSecond": 93.63810977414549,
+            "exclusiveElapsedPercent": 0.18794782570626953
+          },
+          "VirtualBusRouter::getNextAudioBlock": {
+            "meanUs": 572.3634146341426,
+            "callsPerSecond": 46.819054887072745,
+            "exclusiveElapsedPercent": 0.0345769223976925
+          },
+          "addAudio": {
+            "meanUs": 0.12137195121951226,
+            "callsPerSecond": 936.9520618254436,
+            "exclusiveElapsedPercent": 0.011357320797459899
+          },
+          "clearAudio": {
+            "meanUs": 0.6486011477761833,
+            "callsPerSecond": 3186.8360347828843,
+            "exclusiveElapsedPercent": 0.20635461640840705
+          },
+          "copyAudio": {
+            "meanUs": 0.11128048780487827,
+            "callsPerSecond": 1593.5607584124393,
+            "exclusiveElapsedPercent": 0.01770212899980879
+          }
+        }
+      }
+    }
+  },
+  "cachePerformance": {
+    "summary": {
+      "before": {
+        "audio32": {
+          "parentCpuMedian": 5.2533490755499255,
+          "min": 3.70938864863743,
+          "max": 5.586250082502347,
+          "values": [
+            5.2533490755499255,
+            3.70938864863743,
+            5.586250082502347
+          ],
+          "parentGcyclesPerSecond": 0.5317287536238531,
+          "cyclesValues": [
+            0.6236005112675308,
+            0.49605387500296305,
+            0.5317287536238531
+          ]
+        },
+        "effects16": {
+          "parentCpuMedian": 53.234805248073705,
+          "min": 52.11719820466666,
+          "max": 69.85356903669216,
+          "values": [
+            69.85356903669216,
+            52.11719820466666,
+            53.234805248073705
+          ],
+          "parentGcyclesPerSecond": 2.6915161077601226,
+          "cyclesValues": [
+            3.5682209958744195,
+            2.6491313906208878,
+            2.6915161077601226
+          ]
+        }
+      },
+      "cached": {
+        "audio32": {
+          "parentCpuMedian": 6.210228701751394,
+          "min": 4.6137939041786815,
+          "max": 7.755666168093617,
+          "values": [
+            6.210228701751394,
+            7.755666168093617,
+            4.6137939041786815
+          ],
+          "parentGcyclesPerSecond": 0.45103634428494843,
+          "cyclesValues": [
+            0.45103634428494843,
+            0.5787431959106429,
+            0.39936730224824524
+          ]
+        },
+        "effects16": {
+          "parentCpuMedian": 54.50788644878681,
+          "min": 53.3867086198755,
+          "max": 60.25403159352653,
+          "values": [
+            60.25403159352653,
+            54.50788644878681,
+            53.3867086198755
+          ],
+          "parentGcyclesPerSecond": 2.810917442256713,
+          "cyclesValues": [
+            3.095200654124706,
+            2.810917442256713,
+            2.6458683716866482
+          ]
+        }
+      }
+    },
+    "protocol": {
+      "sampleRate": 48000,
+      "buffer": 1024,
+      "inputs": 0,
+      "outputs": 2,
+      "silent": true,
+      "hidden": true,
+      "profile": "isolated",
+      "rounds": 3,
+      "warmup": 2,
+      "seconds": 5,
+      "order": "alternated fresh processes",
+      "settings": "same UI-off gate, same original audio objects except prepared cache fast path",
+      "topology": "numeric target indices checked",
+      "instrumentation": false
+    },
+    "hashes": {
+      "before": "c871f1cd363bce1f0dd42b6080bda36bfccec042499896f3cac57b2ea2ec8a28",
+      "cached": "de6e1821af55d275f8de6fa2e0cb241168f9da3e690714249faa21b2b9f64203"
+    }
+  },
+  "engineExecutables": {
+    "JUCE": {
+      "exe": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-engine-pair\\2026-11-14-root\\JUCE\\CyDAW 2.exe",
+      "sha256": "d119c9526413022936b0932c76b54f5f51f0c3bc087eb28bcfd578c925a8e3d8"
+    },
+    "native": {
+      "exe": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-engine-pair\\2026-11-14-root\\native\\CyDAW 2.exe",
+      "sha256": "d5e1c28d00b49f66d820fba44435597e94ab8f2252fa77a5dc0edd30bfafd99d"
+    }
+  },
+  "cacheBuild": {
+    "commands": [
+      {
+        "command": [
+          "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.40.33807\\bin\\Hostx64\\x64\\cl.exe",
+          "@D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\BufferedAudioSource.rsp"
+        ],
+        "cwd": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop",
+        "log": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\BufferedAudioSource.log"
+      },
+      {
+        "command": [
+          "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.40.33807\\bin\\Hostx64\\x64\\cl.exe",
+          "@D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\AudioSourceTests.rsp"
+        ],
+        "cwd": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop",
+        "log": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\AudioSourceTests.log"
+      },
+      {
+        "command": [
+          "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.40.33807\\bin\\Hostx64\\x64\\link.exe",
+          "@D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\source-tests\\link.rsp"
+        ],
+        "cwd": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop",
+        "log": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\source-tests\\link.log"
+      },
+      {
+        "command": [
+          "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.40.33807\\bin\\Hostx64\\x64\\link.exe",
+          "@D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\control\\link.rsp"
+        ],
+        "cwd": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop",
+        "log": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\control\\link.log"
+      },
+      {
+        "command": [
+          "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.40.33807\\bin\\Hostx64\\x64\\link.exe",
+          "@D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\production\\link.rsp"
+        ],
+        "cwd": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop",
+        "log": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\production\\link.log"
+      }
+    ],
+    "source": {
+      "path": "D:\\_Project\\CyDAW_Project\\src\\integration\\BufferedAudioSource.cpp",
+      "sha256": "0195cb9ff42108fa034ed3fb55de070779891532ae98ea961023c0dbc9129996"
+    },
+    "tests": {
+      "path": "D:\\_Project\\CyDAW_Project\\tests\\AudioSourceTests.cpp",
+      "sha256": "c99dbeee027509484493732e1254a8dd9065cb3ca4ad62fead0b4e49966aed1d"
+    },
+    "variants": {
+      "control": {
+        "exe": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\control\\CyDAW 2.exe",
+        "sha256": "de6e1821af55d275f8de6fa2e0cb241168f9da3e690714249faa21b2b9f64203"
+      },
+      "production": {
+        "exe": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-cache-window\\2026-11-14-final\\production\\CyDAW 2.exe",
+        "sha256": "daf42151ae7ecfb8309bee068183aea022f58853ca25973e96ba3fad287c8a87"
+      }
+    },
+    "regressions": {
+      "repetitions": 5,
+      "output": "Native source lifecycle, Core transport, bounded render, seek, pause and loop passed without JUCE\n"
+    }
+  },
+  "verification": {
+    "fingerprint": "364534d4eb96ee36e0f1bfe330d28a3682854650423c1a0db682707f77d85f26",
+    "stable": true,
+    "allOriginalInputsStable": true,
+    "executables": {
+      "JUCE": {
+        "exe": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-engine-pair\\2026-11-14-root\\JUCE\\CyDAW 2.exe",
+        "sha256": "d119c9526413022936b0932c76b54f5f51f0c3bc087eb28bcfd578c925a8e3d8",
+        "sourceHashes": {
+          "src/v2/ImGuiHost.cpp": "52ea02f19c9ab0a0e1d51641571629bf5941932063372da41a738c40898d5f32",
+          "src/v2/AppUi.cpp": "9e295622ec07574df032e4c2dfdc56280f609c112893c4b312b84523946f62a4",
+          "src/app/AudioTrackController.cpp": "16c5126e02f88210b40dc4d57d7b8eeb4ff82a92c1329b385c78d043165c97ce",
+          "src/app/DjEngine.cpp": "a06838d31ea89439c7ff701122edd1de153bd3f039d36f5dde97d55f577d2b4c",
+          "src/app/IsolatedPluginHost.cpp": "c45ef5561a3b995abf30a5a8f770a90d2992dfbd63b4d906611a3888334c1f10",
+          "src/native_plugin/NativeRuntime.cpp": "94223e3a27d9380151cb2ab5438c0bd3084d3c57935344b2f1596f6d508db63f",
+          "src/engine/AudioRenderPlan.cpp": "4006f4d5fc7017d653edbff23e6cff739a7415eca18a6acf81f65ff106bc5c19",
+          "src/engine/AudioBuffer.cpp": "15513536e9a8e9051bdfa303f5cda51fa56f9576f607d55e686f7af295e9a4b6",
+          "src/engine/ProEffects.cpp": "3e8e8aa014badb0b6e69def166525edcb6ea0a5837af11532d0225b3e5a10e04",
+          "src/engine/EffectProcessors.cpp": "ebe89ebc4cbeb9a65972636b3f83d38af21b92da3ec186c2ff6ff7aa8ad74655",
+          "src/app/VirtualAudioBus.cpp": "f785b3695636f363289520fe19c81e0a378676be254d52307284e40e57b93826"
+        },
+        "generatedHashes": {
+          "AppUi.cpp": "4d33362deb62cbc34b7f789328124bd6c625d0800d7b7ffcef23f3a922d234c1",
+          "AudioBuffer.cpp": "a65dc3d17295f16a41c361ca1c8f9f5ac8444bc1e451d16f861203693b060138",
+          "AudioRenderPlan.cpp": "7cbdd259f5c6749ab44eb2583e6e3ec562d1d8e94ee1af0954e4917e0529c0b3",
+          "AudioTrackController.cpp": "5dc4ff57c12fb1dda86ce62f0ccd9ae59cd6c971d80283a0dda6dc1d280d0823",
+          "DjEngine.cpp": "25dc8af592402cc6322911813705e0439120f7d8d6787db1f29a648b55d12785",
+          "EffectProcessors.cpp": "ae45ec0945ba5260ebc59afabdd52a2074b8f298230bc9a6ee58c3f33993742e",
+          "ImGuiHost.cpp": "48fc7e5a88e763b73be6f0c941fa47379e4e2288b3edc49473fcfdb30964bf26",
+          "IsolatedPluginHost.cpp": "5a9926278553ee4b5d8ddb119a412078aed478f29a12347c483f66b9c95b1d36",
+          "NativeRuntime.cpp": "bd41cd4c5704023e176ede8543c7bde5684a4e4efaa26e9c90130009d3e92250",
+          "ProEffects.cpp": "45424875384b4f6622c70a20708506b06e2fd96b0b2a07ebcbfa14fa8a94ae66",
+          "VirtualAudioBus.cpp": "adfaa8604f1f0465b88b2c4989612919feed54d4eada0a3e081e522a1c3ad7a5"
+        }
+      },
+      "native": {
+        "exe": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-engine-pair\\2026-11-14-root\\native\\CyDAW 2.exe",
+        "sha256": "d5e1c28d00b49f66d820fba44435597e94ab8f2252fa77a5dc0edd30bfafd99d",
+        "sourceHashes": {
+          "src/v2/ImGuiHost.cpp": "733f7aff1ce2eb1b6b5aa86be1d1776f010aa0248d8878cf7b75fa4fc22e2353",
+          "src/v2/AppUi.cpp": "8a3d88c78c23cfdde2efc102d839f0ccd47f08dcf8def20ae082db3ac19a0126",
+          "src/app/AudioTrackController.cpp": "3f3fa0dd71f10a2b7a0344c5444199b25af0fa50973d138e9ce8dc8cbf0a6f2c",
+          "src/app/DjEngine.cpp": "7ad7d2493d8d2c0f2e566174650fd701ef8e92da3e808a8fc99d8f18bc182522",
+          "src/app/IsolatedPluginHost.cpp": "21c90047bee60a0e325f3feec1aaf56a8e17239df5f6c9be603e23e2600bbd78",
+          "src/native_plugin/NativeRuntime.cpp": "94223e3a27d9380151cb2ab5438c0bd3084d3c57935344b2f1596f6d508db63f",
+          "src/engine/AudioRenderPlan.cpp": "4006f4d5fc7017d653edbff23e6cff739a7415eca18a6acf81f65ff106bc5c19",
+          "src/engine/AudioBuffer.cpp": "bd5714b2aabd2674628f4ec35230830d49485016349b963f2c83abf883e59175",
+          "src/engine/ProEffects.cpp": "3e8e8aa014badb0b6e69def166525edcb6ea0a5837af11532d0225b3e5a10e04",
+          "src/engine/EffectProcessors.cpp": "ebe89ebc4cbeb9a65972636b3f83d38af21b92da3ec186c2ff6ff7aa8ad74655",
+          "src/integration/AudioSources.cpp": "9f5cc62cb9ea75b2a84c9688519f3610deb178c1c8d928c5fd764184e35eb668",
+          "src/integration/BufferedAudioSource.cpp": "21ac6be2d9bf15af01ea2034eac323f247c5ceab0dbfd4b86412261a72174b44",
+          "src/integration/DeviceManager.cpp": "999f98764b767322078022b5b9e48407c1035dd5183aee526d89cd7177ec4e63",
+          "src/app/VirtualAudioBus.cpp": "e98f8c732e9f220169daec7339073528ee4a183a24fa4ddab3e5dd1cb6ce6080"
+        },
+        "generatedHashes": {
+          "AppUi.cpp": "cb04fb2c1b6dade4d0fe77fa9aaeeb3de3365e91c0d3d20721b205c3616fbe48",
+          "AudioBuffer.cpp": "0cc65ce893589ff8530138cbad6dc2fbde8fdf6e563958be082e177ed7c48d02",
+          "AudioRenderPlan.cpp": "65239b1a1178389de1fb5cdf67564844ad41b50e5f69edeb22997e94151cbfb7",
+          "AudioSources.cpp": "3009340ace5552a5c353b5d7a5347438c80ae9f6582ca46f8c33ce7f1309cebc",
+          "AudioTrackController.cpp": "3c7cfd1849feb7c1ac3bba21129d18b132d1662a5dedd51d4395af224b7cd7d0",
+          "BufferedAudioSource.cpp": "43ba5f1a643b8bf4dc58d5a7f4e14f5a069923e3c5dc8739689fac015110064d",
+          "DeviceManager.cpp": "df0df90b7376c926cc0e03bfccae31486d297db5e45c92d49882e2cf3f7fb8cd",
+          "DjEngine.cpp": "b3ed4d5ce77905b33a2adc9f14b8cf206692b04164defded5c40314bd0842641",
+          "EffectProcessors.cpp": "bc94f3f82cf33960fdb102faf0b0de5d6d8032d9844b609068f2bf3962ef10a4",
+          "ImGuiHost.cpp": "56986f38083740b11f69b1b594f78bce689d78a49aae726835d0b1e8a1fe27c0",
+          "IsolatedPluginHost.cpp": "fa9b3c4c8892a0e76307c79e05ee5e409984d9282c33af744602ae80b09b8075",
+          "NativeRuntime.cpp": "715fe68e3e8031fe7609a73ff2fa432aff5010164a03bc0e5d76673e49acf1dc",
+          "ProEffects.cpp": "09cc5ddcfd0db55f1c02ad90197b81c4334cb747fea65d5ff3d8f96ef78bef99",
+          "VirtualAudioBus.cpp": "250057a23f87511301d0167b761a6e05cbea959318651559bce49f79fe8b9173"
+        }
+      }
+    }
+  },
+  "limits": [
+    "Root render elapsed includes preemption; it is not CPU time or physical latency.",
+    "Full render root excludes part of backend/device callback adaptation; native bridge measured separately.",
+    "No new p95 callback or hardware xrun claim.",
+    "Instrumentation and production performance separated; no changes to SDK working trees.",
+    "Prior Cinema-to-Studio DC and CUE ASIO findings remain unresolved."
+  ],
+  "initialCandidatePerformance": {
+    "summary": {
+      "before": {
+        "audio32": {
+          "parentCpuMedian": 4.967293353643751,
+          "min": 4.965623682435016,
+          "max": 10.844581887255366,
+          "values": [
+            4.965623682435016,
+            4.967293353643751,
+            10.844581887255366
+          ],
+          "parentGcyclesPerSecond": 0.48549112650011456,
+          "cyclesValues": [
+            0.48549112650011456,
+            0.4840212147139818,
+            0.8095726999748694
+          ]
+        },
+        "effects16": {
+          "parentCpuMedian": 53.2594518545623,
+          "min": 52.74060880110842,
+          "max": 56.25901971959533,
+          "values": [
+            56.25901971959533,
+            53.2594518545623,
+            52.74060880110842
+          ],
+          "parentGcyclesPerSecond": 2.7149924854902543,
+          "cyclesValues": [
+            2.774826724607836,
+            2.6813201824365884,
+            2.7149924854902543
+          ]
+        }
+      },
+      "cached": {
+        "audio32": {
+          "parentCpuMedian": 4.654917809692913,
+          "min": 4.003038387427024,
+          "max": 5.260805744508977,
+          "values": [
+            4.654917809692913,
+            4.003038387427024,
+            5.260805744508977
+          ],
+          "parentGcyclesPerSecond": 0.39908404186728746,
+          "cyclesValues": [
+            0.39908404186728746,
+            0.40014379248896104,
+            0.39141019955582523
+          ]
+        },
+        "effects16": {
+          "parentCpuMedian": 53.81341397438468,
+          "min": 53.13990061456092,
+          "max": 54.14096857855479,
+          "values": [
+            53.13990061456092,
+            54.14096857855479,
+            53.81341397438468
+          ],
+          "parentGcyclesPerSecond": 2.6535608416173244,
+          "cyclesValues": [
+            2.6535608416173244,
+            2.6487625014512783,
+            2.727390980205656
+          ]
+        }
+      }
+    },
+    "protocol": {
+      "sampleRate": 48000,
+      "buffer": 1024,
+      "inputs": 0,
+      "outputs": 2,
+      "silent": true,
+      "hidden": true,
+      "profile": "isolated",
+      "rounds": 3,
+      "warmup": 2,
+      "seconds": 5,
+      "order": "alternated fresh processes",
+      "settings": "same UI-off gate, same original audio objects except prepared cache fast path",
+      "topology": "numeric target indices checked",
+      "instrumentation": false
+    },
+    "hashes": {
+      "before": "c871f1cd363bce1f0dd42b6080bda36bfccec042499896f3cac57b2ea2ec8a28",
+      "cached": "edecbad190ce7bef34488b026fa946e9dd8cfec77a96f2e0f9eaa9160601b26d"
+    }
+  },
+  "finalSourcesMatchCompiled": true
+}

@@ -1,8 +1,8 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "ProjectImport.h"
 
-#include <juce_core/juce_core.h>
 
 #include <string>
 #include <utility>
@@ -17,9 +17,9 @@ namespace cydaw::v2::imported {
 
 struct Equivalent {
     // The factory instrument to put on the track ("opale-instrument").
-    juce::String instrument;
+    cydaw::base::Text instrument;
     // Then, if it is not there yet (a model still to come), this one.
-    juce::String fallback;
+    cydaw::base::Text fallback;
     // Its synth card's settings, by the model's keys; a choice by its index.
     std::vector<std::pair<std::string, float>> settings;
 };
@@ -27,6 +27,6 @@ struct Equivalent {
 // What stands for `device` (an instrument of `format`'s own: "bitwig",
 // "ableton", "dawproject"); empty when it is a plug-in or not an instrument.
 [[nodiscard]] std::optional<Equivalent> equivalentOf(const app::project_import::ImportedDevice& device,
-                                                     const juce::String& format);
+                                                     const cydaw::base::Text& format);
 
 } // namespace cydaw::v2::imported

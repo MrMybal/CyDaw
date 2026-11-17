@@ -1,5 +1,11 @@
 #include <cydaw/engine/BuiltinProcessors.h>
 
+#include <cydsp/processors/Dynamics.h>
+#include <cydsp/math/DspMath.h>
+#include <cassert>
+#include <stdexcept>
+#include <limits>
+
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -123,6 +129,9 @@ void SineOscillatorProcessor::prepare(const ProcessSpec& spec)
     if (std::isfinite(spec.sampleRate) && spec.sampleRate > 0.0)
         sampleRate_ = spec.sampleRate;
     reset();
+    const auto status = oscillator_.prepare({sampleRate_, spec.maximumBlockSize, spec.channelCount});
+    if (status != cydsp::Status::ok)
+        throw std::invalid_argument("Oscillator preparation");
 }
 
 void SineOscillatorProcessor::reset() noexcept
@@ -141,12 +150,17 @@ void SineOscillatorProcessor::process(const AudioBlockView,
         waveform_.load(std::memory_order_relaxed)));
     const auto level = level_.load(std::memory_order_relaxed);
 
+    oscillator_.reset(phase_);
+    oscillator_.setWaveform(waveform == 1 ? cydsp::Waveform::triangle : cydsp::Waveform::sine);
+    const auto status = oscillator_.setFrequency(frequencyHz);
+    assert(status == cydsp::Status::ok);
+    (void)status;
+
     for (std::uint32_t frame = 0; frame < output.frameCount; ++frame) {
         float sample {};
         switch (waveform) {
         case 1:
-            sample = static_cast<float>(1.0 - 4.0
-                * std::abs(phase_ - 0.5));
+            sample = static_cast<float>(oscillator_.next());
             break;
         case 2:
             sample = static_cast<float>(2.0 * phase_ - 1.0);
@@ -158,8 +172,7 @@ void SineOscillatorProcessor::process(const AudioBlockView,
             sample = phase_ < 0.25 ? 1.0f : -1.0f;
             break;
         default:
-            sample = static_cast<float>(
-                std::sin(phase_ * 2.0 * std::numbers::pi));
+            sample = static_cast<float>(oscillator_.next());
             break;
         }
         sample *= level;
@@ -1130,13 +1143,38 @@ void CompressorProcessor::setRatio(const float ratio) noexcept
                  std::memory_order_relaxed);
 }
 
+struct CompressorProcessor::NumericalState {
+    cydsp::Dynamics<float> processor;
+    cydsp::AudioBuffer<float> zero, sink, detector;
+    std::vector<const float*> inputPointers, keyPointers;
+    std::vector<float*> outputPointers;
+    std::uint32_t maximumFrames {};
+    float threshold {std::numeric_limits<float>::infinity()}, ratio {};
+};
+
 void CompressorProcessor::prepare(const ProcessSpec& spec)
 {
-    sampleRate_ = std::max(1.0, spec.sampleRate);
+    auto state = std::make_shared<NumericalState>();
+    state->maximumFrames = std::max<std::uint32_t>(1, spec.maximumBlockSize);
+    const auto channels = std::max<std::uint32_t>(1, spec.channelCount);
+    const cydsp::ProcessSpec numericalSpec {std::max(1.0, spec.sampleRate), state->maximumFrames, channels};
+    if (state->processor.prepare(numericalSpec, cydsp::DynamicsMode::compressor, 0) != cydsp::Status::ok
+        || state->zero.resize(channels, state->maximumFrames) != cydsp::Status::ok
+        || state->sink.resize(channels, state->maximumFrames) != cydsp::Status::ok
+        || state->detector.resize(1, state->maximumFrames) != cydsp::Status::ok)
+        throw std::runtime_error("CyDSP compressor preparation failed");
+    state->inputPointers.resize(channels);
+    state->outputPointers.resize(channels);
+    state->keyPointers.resize(channels);
+    numerical_ = std::move(state);
     reset();
 }
 
-void CompressorProcessor::reset() noexcept { envelope_ = 0.0f; }
+void CompressorProcessor::reset() noexcept
+{
+    if (numerical_) numerical_->processor.reset();
+    gainReductionDb_.store(0.0f, std::memory_order_relaxed);
+}
 
 void CompressorProcessor::process(const AudioBlockView input,
                                   const AudioBlockView output,
@@ -1168,25 +1206,59 @@ void CompressorProcessor::compress(const AudioBlockView input, const AudioBlockV
     clearAudio(output);
     const auto channels = std::min(input.channelCount, output.channelCount);
     const auto frames = std::min({ input.frameCount, output.frameCount, detector.frameCount });
-    const auto heard = detector.channelCount;
-    const auto attack = static_cast<float>(std::exp(-1.0 / (0.008 * sampleRate_)));
-    const auto release = static_cast<float>(std::exp(-1.0 / (0.090 * sampleRate_)));
-    const auto thresholdDb = thresholdDb_.load(std::memory_order_relaxed);
+    auto* state = numerical_.get();
+    if (state == nullptr) return;
+    const auto preparedChannels = state->inputPointers.size();
+    const auto threshold = thresholdDb_.load(std::memory_order_relaxed);
     const auto ratio = ratio_.load(std::memory_order_relaxed);
+    if (threshold != state->threshold || ratio != state->ratio) {
+        cydsp::DynamicsParameters parameters;
+        parameters.thresholdDb = threshold;
+        parameters.ratio = ratio;
+        parameters.kneeDb = 0;
+        parameters.attackMs = 8;
+        parameters.releaseMs = 90;
+        const auto status = state->processor.setParameters(parameters);
+        assert(status == cydsp::Status::ok);
+        if (status != cydsp::Status::ok) return;
+        state->threshold = threshold;
+        state->ratio = ratio;
+    }
     auto deepestReductionDb = 0.0f;
-    for (std::uint32_t frame = 0; frame < frames; ++frame) {
-        auto peak = 0.0f;
-        for (std::uint32_t channel = 0; channel < heard; ++channel)
-            peak = std::max(peak, std::abs(detector.channel(channel)[frame]));
-        const auto coefficient = peak > envelope_ ? attack : release;
-        envelope_ = coefficient * envelope_ + (1.0f - coefficient) * peak;
-        const auto levelDb = 20.0f * std::log10(std::max(envelope_, 1.0e-9f));
-        const auto over = std::max(0.0f, levelDb - thresholdDb);
-        const auto reductionDb = -over * (1.0f - 1.0f / ratio);
-        const auto gain = std::pow(10.0f, reductionDb / 20.0f);
-        deepestReductionDb = std::min(deepestReductionDb, reductionDb);
-        for (std::uint32_t channel = 0; channel < channels; ++channel)
-            output.channel(channel)[frame] = input.channel(channel)[frame] * gain;
+    for (std::uint32_t first = 0; first < frames; first += state->maximumFrames) {
+        const auto count = std::min(state->maximumFrames, frames - first);
+        for (std::size_t ch = 0; ch < preparedChannels; ++ch) {
+            state->inputPointers[ch] = ch < input.channelCount ? input.channel(static_cast<std::uint32_t>(ch)) + first
+                                                               : state->zero.block().channel(ch).data();
+            state->outputPointers[ch] = ch < channels ? output.channel(static_cast<std::uint32_t>(ch)) + first
+                                                      : state->sink.block().channel(ch).data();
+        }
+        const cydsp::AudioBlock<const float> program(state->inputPointers.data(), preparedChannels, count);
+        const cydsp::AudioBlock<float> result(state->outputPointers.data(), preparedChannels, count);
+        const auto selfDetector = detector.data == input.data && detector.channelCount == input.channelCount
+                                  && detector.channelStride == input.channelStride && input.channelCount == preparedChannels;
+        cydsp::Status status;
+        if (selfDetector) status = state->processor.process(program, result);
+        else {
+            const auto heard = detector.channelCount;
+            if (heard == 1 || heard == preparedChannels) {
+                for (std::uint32_t ch = 0; ch < heard; ++ch) state->keyPointers[ch] = detector.channel(ch) + first;
+            } else {
+                // Legacy graphs may have an arbitrary number of key channels.
+                // Broadcast their maximum peak; the sidechain remains inaudible.
+                auto key = state->detector.block(count).channel(0);
+                std::fill(key.begin(), key.end(), 0.0f);
+                for (std::uint32_t ch = 0; ch < heard; ++ch)
+                    for (std::uint32_t i = 0; i < count; ++i) key[i] = std::max(key[i], std::abs(detector.channel(ch)[first+i]));
+                state->keyPointers[0] = key.data();
+            }
+            const cydsp::AudioBlock<const float> key(state->keyPointers.data(), heard == preparedChannels ? preparedChannels : 1, count);
+            status = state->processor.process(program, key, result);
+        }
+        assert(status == cydsp::Status::ok);
+        if (status != cydsp::Status::ok) { clearAudio(output); return; }
+        const auto gain = state->processor.minimumAppliedGain();
+        deepestReductionDb = std::min(deepestReductionDb, static_cast<float>(cydsp::gainToDecibels(gain, -240.0)));
     }
     gainReductionDb_.store(deepestReductionDb, std::memory_order_relaxed);
 }

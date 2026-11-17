@@ -1,8 +1,11 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/Properties.h>
+#include <cydaw/base/File.h>
 #include "Companion.h"
 
 #include "Locations.h"
 
-#include <juce_data_structures/juce_data_structures.h>
 
 #include <optional>
 #include <thread>
@@ -11,17 +14,17 @@ namespace cydaw::v2 {
 
 namespace {
 
-std::unique_ptr<juce::PropertiesFile> openSettings()
+std::unique_ptr<cydaw::base::PropertiesFile> openSettings()
 {
-    juce::PropertiesFile::Options options;
+    cydaw::base::PropertiesFile::Options options;
     options.applicationName = "CyDAW";
     options.filenameSuffix = ".settings";
     options.osxLibrarySubFolder = "Application Support";
     options.folderName = "CyDAW";
-    return std::make_unique<juce::PropertiesFile>(options);
+    return std::make_unique<cydaw::base::PropertiesFile>(options);
 }
 
-juce::File environmentPython()
+cydaw::base::File environmentPython()
 {
     const auto folder = Companion::environmentFolder();
     for (const auto& candidate : { folder.getChildFile("Scripts").getChildFile("python.exe"),
@@ -34,10 +37,10 @@ juce::File environmentPython()
 } // namespace
 
 // One run of the companion: its output read line by line on its own thread.
-class Companion::Job final : public juce::Thread {
+class Companion::Job final : public cydaw::base::Thread {
 public:
-    Job(Companion& owner, juce::StringArray command, juce::String name)
-        : juce::Thread("CyDAW companion"), owner_(owner), command_(std::move(command)), name_(std::move(name))
+    Job(Companion& owner, cydaw::base::TextList command, cydaw::base::Text name)
+        : cydaw::base::Thread("CyDAW companion"), owner_(owner), command_(std::move(command)), name_(std::move(name))
     {
     }
 
@@ -56,34 +59,34 @@ public:
 
     void run() override
     {
-        if (!process_.start(command_, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+        if (!process_.start(command_, cydaw::base::ChildProcess::wantStdOut | cydaw::base::ChildProcess::wantStdErr)) {
             finish(false, {}, "Python could not be started: " + command_[0]);
             return;
         }
-        juce::String pending;
-        juce::String lastError;
-        juce::var done;
+        cydaw::base::Text pending;
+        cydaw::base::Text lastError;
+        cydaw::base::Value done;
         // A byte at a time: JUCE's read waits until the whole request is
         // filled, and a line of progress is short.
-        juce::MemoryBlock bytes;
+        cydaw::base::MemoryBlock bytes;
         while (!threadShouldExit()) {
             char byte {};
             if (process_.readProcessOutput(&byte, 1) <= 0) {
                 if (!process_.isRunning())
                     break;
-                juce::Thread::sleep(20);
+                cydaw::base::Thread::sleep(20);
                 continue;
             }
             if (byte != '\n') {
                 bytes.append(&byte, 1);
                 continue;
             }
-            pending += juce::String::fromUTF8(static_cast<const char*>(bytes.getData()), static_cast<int>(bytes.getSize())) + "\n";
+            pending += cydaw::base::Text::fromUTF8(static_cast<const char*>(bytes.getData()), static_cast<int>(bytes.getSize())) + "\n";
             bytes.reset();
             for (auto end = pending.indexOfChar('\n'); end >= 0; end = pending.indexOfChar('\n')) {
                 const auto line = pending.substring(0, end).trim();
                 pending = pending.substring(end + 1);
-                const auto value = juce::JSON::parse(line);
+                const auto value = cydaw::base::JSON::parse(line);
                 if (!value.isObject()) {
                     // Python's own complaints (a missing module…) come as text.
                     if (line.isNotEmpty())
@@ -113,11 +116,11 @@ public:
         if (done.isObject() && exitCode == 0)
             finish(true, done, {});
         else
-            finish(false, {}, lastError.isNotEmpty() ? lastError : "the companion stopped (" + juce::String(static_cast<int>(exitCode)) + ")");
+            finish(false, {}, lastError.isNotEmpty() ? lastError : "the companion stopped (" + cydaw::base::Text(static_cast<int>(exitCode)) + ")");
     }
 
 private:
-    void finish(const bool ok, juce::var result, juce::String error)
+    void finish(const bool ok, cydaw::base::Value result, cydaw::base::Text error)
     {
         const std::scoped_lock lock(owner_.mutex_);
         owner_.status_.running = false;
@@ -129,9 +132,9 @@ private:
     }
 
     Companion& owner_;
-    juce::StringArray command_;
-    juce::String name_;
-    juce::ChildProcess process_;
+    cydaw::base::TextList command_;
+    cydaw::base::Text name_;
+    cydaw::base::ChildProcess process_;
 };
 
 Companion::Companion()
@@ -150,9 +153,9 @@ void Companion::loadSettings()
     python_ = settings->getValue("companionPython", {});
 }
 
-juce::String Companion::pythonCommand() const
+cydaw::base::Text Companion::pythonCommand() const
 {
-    if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_COMPANION_PYTHON", {}); other.trim().isNotEmpty())
+    if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_COMPANION_PYTHON", {}); other.trim().isNotEmpty())
         return other.trim();
     if (python_.trim().isNotEmpty())
         return python_.trim();
@@ -161,7 +164,7 @@ juce::String Companion::pythonCommand() const
     return "python";
 }
 
-void Companion::setPythonCommand(const juce::String& command)
+void Companion::setPythonCommand(const cydaw::base::Text& command)
 {
     python_ = command.trim();
     const auto settings = openSettings();
@@ -169,9 +172,9 @@ void Companion::setPythonCommand(const juce::String& command)
     settings->saveIfNeeded();
 }
 
-juce::File Companion::packageFolder()
+cydaw::base::File Companion::packageFolder()
 {
-    const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    const auto executable = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile);
     auto shipped = executable.getSiblingFile("tools").getChildFile("companion");
     if (shipped.getChildFile("cydaw_companion").isDirectory())
         return shipped;
@@ -183,17 +186,17 @@ juce::File Companion::packageFolder()
     return shipped;
 }
 
-juce::File Companion::environmentFolder()
+cydaw::base::File Companion::environmentFolder()
 {
     return locations::folder(Location::companion);
 }
 
-juce::var Companion::componentCatalogue()
+cydaw::base::Value Companion::componentCatalogue()
 {
-    return juce::JSON::parse(packageFolder().getChildFile("cydaw_companion").getChildFile("components.json"));
+    return cydaw::base::JSON::parse(packageFolder().getChildFile("cydaw_companion").getChildFile("components.json"));
 }
 
-juce::var Companion::component(const juce::String& id)
+cydaw::base::Value Companion::component(const cydaw::base::Text& id)
 {
     // Held: the list lives as long as the catalogue does.
     const auto catalogue = componentCatalogue();
@@ -205,7 +208,7 @@ juce::var Companion::component(const juce::String& id)
     return {};
 }
 
-bool Companion::componentInstalled(const juce::String& id, const juce::var& info)
+bool Companion::componentInstalled(const cydaw::base::Text& id, const cydaw::base::Value& info)
 {
     if (!info.isObject())
         return false;
@@ -225,8 +228,8 @@ bool Companion::componentInstalled(const juce::String& id, const juce::var& info
     return false;
 }
 
-bool Companion::install(const juce::String& id, const bool licencesAccepted, juce::String& error,
-                        const juce::StringArray& extra)
+bool Companion::install(const cydaw::base::Text& id, const bool licencesAccepted, cydaw::base::Text& error,
+                        const cydaw::base::TextList& extra)
 {
     const auto item = component(id);
     if (!item.isObject()) {
@@ -238,7 +241,7 @@ bool Companion::install(const juce::String& id, const bool licencesAccepted, juc
         return false;
     }
     const auto environment = environmentFolder();
-    juce::StringArray arguments { "setup", "--env", environment.getFullPathName() };
+    cydaw::base::TextList arguments { "setup", "--env", environment.getFullPathName() };
     if (const auto* own = item.getProperty("arguments", {}).getArray())
         for (const auto& argument : *own)
             arguments.add(argument.toString());
@@ -248,23 +251,23 @@ bool Companion::install(const juce::String& id, const bool licencesAccepted, juc
         return false;
     }
     // The receipt: what was asked for, from where, and the licences shown.
-    auto* receipt = new juce::DynamicObject();
+    auto* receipt = new cydaw::base::Object();
     receipt->setProperty("component", id);
-    receipt->setProperty("when", juce::Time::getCurrentTime().toISO8601(true));
+    receipt->setProperty("when", cydaw::base::Time::getCurrentTime().toISO8601(true));
     receipt->setProperty("licencesAccepted", licencesAccepted);
     receipt->setProperty("sources", item.getProperty("sources", {}));
     receipt->setProperty("packages", item.getProperty("packages", {}));
     const auto file = environment.getChildFile("receipts").getChildFile(id + ".json");
     (void) file.getParentDirectory().createDirectory();
-    (void) file.replaceWithText(juce::JSON::toString(juce::var(receipt)));
+    (void) file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(receipt)));
     return true;
 }
 
-juce::StringArray Companion::commandLine(const juce::StringArray& arguments) const
+cydaw::base::TextList Companion::commandLine(const cydaw::base::TextList& arguments) const
 {
     // No working folder can be given to a child process here: the package is
     // put on the path by the command itself.
-    auto command = juce::StringArray::fromTokens(pythonCommand(), " ", "\"");
+    auto command = cydaw::base::TextList::fromTokens(pythonCommand(), " ", "\"");
     command.removeEmptyStrings();
     const auto folder = packageFolder().getFullPathName().replaceCharacter('\\', '/');
     command.add("-X");
@@ -275,7 +278,7 @@ juce::StringArray Companion::commandLine(const juce::StringArray& arguments) con
     return command;
 }
 
-bool Companion::start(const juce::StringArray& arguments)
+bool Companion::start(const cydaw::base::TextList& arguments)
 {
     if (status().running)
         return false;
@@ -284,10 +287,10 @@ bool Companion::start(const juce::StringArray& arguments)
         const std::scoped_lock lock(mutex_);
         status_ = {};
         status_.running = true;
-        status_.command = arguments.isEmpty() ? juce::String() : arguments[0];
+        status_.command = arguments.isEmpty() ? cydaw::base::Text() : arguments[0];
         status_.message = "start";
     }
-    job_ = std::make_unique<Job>(*this, commandLine(arguments), arguments.isEmpty() ? juce::String() : arguments[0]);
+    job_ = std::make_unique<Job>(*this, commandLine(arguments), arguments.isEmpty() ? cydaw::base::Text() : arguments[0]);
     job_->startThread();
     return true;
 }
@@ -314,18 +317,18 @@ std::optional<Companion::Status> Companion::takeFinished()
     return finished;
 }
 
-juce::var Companion::runNow(const juce::StringArray& arguments, juce::String& error, const int timeoutMs) const
+cydaw::base::Value Companion::runNow(const cydaw::base::TextList& arguments, cydaw::base::Text& error, const int timeoutMs) const
 {
-    juce::ChildProcess process;
+    cydaw::base::ChildProcess process;
     const auto command = commandLine(arguments);
-    if (!process.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+    if (!process.start(command, cydaw::base::ChildProcess::wantStdOut | cydaw::base::ChildProcess::wantStdErr)) {
         error = "Python could not be started: " + command[0];
         return {};
     }
     // Read on a thread of its own: reading lasts until the output ends, which
     // a hung Python never does; past the time allowed it is ended.
-    juce::String output;
-    juce::WaitableEvent read;
+    cydaw::base::Text output;
+    cydaw::base::WaitableEvent read;
     std::thread reader([&process, &output, &read] {
         output = process.readAllProcessOutput();
         read.signal();
@@ -338,16 +341,16 @@ juce::var Companion::runNow(const juce::StringArray& arguments, juce::String& er
         error = command[0] + " did not answer in time";
         return {};
     }
-    juce::StringArray lines;
+    cydaw::base::TextList lines;
     lines.addLines(output);
-    juce::var last;
+    cydaw::base::Value last;
     for (const auto& line : lines) {
-        const auto value = juce::JSON::parse(line.trim());
+        const auto value = cydaw::base::JSON::parse(line.trim());
         if (value.isObject())
             last = value;
     }
     if (!last.isObject()) {
-        error = lines.isEmpty() ? juce::String("no answer from ") + command[0] : lines[lines.size() - 1];
+        error = lines.isEmpty() ? cydaw::base::Text("no answer from ") + command[0] : lines[lines.size() - 1];
         return {};
     }
     if (last.hasProperty("error"))

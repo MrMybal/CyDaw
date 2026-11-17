@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -25,7 +26,7 @@ class RackView final {
 public:
     RackView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 
-    [[nodiscard]] static bool handles(const juce::String& typeKey)
+    [[nodiscard]] static bool handles(const cydaw::base::Text& typeKey)
     {
         return engine::instrument_container::isContainerType(typeKey.toStdString());
     }
@@ -35,10 +36,10 @@ public:
     // The instruments a pad, a layer or a Replacer can play, as menu items:
     // CyDAW's, then the factory's by category (English names, a module's).
     // The key of the one chosen, empty while none is.
-    [[nodiscard]] static juce::String instrumentItems(Studio& studio, const juce::String& current = {});
+    [[nodiscard]] static cydaw::base::Text instrumentItems(Studio& studio, const cydaw::base::Text& current = {});
     // The same for a pad of a drum machine (made on `note` when there is
     // none) or a layer; true when one was chosen.
-    static bool instrumentMenu(Studio& studio, const TrackRef& track, int note, std::optional<std::size_t> pad, juce::String& error);
+    static bool instrumentMenu(Studio& studio, const TrackRef& track, int note, std::optional<std::size_t> pad, cydaw::base::Text& error);
 
 private:
     void drawDrums(const TrackRef& track, ImVec2 at, ImVec2 size, ImU32 colour);
@@ -48,7 +49,7 @@ private:
     // A selector's way of choosing: its mode and what it listens to.
     void drawSelection(const TrackRef& track, ImVec2 at, float width);
     void chooseSample(const TrackRef& track, int note);
-    void report(const juce::String& error);
+    void report(const cydaw::base::Text& error);
 
     Studio& studio_;
     UiState& state_;

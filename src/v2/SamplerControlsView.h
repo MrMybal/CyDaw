@@ -18,9 +18,9 @@ struct Count {
     int articulations {};
 };
 // What a card's map has of them.
-[[nodiscard]] Count count(app::NodeGraphComponent& graph, std::uint64_t nodeId);
+[[nodiscard]] Count count(app::GraphDocument& graph, std::uint64_t nodeId);
 // Draws them in the space left (rows of knobs that wrap); `colour` the card's.
-void draw(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId,
+void draw(Studio& studio, UiState& state, const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId,
           ImU32 colour);
 
 } // namespace cydaw::v2::sampler_controls

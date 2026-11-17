@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Text.h>
 #include "ContextMenus.h"
 
 #include "RoutingUi.h"
@@ -50,7 +52,7 @@ void ContextMenus::draw()
             ImGui::PopFont();
             ImGui::Separator();
             ImGui::BeginChild("##outputsBody", ImVec2(dp(380.0f), dp(150.0f)), ImGuiChildFlags_None);
-            juce::String error;
+            cydaw::base::Text error;
             routing_ui::outputsEditor(studio_, outputsTrack_, dp(64.0f), error);
             if (error.isNotEmpty()) {
                 state_.status = error;
@@ -77,7 +79,7 @@ void ContextMenus::draw()
     renameDialog();
 }
 
-void ContextMenus::colourMenu(const std::function<void(juce::uint32)>& apply)
+void ContextMenus::colourMenu(const std::function<void(std::uint32_t)>& apply)
 {
     if (!ImGui::BeginMenu(L("Couleur", "Colour")))
         return;
@@ -95,7 +97,7 @@ void ContextMenus::colourMenu(const std::function<void(juce::uint32)>& apply)
     ImGui::EndMenu();
 }
 
-void ContextMenus::askRename(const juce::String& current)
+void ContextMenus::askRename(const cydaw::base::Text& current)
 {
     std::snprintf(renameBuffer_, sizeof(renameBuffer_), "%s", current.toRawUTF8());
     openRename_ = true;
@@ -112,7 +114,7 @@ void ContextMenus::trackMenu(const TrackRef& track)
         renameTrack_ = track;
         askRename(studio_.trackName(track));
     }
-    colourMenu([this, track](const juce::uint32 colour) { studio_.setTrackColour(track, colour); });
+    colourMenu([this, track](const std::uint32_t colour) { studio_.setTrackColour(track, colour); });
     auto mix = studio_.trackMix(track);
     if (ImGui::MenuItem(L("Muet", "Mute"), "M", mix.muted)) {
         mix.muted = !mix.muted;
@@ -155,7 +157,7 @@ void ContextMenus::trackMenu(const TrackRef& track)
     // Groups: the picked tracks gathered; a group folded, undone.
     {
         const auto picked = state_.pickedTracks.empty() ? std::vector<TrackRef> { track } : state_.pickedTracks;
-        const auto label = picked.size() > 1 ? (ui::Ls("Grouper les ", "Group the ") + juce::String(static_cast<int>(picked.size()))
+        const auto label = picked.size() > 1 ? (ui::Ls("Grouper les ", "Group the ") + cydaw::base::Text(static_cast<int>(picked.size()))
                                                 + ui::Ls(" pistes choisies", " picked tracks"))
                                               : ui::Ls("Mettre dans un groupe", "Put in a group");
         if (!studio_.isGroupTrack(track) && ImGui::MenuItem(label.toRawUTF8(), "Ctrl+G"))
@@ -184,7 +186,7 @@ void ContextMenus::trackMenu(const TrackRef& track)
     ImGui::Separator();
     // Where it goes: its output at once, or all its outputs and sends.
     if (ImGui::BeginMenu(L("Sortie", "Output"))) {
-        juce::String error;
+        cydaw::base::Text error;
         routing_ui::mainOutputItems(studio_, track, error);
         if (error.isNotEmpty()) {
             state_.status = error;
@@ -311,7 +313,7 @@ void ContextMenus::slotMenu(const TrackRef& owner, const int scene)
             renameClip_ = clipId;
             askRename(clip->name);
         }
-        colourMenu([&engine, this, track, clipId](const juce::uint32 colour) {
+        colourMenu([&engine, this, track, clipId](const std::uint32_t colour) {
             (void) engine.setMidiClipPresentation(track.midiId, clipId, {}, colour);
             studio_.markDirty();
         });
@@ -386,7 +388,7 @@ void ContextMenus::renameDialog()
     ImGui::SetNextItemWidth(dp(260.0f));
     const auto entered = ImGui::InputText("##name", renameBuffer_, sizeof(renameBuffer_), ImGuiInputTextFlags_EnterReturnsTrue);
     if (entered || ui::primaryButton(L("Renommer", "Rename"))) {
-        const auto name = juce::String::fromUTF8(renameBuffer_).trim();
+        const auto name = cydaw::base::Text::fromUTF8(renameBuffer_).trim();
         if (name.isNotEmpty()) {
             if (renaming_ == Renaming::track && studio_.isValid(renameTrack_))
                 studio_.setTrackName(renameTrack_, name);

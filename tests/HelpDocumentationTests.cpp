@@ -6,23 +6,23 @@ static void need(bool condition, const char* reason) { if (!condition) throw std
 int main(int argc, char** argv) {
     try {
         need(argc==2,"help export directory required");
-        HelpDocumentation help{juce::File(juce::String::fromUTF8(argv[1]))};
+        HelpDocumentation help{cydaw::base::File(cydaw::base::Text::fromUTF8(argv[1]))};
         need(help.load(),"load shipped CyDoc catalog");
         auto link=help.link("cinema","video","fr");
         need(link.startsWith("file:///") && link.endsWith("#/fr/cinema/video"),"canonical file route");
         need(help.follow("manual:mixing.md#sidechain").endsWith("#/en/mixing/sidechain"),"old manual link");
         need(help.follow("doc:mixing#sidechain").endsWith("#/en/mixing/sidechain"),"CyDoc link");
         need(help.link("atelier-vst").endsWith("#/en/workshop"),"renamed workshop alias");
-        juce::StringPairArray media;media.set("media","figure-cinema");media.set("zoom","2");media.set("x","12.5");
+        cydaw::base::TextMap media;media.set("media","figure-cinema");media.set("zoom","2");media.set("x","12.5");
         need(help.link("cinema",{},"en",media).endsWith("?media=figure-cinema&x=12.5&zoom=2"),"precise media state");
         for (const auto* invalid : {"https://example.com","file:///Windows/win.ini","../../secret.md","doc://external/page","missing"})
             need(help.follow(invalid).isEmpty(),"reject unknown/external help target");
         need(help.link("cinema","unknown").isEmpty(),"unknown section");
         need(help.link("cinema",{},"de").isEmpty(),"unsupported locale");
-        const auto folder=juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile(juce::String::fromUTF8("CyDAW help é #%"),"",false);
+        const auto folder=cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory).getNonexistentChildFile(cydaw::base::Text::fromUTF8("CyDAW help é #%"),"",false);
         folder.getChildFile("DocData").createDirectory();
-        struct Cleanup {juce::File file;~Cleanup(){file.deleteRecursively();}} cleanup{folder};
-        juce::File(juce::String::fromUTF8(argv[1])).getChildFile("DocData/routes.json").copyFileTo(folder.getChildFile("DocData/routes.json"));
+        struct Cleanup {cydaw::base::File file;~Cleanup(){file.deleteRecursively();}} cleanup{folder};
+        cydaw::base::File(cydaw::base::Text::fromUTF8(argv[1])).getChildFile("DocData/routes.json").copyFileTo(folder.getChildFile("DocData/routes.json"));
         folder.getChildFile("Documentation.html").replaceWithText("fixture");
         HelpDocumentation spaced{folder};auto encoded=spaced.link("welcome");
         need(encoded.contains("%20") && encoded.contains("%23") && encoded.contains("%25") && encoded.contains("%C3%A9"),"platform file URL encoding");

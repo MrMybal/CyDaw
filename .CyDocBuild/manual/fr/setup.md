@@ -5,7 +5,7 @@ description: Choisir les sorties audio, le tampon et les entrées MIDI.
 section: Manuel / Bien démarrer
 parent: welcome
 order: 1
-sourceRevision: b70548790723c3c5
+sourceRevision: 8fe7c4913878c8b8
 ---
 
 ## Vue d’ensemble {#overview}
@@ -26,9 +26,13 @@ Dans Options > Réglages audio choisir pilote, carte, fréquence et tampon. Acti
 Un petit tampon réduit le retard mais demande une exécution plus régulière. L'augmenter si le son craque ou si les surcharges montent. Garder une fréquence compatible avec la session et les applications utilisant un pilote partagé. Installer ASIO n'ajoute pas ce backend au paquet WASAPI.
 
 ## MIDI et écoute {#midi}
-Activer l'entrée MIDI voulue, sélectionner une piste instrument et jouer. Une piste audio demande une source ou entrée d'enregistrement ; un clip MIDI demande un instrument. Armer la piste et contrôler entrée et écoute avant d'enregistrer. Ctrl+K active le clavier musical de l'ordinateur ; octave et vélocité se règlent dans le transport.
+Dans Options > Contrôleurs et entrées > Matériel détecté, activer l'entrée MIDI voulue, sélectionner une piste instrument et jouer. Une piste audio demande une source ou entrée d'enregistrement ; un clip MIDI demande un instrument. Armer la piste et contrôler entrée et écoute avant d'enregistrer. Ctrl+K active le clavier musical de l'ordinateur ; octave, vélocité et aperçu des touches se trouvent dans l’onglet Clavier musical de cette même fenêtre.
 
 ## Emplacements et déplacements {#storage}
 Options > Emplacements liste caches, périphériques, presets, banques, exports et sessions des modes. Utiliser ce panneau pour changer les dossiers gérés. Les grandes banques peuvent être sur un disque de données ; caches et échantillons sources ont des rôles différents. Conserver projet et sons référencés pour déplacer le travail.
 
 Si tout semble correct mais que rien ne sort, suivre le [dépannage](doc:troubleshooting#silence). Continuer avec [l'espace de travail](doc:workspace) et [l'enregistrement](doc:studio#recording).
+
+## Fréquence d’affichage {#display-frame-rate}
+
+Dans **Options > Fréquence d'affichage**, choisir **30, 60 ou 120 FPS**. La valeur par défaut est **60 FPS**. Le choix prend effet immédiatement et reste enregistré pour le prochain lancement. Il limite le rafraîchissement animé dans tous les modes, y compris les panneaux détachés ; il ne change ni la fréquence audio ni le tampon. L’interface descend à 12 FPS au repos. Les projets complexes peuvent s’afficher sous le maximum choisi.

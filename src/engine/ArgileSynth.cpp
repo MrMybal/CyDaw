@@ -925,7 +925,7 @@ private:
 
     // A square an octave below its oscillator: half its pace, turning over
     // every other period.
-    static double subOf(const Unison& unison, const std::size_t osc) noexcept
+    double subOf(const Unison& unison, const std::size_t osc) const noexcept
     {
         return oscillator(1, 0.5 * (unison.phase[osc] + static_cast<double>(unison.flip[osc])), 0.5 * unison.increment[osc], 0.5);
     }

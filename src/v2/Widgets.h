@@ -1,7 +1,9 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <cyui/Core.h>
-#include <juce_core/juce_core.h>
+
 
 #include <cstdint>
 #include <string>
@@ -30,14 +32,14 @@ public:
     ModuleText& operator=(const ModuleText&) = delete;
 };
 [[nodiscard]] const char* L(const char* fr, const char* en);
-// The same, as a juce::String (inline text is UTF-8).
-[[nodiscard]] inline juce::String Ls(const char* fr, const char* en)
+// The same, as a cydaw::base::Text (inline text is UTF-8).
+[[nodiscard]] inline cydaw::base::Text Ls(const char* fr, const char* en)
 {
-    return juce::String::fromUTF8(L(fr, en));
+    return cydaw::base::Text::fromUTF8(L(fr, en));
 }
 void setFrench(bool french);
-void setLanguage(const juce::String& code);
-[[nodiscard]] juce::String language();
+void setLanguage(const cydaw::base::Text& code);
+[[nodiscard]] cydaw::base::Text language();
 // How many interface texts the current language translates (0 in French and
 // English, which are inline).
 [[nodiscard]] int translationCount();
@@ -186,8 +188,8 @@ public:
 // A card's knob, by its binding, on the track being drawn (or `prefix`'s).
 class LearnParameterScope {
 public:
-    LearnParameterScope(const juce::String& binding, const juce::String& label, const std::string& prefix = {},
-                        const juce::String& trackName = {});
+    LearnParameterScope(const cydaw::base::Text& binding, const cydaw::base::Text& label, const std::string& prefix = {},
+                        const cydaw::base::Text& trackName = {});
     ~LearnParameterScope();
     LearnParameterScope(const LearnParameterScope&) = delete;
     LearnParameterScope& operator=(const LearnParameterScope&) = delete;
@@ -281,7 +283,7 @@ void centredText(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour, const c
 // A centred title and message filling the rest of a panel.
 void emptyState(const char* title, const char* message);
 // A size for people: "6,2 Go", "312 Mo" ("6.2 GB", "312 MB").
-[[nodiscard]] juce::String sizeText(juce::int64 bytes);
+[[nodiscard]] cydaw::base::Text sizeText(std::int64_t bytes);
 // Text clipped to a width with an ellipsis.
 void clippedText(ImDrawList* list, ImVec2 position, float maxWidth, ImU32 colour, const char* text);
 

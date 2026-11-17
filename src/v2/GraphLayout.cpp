@@ -7,7 +7,7 @@
 
 namespace cydaw::v2::graph_layout {
 
-using EditorNode = app::NodeGraphComponent::EditorNode;
+using EditorNode = app::GraphDocument::EditorNode;
 
 CardContent content(const EditorNode& node)
 {
@@ -71,7 +71,7 @@ float height(const EditorNode& node, const int rows)
            + knobRows * knobCellH + 8.0f;
 }
 
-void arrange(app::NodeGraphComponent& graph)
+void arrange(app::GraphDocument& graph)
 {
     const auto nodes = graph.editorNodes();
     const auto connections = graph.editorConnections();
@@ -99,7 +99,7 @@ void arrange(app::NodeGraphComponent& graph)
         const auto to = pins.find({connection.destination, connection.destinationPort});
         if (from != pins.end() && to != pins.end()) links.push_back({next++, from->second, to->second});
     }
-    std::vector<std::pair<std::uint64_t, juce::Point<float>>> positions;
+    std::vector<std::pair<std::uint64_t, cydaw::base::Point<float>>> positions;
     for (const auto& move : cyui::arrangeNodes(cards, links, {maxWidth + 60., maxHeight + 30.}))
         positions.push_back({move.id, {float((move.position.x + 40.) / worldX), float((move.position.y + 40.) / worldY)}});
     // One committed operation, through the application's existing Undo path.

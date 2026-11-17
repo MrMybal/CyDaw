@@ -135,6 +135,7 @@ const char* modifierName(const ModifierKind kind) noexcept
     case ModifierKind::deadzone: return "deadzone";
     case ModifierKind::steps: return "steps";
     case ModifierKind::scale: return "scale";
+    case ModifierKind::drawnCurve: return "drawnCurve";
     }
     return "range";
 }
@@ -159,6 +160,7 @@ Modifier defaultModifier(const ModifierKind kind) noexcept
     case ModifierKind::deadzone: return { kind, 0.08, 0.0 };
     case ModifierKind::steps: return { kind, 4.0, 0.0 };
     case ModifierKind::scale: return { kind, 0.0, 1.0 };
+    case ModifierKind::drawnCurve: return { kind, 0.0, 1.0 };
     }
     return { kind, 0.0, 1.0 };
 }
@@ -230,6 +232,12 @@ double applyChain(VirtualControl& control, const double raw) noexcept
         case ModifierKind::curve:
             x = std::pow(clamp01(x), curveExponent(m.a));
             break;
+        case ModifierKind::drawnCurve: {
+            const auto at=clamp01(x)*double(m.points.size()-1);
+            const auto i=std::min<std::size_t>(static_cast<std::size_t>(at),m.points.size()-2);
+            x=clamp01(m.points[i]+(m.points[i+1]-m.points[i])*(at-i));
+            break;
+        }
         case ModifierKind::relative: {
             const auto tick = ticks(midi7(x), static_cast<int>(std::lround(m.a)));
             x = clamp01((control.known ? control.value : half) + tick * m.b);
@@ -279,6 +287,16 @@ double feedbackValue(const VirtualControl& control, const double value) noexcept
         case ModifierKind::curve:
             x = std::pow(x, 1.0 / curveExponent(m->a));
             break;
+        case ModifierKind::drawnCurve: {
+            double best=0,distance=2;
+            for(std::size_t i=0;i+1<m->points.size();++i) {
+                const auto a=m->points[i],b=m->points[i+1];
+                const auto t=a!=b?clamp01((x-a)/(b-a)):0.0;
+                const auto error=std::abs(a+(b-a)*t-x);
+                if(error<distance){distance=error;best=(i+t)/double(m->points.size()-1);}
+            }
+            x=best;break;
+        }
         case ModifierKind::scale:
             x = m->b != m->a ? clamp01((x - m->a) / (m->b - m->a)) : x;
             break;

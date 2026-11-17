@@ -1,3 +1,4 @@
+#include <cydaw/engine/DspHistory.h>
 // Tirette: a drawbar organ of the synth family. Nine drawbars (16' to 1')
 // mix sine partials for each key, from one of three generators: spinning
 // tone wheels (tempered partials folded back an octave at the top of the
@@ -194,42 +195,21 @@ namespace {
 // A delay line read between its samples (cubic Hermite).
 template <int Size>
 struct Delay {
-    static_assert((Size & (Size - 1)) == 0, "a power of two");
-    std::array<float, static_cast<std::size_t>(Size)> buffer {};
-    int write {};
-
-    void clear() noexcept
+    DspHistory<double> history;
+    Delay() { history.prepare(1, Size); }
+    void clear() noexcept { history.reset(); }
+    void push(double x) noexcept
     {
-        buffer.fill(0.0f);
-        write = 0;
+        const double rounded = static_cast<float>(x);
+        history.push({&rounded, 1});
     }
-    void push(const double x) noexcept
+    [[nodiscard]] double tap(int samples) const noexcept
     {
-        write = (write + 1) & (Size - 1);
-        buffer[static_cast<std::size_t>(write)] = static_cast<float>(x);
+        return history.read(0, double(std::clamp(samples, 0, Size - 1)), cydsp::HistoryInterpolation::nearest);
     }
-    // What was pushed `samples` ago, a whole number of them.
-    [[nodiscard]] double tap(const int samples) const noexcept
-    {
-        return static_cast<double>(buffer[static_cast<std::size_t>((write - std::clamp(samples, 0, Size - 1)) & (Size - 1))]);
-    }
-    // What was pushed `samples` ago (at least two).
     [[nodiscard]] double read(double samples) const noexcept
     {
-        samples = std::clamp(samples, 2.0, static_cast<double>(Size - 4));
-        const auto position = static_cast<double>(write) - samples;
-        const auto whole = std::floor(position);
-        const auto t = position - whole;
-        const auto at = static_cast<int>(whole);
-        const auto sample = [this](const int index) { return static_cast<double>(buffer[static_cast<std::size_t>(index & (Size - 1))]); };
-        const auto before = sample(at - 1);
-        const auto x0 = sample(at);
-        const auto x1 = sample(at + 1);
-        const auto x2 = sample(at + 2);
-        const auto c1 = 0.5 * (x1 - before);
-        const auto c2 = before - 2.5 * x0 + 2.0 * x1 - 0.5 * x2;
-        const auto c3 = 0.5 * (x2 - before) + 1.5 * (x0 - x1);
-        return ((c3 * t + c2) * t + c1) * t + x0;
+        return history.read(0, std::clamp(samples, 2., double(Size - 4)), cydsp::HistoryInterpolation::catmullRom);
     }
 };
 

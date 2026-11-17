@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Text.h>
 #include "ModulatorsView.h"
 
 #include "Icons.h"
@@ -41,7 +43,7 @@ const std::vector<Shelf>& shelves()
 }
 
 // A modulator's setting: its catalogue entry, from its binding.
-const engine::EffectParameter* settingOf(const juce::String& binding)
+const engine::EffectParameter* settingOf(const cydaw::base::Text& binding)
 {
     if (!binding.startsWith("node."))
         return nullptr;
@@ -49,13 +51,13 @@ const engine::EffectParameter* settingOf(const juce::String& binding)
     return separator < 0 ? nullptr : engine::effectParameterForSuffix(binding.substring(separator + 1).toStdString());
 }
 
-bool hidden(const juce::String& binding)
+bool hidden(const cydaw::base::Text& binding)
 {
     return binding.endsWith(".ownerLow") || binding.endsWith(".ownerHigh");
 }
 
 // The names of a setting's choices, or none for a knob.
-std::vector<std::string> choicesOf(const juce::String& typeKey, const std::string_view key)
+std::vector<std::string> choicesOf(const cydaw::base::Text& typeKey, const std::string_view key)
 {
     std::vector<std::string> names;
     if (key == "sync")
@@ -103,10 +105,10 @@ float ModulatorsView::width()
     return dp(184.0f);
 }
 
-void ModulatorsView::begin(const TrackRef& track, const std::uint64_t trackKey, app::NodeGraphComponent& graph,
-                           const std::vector<app::NodeGraphComponent::EditorNode>& nodes)
+void ModulatorsView::begin(const TrackRef& track, const std::uint64_t trackKey, app::GraphDocument& graph,
+                           const std::vector<app::GraphDocument::EditorNode>& nodes)
 {
-    juce::ignoreUnused(track);
+    cydaw::base::ignoreUnused(track);
     graph_ = &graph;
     trackKey_ = trackKey;
     owners_.clear();
@@ -118,8 +120,8 @@ void ModulatorsView::begin(const TrackRef& track, const std::uint64_t trackKey, 
     for (const auto& node : nodes)
         present.insert(node.id);
     // Each card's modulators, in the order they were made; "LFO", "LFO 2".
-    std::map<std::pair<std::uint64_t, juce::String>, int> made;
-    std::map<std::pair<std::uint64_t, juce::String>, int> total;
+    std::map<std::pair<std::uint64_t, cydaw::base::Text>, int> made;
+    std::map<std::pair<std::uint64_t, cydaw::base::Text>, int> total;
     for (const auto& node : nodes)
         if (const auto owner = graph.editorModulatorOwner(node.id); owner != 0 && present.contains(owner))
             ++total[{ owner, node.typeKey }];
@@ -199,7 +201,7 @@ void ModulatorsView::removeWith(const std::uint64_t owner)
         (void) graph_->editorRemoveNodes(going);
 }
 
-void ModulatorsView::report(const juce::String& problem)
+void ModulatorsView::report(const cydaw::base::Text& problem)
 {
     if (problem == lastProblem_ && ImGui::GetTime() - lastProblemTime_ < 2.0)
         return;
@@ -358,19 +360,19 @@ void ModulatorsView::draw(const std::uint64_t owner, const ImVec2 at, const ImVe
     ImGui::PopID();
 }
 
-void ModulatorsView::drawSettings(const app::NodeGraphComponent::EditorNode& node, const ImVec2 at, const float width,
+void ModulatorsView::drawSettings(const app::GraphDocument::EditorNode& node, const ImVec2 at, const float width,
                                   const ImU32 colour)
 {
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
-    const auto set = [this](const juce::String& binding, const double value) {
+    const auto set = [this](const cydaw::base::Text& binding, const double value) {
         (void) graph_->editorSetParameter(binding, value);
         state_.focused = Panel::devices;
     };
-    std::vector<const app::NodeGraphComponent::EditorParameter*> choices;
-    std::vector<const app::NodeGraphComponent::EditorParameter*> switches;
-    std::vector<const app::NodeGraphComponent::EditorParameter*> knobs;
-    std::vector<const app::NodeGraphComponent::EditorParameter*> steps;
+    std::vector<const app::GraphDocument::EditorParameter*> choices;
+    std::vector<const app::GraphDocument::EditorParameter*> switches;
+    std::vector<const app::GraphDocument::EditorParameter*> knobs;
+    std::vector<const app::GraphDocument::EditorParameter*> steps;
     auto stepCount = modulator::stepCount;
     for (const auto& parameter : node.parameters) {
         if (hidden(parameter.binding))
@@ -516,16 +518,16 @@ void ModulatorsView::drawBrowser()
         ImGui::SetKeyboardFocusHere();
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextWithHint("##search", "Find a modulator...", browserSearch_.data(), browserSearch_.size());
-    const auto filter = juce::String::fromUTF8(browserSearch_.data()).trim();
-    std::optional<juce::String> chosen;
+    const auto filter = cydaw::base::Text::fromUTF8(browserSearch_.data()).trim();
+    std::optional<cydaw::base::Text> chosen;
     for (const auto& shelf : shelves()) {
         auto header = false;
         for (const auto* type : shelf.types) {
             const auto* effect = engine::effectForType(type);
             if (effect == nullptr)
                 continue;
-            const auto name = juce::String(std::string(effect->displayName));
-            if (filter.isNotEmpty() && !name.containsIgnoreCase(filter) && !juce::String(shelf.name).containsIgnoreCase(filter))
+            const auto name = cydaw::base::Text(std::string(effect->displayName));
+            if (filter.isNotEmpty() && !name.containsIgnoreCase(filter) && !cydaw::base::Text(shelf.name).containsIgnoreCase(filter))
                 continue;
             if (!header) {
                 ImGui::Spacing();
@@ -539,9 +541,9 @@ void ModulatorsView::drawBrowser()
                                                       colour, dp(1.0f));
             ImGui::SetCursorScreenPos(ImVec2(start.x + dp(9.0f), start.y));
             if (ImGui::Selectable(name.toRawUTF8()))
-                chosen = juce::String(type);
+                chosen = cydaw::base::Text(type);
             if (ImGui::IsItemHovered()) {
-                const auto about = app::tr(juce::String(std::string(effect->descriptionKey)));
+                const auto about = app::tr(cydaw::base::Text(std::string(effect->descriptionKey)));
                 ui::tooltip(about.isNotEmpty() ? about.toRawUTF8() : name.toRawUTF8());
             }
             ImGui::PopID();
@@ -581,7 +583,7 @@ void ModulatorsView::Host::dropped(const std::string& binding, const std::uint64
     if (view->graph_ == nullptr || source == 0
         || std::any_of(listed.begin(), listed.end(), [source](const auto& modulation) { return modulation.source == source; }))
         return;
-    const auto problem = view->graph_->editorModulate(source, juce::String(binding), 0.25f);
+    const auto problem = view->graph_->editorModulate(source, cydaw::base::Text(binding), 0.25f);
     if (problem.isNotEmpty()) {
         view->report(problem);
         return;
@@ -597,12 +599,12 @@ void ModulatorsView::Host::setAmount(const std::string& binding, const std::uint
     auto& listed = view->byBinding_[binding];
     const auto entry = std::find_if(listed.begin(), listed.end(), [source](const auto& modulation) { return modulation.source == source; });
     if (amount == 0.0f) {
-        (void) view->graph_->editorUnmodulate(source, juce::String(binding));
+        (void) view->graph_->editorUnmodulate(source, cydaw::base::Text(binding));
         if (entry != listed.end())
             listed.erase(entry);
         return;
     }
-    const auto problem = view->graph_->editorModulate(source, juce::String(binding), amount);
+    const auto problem = view->graph_->editorModulate(source, cydaw::base::Text(binding), amount);
     if (problem.isNotEmpty()) {
         view->report(problem);
         return;

@@ -1,3 +1,7 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
 #include "SoundBanks.h"
 
 #include "AiModels.h"
@@ -19,16 +23,16 @@ constexpr int kWorkers = 4;
 constexpr auto kLfsPointer = "version https://git-lfs";
 
 // Every byte but the unreserved ones and the slashes, as %XX of its UTF-8.
-juce::String escapedPath(const juce::String& path)
+cydaw::base::Text escapedPath(const cydaw::base::Text& path)
 {
-    juce::String escaped;
+    cydaw::base::Text escaped;
     for (const auto* byte = path.toRawUTF8(); *byte != 0; ++byte) {
         const auto c = static_cast<unsigned char>(*byte);
         if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '.'
             || c == '_' || c == '~' || c == '/')
             escaped << static_cast<char>(c);
         else
-            escaped << "%" << juce::String::toHexString(static_cast<int>(c)).paddedLeft('0', 2).toUpperCase();
+            escaped << "%" << cydaw::base::Text::toHexString(static_cast<int>(c)).paddedLeft('0', 2).toUpperCase();
     }
     return escaped;
 }
@@ -37,14 +41,14 @@ juce::String escapedPath(const juce::String& path)
 // same one, or one of its parents, at the same instant. JUCE makes the
 // parents first and gives up when one of them appears under it: tried again,
 // what is already there is skipped.
-bool makeFolder(const juce::File& folder)
+bool makeFolder(const cydaw::base::File& folder)
 {
     for (auto attempt = 0; attempt < 8 && !folder.isDirectory(); ++attempt)
         (void) folder.createDirectory();
     return folder.isDirectory();
 }
 
-bool isLicenceOrReadme(const juce::String& path)
+bool isLicenceOrReadme(const cydaw::base::Text& path)
 {
     if (path.containsChar('/'))
         return false;
@@ -54,9 +58,9 @@ bool isLicenceOrReadme(const juce::String& path)
 
 // A WAV as a generated bank writes it: 16-bit PCM, mono, a 44-byte header,
 // so its size is known before it is made (44 + 2 a frame).
-juce::MemoryBlock wavOf(const std::vector<float>& samples, const int rate)
+cydaw::base::MemoryBlock wavOf(const std::vector<float>& samples, const int rate)
 {
-    juce::MemoryOutputStream out;
+    cydaw::base::MemoryOutputStream out;
     const auto dataBytes = static_cast<int>(samples.size() * 2);
     out.write("RIFF", 4);
     out.writeInt(36 + dataBytes);
@@ -78,9 +82,9 @@ juce::MemoryBlock wavOf(const std::vector<float>& samples, const int rate)
 
 } // namespace
 
-class SoundBanks::Worker final : public juce::Thread {
+class SoundBanks::Worker final : public cydaw::base::Thread {
 public:
-    explicit Worker(SoundBanks& owner) : juce::Thread("CyDAW bank download"), owner_(owner) {}
+    explicit Worker(SoundBanks& owner) : cydaw::base::Thread("CyDAW bank download"), owner_(owner) {}
     void run() override { owner_.work(*this); }
 
 private:
@@ -105,10 +109,10 @@ SoundBanks::~SoundBanks()
 
 // ---- The registry ------------------------------------------------------------------------
 
-juce::File SoundBanks::registryFile() const
+cydaw::base::File SoundBanks::registryFile() const
 {
-    if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_BANKS_REGISTRY", {}); other.isNotEmpty())
-        return juce::File(other);
+    if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_BANKS_REGISTRY", {}); other.isNotEmpty())
+        return cydaw::base::File(other);
     return app::factoryContentFolder().getChildFile("banks.json");
 }
 
@@ -118,7 +122,7 @@ void SoundBanks::loadRegistry()
     if (busy())
         return;
     const auto file = registryFile();
-    const auto json = juce::JSON::parse(file.loadFileAsString());
+    const auto json = cydaw::base::JSON::parse(file.loadFileAsString());
     // The maps' files stay known: they do not depend on the list.
     banks_.clear();
     lists_.clear();
@@ -137,16 +141,16 @@ void SoundBanks::loadRegistry()
             bank.commit = item.getProperty("commit", {}).toString();
             bank.baseUrl = item.getProperty("baseUrl", {}).toString();
             bank.generator = item.getProperty("generator", {}).toString();
-            bank.rate = juce::jlimit(8'000.0, 192'000.0, static_cast<double>(item.getProperty("rate", 48'000.0)));
+            bank.rate = cydaw::base::limit(8'000.0, 192'000.0, static_cast<double>(item.getProperty("rate", 48'000.0)));
             // In the interface's language ({"fr": …, "en": …}), else English.
             if (const auto description = item.getProperty("description", {}); description.isObject())
-                bank.description = description.getProperty(juce::Identifier(ui::language()),
+                bank.description = description.getProperty(cydaw::base::Identifier(ui::language()),
                                                            description.getProperty("en", {})).toString();
             else
                 bank.description = description.toString();
             bank.list = file.getParentDirectory().getChildFile(item.getProperty("list", {}).toString());
             bank.count = static_cast<int>(item.getProperty("count", 0));
-            bank.bytes = static_cast<juce::int64>(item.getProperty("bytes", 0));
+            bank.bytes = static_cast<std::int64_t>(item.getProperty("bytes", 0));
             // A bank is downloaded into a folder of its name: nothing that
             // could leave the banks' folder.
             if (bank.id.isNotEmpty() && bank.id.containsOnly("abcdefghijklmnopqrstuvwxyz0123456789-_.")
@@ -155,13 +159,13 @@ void SoundBanks::loadRegistry()
         }
 }
 
-const SoundBanks::Bank* SoundBanks::find(const juce::String& id) const
+const SoundBanks::Bank* SoundBanks::find(const cydaw::base::Text& id) const
 {
     const auto found = std::ranges::find_if(banks_, [&id](const Bank& bank) { return bank.id == id; });
     return found != banks_.end() ? &*found : nullptr;
 }
 
-bool SoundBanks::generatedOnly(const juce::StringArray& ids) const
+bool SoundBanks::generatedOnly(const cydaw::base::TextList& ids) const
 {
     if (ids.isEmpty())
         return false;
@@ -171,7 +175,7 @@ bool SoundBanks::generatedOnly(const juce::StringArray& ids) const
     return true;
 }
 
-const std::vector<SoundBanks::BankFile>& SoundBanks::filesOf(const juce::String& id)
+const std::vector<SoundBanks::BankFile>& SoundBanks::filesOf(const cydaw::base::Text& id)
 {
     if (const auto found = lists_.find(id); found != lists_.end())
         return found->second;
@@ -192,7 +196,7 @@ const std::vector<SoundBanks::BankFile>& SoundBanks::filesOf(const juce::String&
                 if (!listsWaiting_.contains(id))
                     break;
             }
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         }
         if (!read)
             read = readList(bank->list);
@@ -202,16 +206,16 @@ const std::vector<SoundBanks::BankFile>& SoundBanks::filesOf(const juce::String&
     return files;
 }
 
-SoundBanks::PreloadedList SoundBanks::readList(const juce::File& listFile)
+SoundBanks::PreloadedList SoundBanks::readList(const cydaw::base::File& listFile)
 {
     PreloadedList read;
-    const auto json = juce::JSON::parse(listFile.loadFileAsString());
+    const auto json = cydaw::base::JSON::parse(listFile.loadFileAsString());
     if (const auto* list = json.getProperty("files", {}).getArray())
         for (const auto& item : *list)
             if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 2) {
                 BankFile file;
                 file.path = (*fields)[0].toString();
-                file.size = static_cast<juce::int64>((*fields)[1]);
+                file.size = static_cast<std::int64_t>((*fields)[1]);
                 file.lfs = fields->size() > 2 && static_cast<int>((*fields)[2]) != 0;
                 if (fields->size() > 3)
                     file.recipe = (*fields)[3];
@@ -229,7 +233,7 @@ SoundBanks::PreloadedList SoundBanks::readList(const juce::File& listFile)
     return read;
 }
 
-juce::File SoundBanks::folderOf(const juce::String& id) const
+cydaw::base::File SoundBanks::folderOf(const cydaw::base::Text& id) const
 {
     return app::banksFolder().getChildFile(id);
 }
@@ -245,7 +249,7 @@ void SoundBanks::forgetDisk()
     ++diskGeneration_;
 }
 
-std::optional<SoundBanks::OnDisk> SoundBanks::onDisk(const juce::String& id)
+std::optional<SoundBanks::OnDisk> SoundBanks::onDisk(const cydaw::base::Text& id)
 {
     {
         const std::scoped_lock lock(countLock_);
@@ -256,7 +260,7 @@ std::optional<SoundBanks::OnDisk> SoundBanks::onDisk(const juce::String& id)
     }
     counter_.addJob([this, id, files = filesOf(id), folder = folderOf(id), generation = countGeneration_.load()] {
         OnDisk disk;
-        std::set<juce::String> absent;
+        std::set<cydaw::base::Text> absent;
         const auto there = folder.isDirectory();
         for (const auto& file : files)
             if (const auto found = folder.getChildFile(file.path); there && found.existsAsFile() && found.getSize() == file.size) {
@@ -277,12 +281,12 @@ std::optional<SoundBanks::OnDisk> SoundBanks::onDisk(const juce::String& id)
 
 // ---- What is missing ------------------------------------------------------------------------
 
-void SoundBanks::preloadMaps(std::vector<juce::File> maps)
+void SoundBanks::preloadMaps(std::vector<cydaw::base::File> maps)
 {
     if (preloader_.joinable())
         return;
     // The banks' lists first (each map's count needs them), then the maps.
-    std::vector<std::pair<juce::String, juce::File>> lists;
+    std::vector<std::pair<cydaw::base::Text, cydaw::base::File>> lists;
     for (const auto& bank : banks_)
         if (!lists_.contains(bank.id) && bank.list.existsAsFile())
             lists.emplace_back(bank.id, bank.list);
@@ -294,7 +298,7 @@ void SoundBanks::preloadMaps(std::vector<juce::File> maps)
             listsWaiting_.insert(id);
     }
     preloader_ = std::thread([this, maps = std::move(maps), lists = std::move(lists)] {
-        juce::Thread::setCurrentThreadName("CyDAW maps");
+        cydaw::base::Thread::setCurrentThreadName("CyDAW maps");
         for (const auto& [id, file] : lists) {
             if (stopPreload_)
                 break;
@@ -313,7 +317,7 @@ void SoundBanks::preloadMaps(std::vector<juce::File> maps)
                 return;
             Preloaded entry;
             entry.stamp = map.getLastModificationTime().toMilliseconds();
-            juce::String error;
+            cydaw::base::Text error;
             entry.paths = pathsOfMap(app::loadSamplerMapFile(map, error));
             const std::scoped_lock lock(preloadLock_);
             preloaded_[map.getFullPathName()] = std::move(entry);
@@ -322,14 +326,14 @@ void SoundBanks::preloadMaps(std::vector<juce::File> maps)
     });
 }
 
-std::vector<juce::String> SoundBanks::bankPathsOf(const juce::var& mapJson) const
+std::vector<cydaw::base::Text> SoundBanks::bankPathsOf(const cydaw::base::Value& mapJson) const
 {
     return pathsOfMap(mapJson);
 }
 
-std::vector<juce::String> SoundBanks::pathsOfMap(const juce::var& mapJson)
+std::vector<cydaw::base::Text> SoundBanks::pathsOfMap(const cydaw::base::Value& mapJson)
 {
-    std::vector<juce::String> paths;
+    std::vector<cydaw::base::Text> paths;
     if (const auto* zones = mapJson.getProperty("zones", {}).getArray())
         for (const auto& zone : *zones)
             if (const auto file = zone.getProperty("file", {}).toString(); app::bankOfSamplePath(file).isNotEmpty())
@@ -339,7 +343,7 @@ std::vector<juce::String> SoundBanks::pathsOfMap(const juce::var& mapJson)
     return paths;
 }
 
-SoundBanks::Missing SoundBanks::missingFor(const juce::var& mapJson, const bool exact)
+SoundBanks::Missing SoundBanks::missingFor(const cydaw::base::Value& mapJson, const bool exact)
 {
     Missing missing;
     for (const auto& stored : bankPathsOf(mapJson)) {
@@ -381,7 +385,7 @@ SoundBanks::Missing SoundBanks::missingFor(const juce::var& mapJson, const bool 
     return missing;
 }
 
-SoundBanks::Missing SoundBanks::missingForFile(const juce::File& mapFile, const bool exact)
+SoundBanks::Missing SoundBanks::missingForFile(const cydaw::base::File& mapFile, const bool exact)
 {
     // The map read once (and again when it changes): only its files are
     // kept, and what is missing of them until something is downloaded.
@@ -403,22 +407,22 @@ SoundBanks::Missing SoundBanks::missingForFile(const juce::File& mapFile, const 
             }
         }
         if (!read) {
-            juce::String error;
+            cydaw::base::Text error;
             entry.paths = bankPathsOf(app::loadSamplerMapFile(mapFile, error));
         }
         entry.stamp = stamp;
         entry.generation = -1;
     }
     if (exact || entry.generation != diskGeneration_) {
-        juce::Array<juce::var> zones;
+        cydaw::base::Array<cydaw::base::Value> zones;
         for (const auto& path : entry.paths) {
-            auto* zone = new juce::DynamicObject();
+            auto* zone = new cydaw::base::Object();
             zone->setProperty("file", path);
-            zones.add(juce::var(zone));
+            zones.add(cydaw::base::Value(zone));
         }
-        auto* json = new juce::DynamicObject();
+        auto* json = new cydaw::base::Object();
         json->setProperty("zones", zones);
-        auto missing = missingFor(juce::var(json), exact);
+        auto missing = missingFor(cydaw::base::Value(json), exact);
         if (exact)
             return missing;
         // Kept once every bank of it is counted.
@@ -428,7 +432,7 @@ SoundBanks::Missing SoundBanks::missingForFile(const juce::File& mapFile, const 
     return entry.missing;
 }
 
-SoundBanks::Missing SoundBanks::missingOfBank(const juce::String& id)
+SoundBanks::Missing SoundBanks::missingOfBank(const cydaw::base::Text& id)
 {
     Missing missing;
     const auto folder = folderOf(id);
@@ -444,14 +448,14 @@ SoundBanks::Missing SoundBanks::missingOfBank(const juce::String& id)
 
 // ---- Downloading ------------------------------------------------------------------------------
 
-void SoundBanks::download(const juce::String& label, const Missing& missing)
+void SoundBanks::download(const cydaw::base::Text& label, const Missing& missing)
 {
     if (missing.files.empty())
         return;
     Job job;
     job.label = label;
     job.banks = missing.banks;
-    std::set<juce::String> taken;
+    std::set<cydaw::base::Text> taken;
     for (const auto& wanted : missing.files)
         if (taken.insert(wanted.bank + "/" + wanted.file.path).second)
             job.items.push_back(wanted);
@@ -472,12 +476,12 @@ void SoundBanks::download(const juce::String& label, const Missing& missing)
         const std::scoped_lock lock(mutex_);
         jobs_.push_back(std::move(job));
         if (jobs_.size() == 1)
-            jobs_.front().started = juce::Time::getMillisecondCounterHiRes() * 0.001;
+            jobs_.front().started = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     }
     if (workers_.empty())
         for (auto count = 0; count < kWorkers; ++count) {
             workers_.push_back(std::make_unique<Worker>(*this));
-            workers_.back()->startThread(juce::Thread::Priority::low);
+            workers_.back()->startThread(cydaw::base::Thread::Priority::low);
         }
     for (auto count = 0; count < kWorkers; ++count)
         wake_.signal();
@@ -520,7 +524,7 @@ SoundBanks::Progress SoundBanks::progress() const
     progress.bytesTotal = job.bytesTotal;
     progress.error = job.error;
     progress.generating = generatedOnly(job.banks);
-    const auto elapsed = juce::Time::getMillisecondCounterHiRes() * 0.001 - job.started;
+    const auto elapsed = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 - job.started;
     progress.bytesPerSecond = elapsed > 0.5 ? static_cast<double>(job.bytesDone) / elapsed : 0.0;
     return progress;
 }
@@ -553,10 +557,10 @@ void SoundBanks::finishFrontJob()
     finished_.push_back(std::move(done));
     jobs_.pop_front();
     if (!jobs_.empty())
-        jobs_.front().started = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        jobs_.front().started = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
 }
 
-void SoundBanks::work(juce::Thread& thread)
+void SoundBanks::work(cydaw::base::Thread& thread)
 {
     while (!thread.threadShouldExit()) {
         std::optional<Wanted> item;
@@ -574,7 +578,7 @@ void SoundBanks::work(juce::Thread& thread)
             wake_.wait(200);
             continue;
         }
-        juce::String error;
+        cydaw::base::Text error;
         const auto ok = fetch(*item, generation, error);
         const std::scoped_lock lock(mutex_);
         --inFlight_;
@@ -593,19 +597,19 @@ void SoundBanks::work(juce::Thread& thread)
     }
 }
 
-juce::String SoundBanks::urlOf(const Bank& bank, const BankFile& file, const bool lfs) const
+cydaw::base::Text SoundBanks::urlOf(const Bank& bank, const BankFile& file, const bool lfs) const
 {
     if (bank.baseUrl.isNotEmpty())
         return bank.baseUrl + (bank.baseUrl.endsWithChar('/') ? "" : "/") + escapedPath(file.path);
-    const auto host = lfs ? juce::String("https://media.githubusercontent.com/media/")
-                          : juce::String("https://raw.githubusercontent.com/");
+    const auto host = lfs ? cydaw::base::Text("https://media.githubusercontent.com/media/")
+                          : cydaw::base::Text("https://raw.githubusercontent.com/");
     return host + bank.repository + "/" + bank.commit + "/" + escapedPath(file.path);
 }
 
-bool SoundBanks::fetch(const Wanted& wanted, const int generation, juce::String& error)
+bool SoundBanks::fetch(const Wanted& wanted, const int generation, cydaw::base::Text& error)
 {
     const auto stopped = [this, generation] { return generation != generation_.load(); };
-    const auto addBytes = [this, generation](const juce::int64 bytes) {
+    const auto addBytes = [this, generation](const std::int64_t bytes) {
         const std::scoped_lock lock(mutex_);
         if (!jobs_.empty() && generation == generation_.load())
             jobs_.front().bytesDone += bytes;
@@ -636,43 +640,43 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, juce::String&
         if (stopped())
             return false;
         if (attempt > 0)
-            juce::Thread::sleep(1'000 * attempt);
+            cydaw::base::Thread::sleep(1'000 * attempt);
         auto status = 0;
         const auto url = urlOf(*bank, wanted.file, lfs);
-        auto stream = juce::URL(url).createInputStream(juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+        auto stream = cydaw::base::Url(url).createInputStream(cydaw::base::Url::InputStreamOptions(cydaw::base::Url::ParameterHandling::inAddress)
                                                            .withConnectionTimeoutMs(30'000)
                                                            .withNumRedirectsToFollow(5)
                                                            .withStatusCode(&status));
         if (stream == nullptr || status >= 400) {
-            error = wanted.bank + "/" + wanted.file.path + ": HTTP " + juce::String(status);
+            error = wanted.bank + "/" + wanted.file.path + ": HTTP " + cydaw::base::Text(status);
             continue;
         }
-        juce::int64 written {};
+        std::int64_t written {};
         // Hashed as it comes, when the list gives the file's hash.
         Sha256 hash;
         {
             (void) partial.deleteFile();
-            juce::FileOutputStream out(partial);
+            cydaw::base::FileOutputStream out(partial);
             if (!out.openedOk()) {
                 error = "cannot write " + partial.getFullPathName();
                 return false;
             }
-            juce::HeapBlock<char> buffer(1 << 16);
+            std::vector<char> buffer(1 << 16);
             for (;;) {
                 if (stopped()) {
                     out.flush();
                     break;
                 }
-                const auto read = stream->read(buffer.get(), 1 << 16);
+                const auto read = stream->read(buffer.data(), 1 << 16);
                 if (read <= 0)
                     break;
-                if (!out.write(buffer.get(), static_cast<std::size_t>(read))) {
+                if (!out.write(buffer.data(), static_cast<std::size_t>(read))) {
                     error = "cannot write " + partial.getFullPathName();
                     break;
                 }
                 written += read;
                 if (wanted.file.sha256.isNotEmpty())
-                    hash.add(buffer.get(), static_cast<std::size_t>(read));
+                    hash.add(buffer.data(), static_cast<std::size_t>(read));
                 addBytes(read);
             }
         }
@@ -685,8 +689,8 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, juce::String&
             if (!lfs && partial.loadFileAsString().startsWith(kLfsPointer))
                 lfs = true;
             addBytes(-written);
-            error = wanted.bank + "/" + wanted.file.path + ": " + juce::String(written) + " bytes of "
-                    + juce::String(wanted.file.size);
+            error = wanted.bank + "/" + wanted.file.path + ": " + cydaw::base::Text(written) + " bytes of "
+                    + cydaw::base::Text(wanted.file.size);
             continue;
         }
         if (wanted.file.sha256.isNotEmpty() && hash.hex() != wanted.file.sha256) {
@@ -706,11 +710,11 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, juce::String&
     return false;
 }
 
-bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int generation, juce::String& error)
+bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int generation, cydaw::base::Text& error)
 {
     const auto& recipe = wanted.file.recipe;
     const auto name = wanted.bank + "/" + wanted.file.path;
-    juce::MemoryBlock bytes;
+    cydaw::base::MemoryBlock bytes;
     if (recipe.hasProperty("text")) {
         const auto text = recipe.getProperty("text", {}).toString();
         bytes.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
@@ -720,12 +724,12 @@ bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int gene
         if (const auto* values = recipe.getProperty("values", {}).getDynamicObject())
             for (const auto& property : values->getProperties())
                 drum.values.emplace_back(property.name.toString().toStdString(), static_cast<double>(property.value));
-        drum.seed = static_cast<std::uint32_t>(static_cast<juce::int64>(recipe.getProperty("seed", 1)));
+        drum.seed = static_cast<std::uint32_t>(static_cast<std::int64_t>(recipe.getProperty("seed", 1)));
         drum.seconds = static_cast<double>(recipe.getProperty("seconds", 0.0));
         drum.gainDb = static_cast<double>(recipe.getProperty("gainDb", 0.0));
         const auto samples = engine::drums::render(drum, bank.rate);
         if (samples.empty()) {
-            error = name + ": no recipe for \"" + juce::String(drum.kind) + "\"";
+            error = name + ": no recipe for \"" + cydaw::base::Text(drum.kind) + "\"";
             return false;
         }
         bytes = wavOf(samples, static_cast<int>(std::lround(bank.rate)));
@@ -734,9 +738,9 @@ bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int gene
         return false;
     }
     // What the list says it is: else this version makes another sound.
-    if (wanted.file.size > 0 && static_cast<juce::int64>(bytes.getSize()) != wanted.file.size) {
-        error = name + ": made " + juce::String(static_cast<juce::int64>(bytes.getSize())) + " bytes of "
-                + juce::String(wanted.file.size);
+    if (wanted.file.size > 0 && static_cast<std::int64_t>(bytes.getSize()) != wanted.file.size) {
+        error = name + ": made " + cydaw::base::Text(static_cast<std::int64_t>(bytes.getSize())) + " bytes of "
+                + cydaw::base::Text(wanted.file.size);
         return false;
     }
     if (generation != generation_.load())
@@ -756,7 +760,7 @@ bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int gene
     }
     const std::scoped_lock lock(mutex_);
     if (!jobs_.empty() && generation == generation_.load())
-        jobs_.front().bytesDone += static_cast<juce::int64>(bytes.getSize());
+        jobs_.front().bytesDone += static_cast<std::int64_t>(bytes.getSize());
     return true;
 }
 
@@ -765,7 +769,7 @@ void SoundBanks::writeBankRecord(const Bank& bank) const
     const auto record = folderOf(bank.id).getChildFile("bank.json");
     if (record.existsAsFile())
         return;
-    auto* json = new juce::DynamicObject();
+    auto* json = new cydaw::base::Object();
     json->setProperty("id", bank.id);
     json->setProperty("title", bank.title);
     json->setProperty("author", bank.author);
@@ -775,12 +779,12 @@ void SoundBanks::writeBankRecord(const Bank& bank) const
     json->setProperty("commit", bank.commit);
     if (bank.generator.isNotEmpty())
         json->setProperty("generator", bank.generator);
-    json->setProperty("fetched", juce::Time::getCurrentTime().formatted("%Y-%m-%d"));
+    json->setProperty("fetched", cydaw::base::Time::getCurrentTime().formatted("%Y-%m-%d"));
     (void) record.getParentDirectory().createDirectory();
-    (void) record.replaceWithText(juce::JSON::toString(juce::var(json)));
+    (void) record.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(json)));
 }
 
-bool SoundBanks::remove(const juce::String& id, juce::String& error)
+bool SoundBanks::remove(const cydaw::base::Text& id, cydaw::base::Text& error)
 {
     if (busy()) {
         error = "a download is running";

@@ -1,3 +1,7 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -17,34 +21,34 @@ namespace {
 using namespace shared;
 
 struct Block {
-    juce::StringArray head; // "<NAME a b": NAME, a, b
+    cydaw::base::TextList head; // "<NAME a b": NAME, a, b
     // Its fields and inner blocks in their order (a take's fields follow its
     // TAKE line).
     struct Entry {
-        juce::StringArray tokens;
+        cydaw::base::TextList tokens;
         std::unique_ptr<Block> block;
     };
     std::vector<Entry> entries;
 
-    [[nodiscard]] juce::String name() const { return head.isEmpty() ? juce::String() : head[0]; }
-    [[nodiscard]] const juce::StringArray* field(const juce::String& key) const
+    [[nodiscard]] cydaw::base::Text name() const { return head.isEmpty() ? cydaw::base::Text() : head[0]; }
+    [[nodiscard]] const cydaw::base::TextList* field(const cydaw::base::Text& key) const
     {
         for (const auto& entry : entries)
             if (entry.block == nullptr && !entry.tokens.isEmpty() && entry.tokens[0] == key)
                 return &entry.tokens;
         return nullptr;
     }
-    [[nodiscard]] juce::String text(const juce::String& key, const int index = 1, const juce::String& fallback = {}) const
+    [[nodiscard]] cydaw::base::Text text(const cydaw::base::Text& key, const int index = 1, const cydaw::base::Text& fallback = {}) const
     {
         const auto* tokens = field(key);
         return tokens != nullptr && index < tokens->size() ? (*tokens)[index] : fallback;
     }
-    [[nodiscard]] double number(const juce::String& key, const int index, const double fallback) const
+    [[nodiscard]] double number(const cydaw::base::Text& key, const int index, const double fallback) const
     {
         const auto* tokens = field(key);
         return tokens != nullptr && index < tokens->size() ? (*tokens)[index].getDoubleValue() : fallback;
     }
-    [[nodiscard]] const Block* child(const juce::String& blockName) const
+    [[nodiscard]] const Block* child(const cydaw::base::Text& blockName) const
     {
         for (const auto& entry : entries)
             if (entry.block != nullptr && entry.block->name() == blockName)
@@ -55,17 +59,17 @@ struct Block {
 
 // A line as Reaper writes it: words, or strings in " ' or ` (the quote the
 // string does not hold).
-juce::StringArray tokenise(const juce::String& line)
+cydaw::base::TextList tokenise(const cydaw::base::Text& line)
 {
-    juce::StringArray tokens;
+    cydaw::base::TextList tokens;
     auto pointer = line.getCharPointer();
     while (!pointer.isEmpty()) {
-        while (!pointer.isEmpty() && juce::CharacterFunctions::isWhitespace(*pointer))
+        while (!pointer.isEmpty() && cydaw::base::CharacterFunctions::isWhitespace(*pointer))
             ++pointer;
         if (pointer.isEmpty())
             break;
         const auto first = *pointer;
-        juce::String token;
+        cydaw::base::Text token;
         if (first == '"' || first == '\'' || first == '`') {
             ++pointer;
             while (!pointer.isEmpty() && *pointer != first)
@@ -73,7 +77,7 @@ juce::StringArray tokenise(const juce::String& line)
             if (!pointer.isEmpty())
                 ++pointer;
         } else {
-            while (!pointer.isEmpty() && !juce::CharacterFunctions::isWhitespace(*pointer))
+            while (!pointer.isEmpty() && !cydaw::base::CharacterFunctions::isWhitespace(*pointer))
                 token += *pointer++;
         }
         tokens.add(token);
@@ -81,11 +85,11 @@ juce::StringArray tokenise(const juce::String& line)
     return tokens;
 }
 
-std::unique_ptr<Block> parse(const juce::String& content)
+std::unique_ptr<Block> parse(const cydaw::base::Text& content)
 {
     auto root = std::make_unique<Block>();
     std::vector<Block*> open { root.get() };
-    juce::StringArray lines;
+    cydaw::base::TextList lines;
     lines.addLines(content);
     for (const auto& raw : lines) {
         const auto line = raw.trim();
@@ -110,47 +114,47 @@ std::unique_ptr<Block> parse(const juce::String& content)
 }
 
 // PEAKCOL: an OS colour with bit 24 set when it is one (Windows: 0x00BBGGRR).
-juce::uint32 reaperColour(const juce::int64 value)
+std::uint32_t reaperColour(const std::int64_t value)
 {
     if ((value & 0x1000000) == 0)
         return 0;
-    return opaque(static_cast<juce::uint8>(value & 0xff), static_cast<juce::uint8>((value >> 8) & 0xff),
-                  static_cast<juce::uint8>((value >> 16) & 0xff));
+    return opaque(static_cast<std::uint8_t>(value & 0xff), static_cast<std::uint8_t>((value >> 8) & 0xff),
+                  static_cast<std::uint8_t>((value >> 16) & 0xff));
 }
 
 class ReaperReader {
 public:
-    ReaperReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
+    ReaperReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         const auto content = file_.loadFileAsString();
         if (!content.trimStart().startsWith("<REAPER_PROJECT"))
-            return juce::Result::fail("Not a Reaper project: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not a Reaper project: " + file_.getFileName());
         const auto root = parse(content);
         const Block* project = nullptr;
         for (const auto& entry : root->entries)
             if (entry.block != nullptr && entry.block->name() == "REAPER_PROJECT")
                 project = entry.block.get();
         if (project == nullptr)
-            return juce::Result::fail("The Reaper project holds no REAPER_PROJECT block");
+            return cydaw::base::Result::fail("The Reaper project holds no REAPER_PROJECT block");
         out_.format = "reaper";
-        out_.application = "Reaper " + (project->head.size() > 2 ? project->head[2] : juce::String());
-        out_.tempo = juce::jlimit(20.0, 960.0, project->number("TEMPO", 1, 120.0));
-        out_.numerator = juce::jlimit(1, 32, static_cast<int>(project->number("TEMPO", 2, 4.0)));
-        out_.denominator = juce::jlimit(1, 32, static_cast<int>(project->number("TEMPO", 3, 4.0)));
+        out_.application = "Reaper " + (project->head.size() > 2 ? project->head[2] : cydaw::base::Text());
+        out_.tempo = cydaw::base::limit(20.0, 960.0, project->number("TEMPO", 1, 120.0));
+        out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(project->number("TEMPO", 2, 4.0)));
+        out_.denominator = cydaw::base::limit(1, 32, static_cast<int>(project->number("TEMPO", 3, 4.0)));
         out_.masterGainDb = linearToDb(project->number("MASTER_VOLUME", 1, 1.0));
         if (const auto* envelope = project->child("TEMPOENVEX"))
             for (const auto& entry : envelope->entries)
                 if (entry.block == nullptr && !entry.tokens.isEmpty() && entry.tokens[0] == "PT" && entry.tokens.size() > 2
                     && std::abs(entry.tokens[2].getDoubleValue() - out_.tempo) > 0.01) {
-                    out_.warnings.add("The tempo changes along the project: CyDAW keeps " + juce::String(out_.tempo, 2) + " BPM.");
+                    out_.warnings.add("The tempo changes along the project: CyDAW keeps " + cydaw::base::Text(out_.tempo, 2) + " BPM.");
                     break;
                 }
         for (const auto& entry : project->entries)
             if (entry.block != nullptr && entry.block->name() == "TRACK")
                 readTrack(*entry.block);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -161,10 +165,10 @@ private:
         ImportedTrack track;
         track.name = block.text("NAME");
         track.gainDb = linearToDb(block.number("VOLPAN", 1, 1.0));
-        track.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, block.number("VOLPAN", 2, 0.0)));
+        track.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, block.number("VOLPAN", 2, 0.0)));
         track.muted = block.number("MUTESOLO", 1, 0.0) != 0.0;
         track.solo = block.number("MUTESOLO", 2, 0.0) != 0.0;
-        track.colour = reaperColour(static_cast<juce::int64>(block.number("PEAKCOL", 1, 0.0)));
+        track.colour = reaperColour(static_cast<std::int64_t>(block.number("PEAKCOL", 1, 0.0)));
         if (block.number("ISBUS", 1, 0.0) == 1.0)
             out_.warnings.add("Folder \"" + track.name + "\" was flattened: its tracks come in on their own.");
         if (const auto* chain = block.child("FXCHAIN"))
@@ -191,7 +195,7 @@ private:
             if (kind != "VST" && kind != "CLAP" && kind != "JS" && kind != "AU" && kind != "LV2" && kind != "DX")
                 continue;
             ImportedDevice device;
-            auto written = entry.block->head.size() > 1 ? entry.block->head[1] : juce::String();
+            auto written = entry.block->head.size() > 1 ? entry.block->head[1] : cydaw::base::Text();
             auto prefix = written.upToFirstOccurrenceOf(":", false, false).trim();
             if (kind == "JS") {
                 prefix = "JS";
@@ -210,10 +214,10 @@ private:
             // Reaper's own (Cockos) devices are the application's; the rest
             // are plug-ins it hosts.
             device.plugin = !(device.vendor == "Cockos" && device.name.startsWith("Rea"));
-            device.type = device.plugin ? juce::String() : device.name;
+            device.type = device.plugin ? cydaw::base::Text() : device.name;
             if (device.name.isEmpty())
                 device.name = written;
-            track.devices.add(device.name + (bypassed ? " (bypassed)" : juce::String()));
+            track.devices.add(device.name + (bypassed ? " (bypassed)" : cydaw::base::Text()));
             track.hadInstrument = track.hadInstrument || device.instrument;
             track.chain.push_back(std::move(device));
             bypassed = false;
@@ -224,7 +228,7 @@ private:
     void readItem(const Block& item, ImportedTrack& track)
     {
         struct Take {
-            juce::String name;
+            cydaw::base::Text name;
             double sourceOffset {};
             double rate { 1.0 };
             const Block* source {};
@@ -280,7 +284,7 @@ private:
             if (const auto* inner = source->child("SOURCE"))
                 source = inner;
         }
-        const auto type = source->head.size() > 1 ? source->head[1] : juce::String();
+        const auto type = source->head.size() > 1 ? source->head[1] : cydaw::base::Text();
         const auto name = take->name.isNotEmpty() ? take->name : item.text("NAME");
         if (type == "MIDI") {
             readMidi(*source, track, name, position, length, looping, muted, sourceOffset, take->rate);
@@ -302,11 +306,11 @@ private:
         clip.gainDb = linearToDb(item.number("VOLPAN", 1, 1.0));
         clip.looping = looping;
         clip.muted = muted;
-        clip.colour = reaperColour(static_cast<juce::int64>(item.number("COLOR", 1, 0.0)));
+        clip.colour = reaperColour(static_cast<std::int64_t>(item.number("COLOR", 1, 0.0)));
         track.audioClips.push_back(std::move(clip));
     }
 
-    void readMidi(const Block& source, ImportedTrack& track, const juce::String& name, const double position, const double length,
+    void readMidi(const Block& source, ImportedTrack& track, const cydaw::base::Text& name, const double position, const double length,
                   const bool looping, const bool muted, const double sourceOffset, const double rate)
     {
         const auto ticksPerQuarter = std::max(1.0, source.number("HASDATA", 2, 960.0));
@@ -377,14 +381,14 @@ private:
         track.midi = true;
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
 };
 
 } // namespace
 
-juce::Result importReaperProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importReaperProject(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     ReaperReader reader(file, out);

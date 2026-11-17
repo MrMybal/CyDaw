@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "PresetMenu.h"
@@ -28,10 +29,10 @@ public:
     SynthView(DeviceHost& studio, UiState& state);
 
     // A card of the family (its type: "ambre-synth").
-    [[nodiscard]] static bool handles(const juce::String& typeKey);
+    [[nodiscard]] static bool handles(const cydaw::base::Text& typeKey);
     // The card's width at that height (its panels side by side).
-    [[nodiscard]] float paneWidth(app::NodeGraphComponent& graph, std::uint64_t nodeId, float height);
-    void drawPane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
+    [[nodiscard]] float paneWidth(app::GraphDocument& graph, std::uint64_t nodeId, float height);
+    void drawPane(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
                   ImU32 colour);
     // `detached`: in a window of its own out of the studio's, as a plug-in's.
     void openEditor(const TrackRef& track, std::uint64_t nodeId, bool detached = false);
@@ -46,7 +47,7 @@ public:
 private:
     struct Card {
         TrackRef track;
-        app::NodeGraphComponent* graph {};
+        app::GraphDocument* graph {};
         std::uint64_t nodeId {};
         engine::synth::Model model { engine::synth::Model::none };
         engine::synth::Values values {};
@@ -60,12 +61,12 @@ private:
     // Where a setting plays now when the automation or its voice's
     // modulations move it away from its knob.
     [[nodiscard]] std::optional<float> heard(int index) const;
-    [[nodiscard]] bool bind(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId);
+    [[nodiscard]] bool bind(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId);
     [[nodiscard]] int indexOf(const char* key) const;
     [[nodiscard]] float value(int index) const;
     [[nodiscard]] float valueOf(const char* key) const;
     void set(int index, float value);
-    [[nodiscard]] juce::String bindingOf(int index) const;
+    [[nodiscard]] cydaw::base::Text bindingOf(int index) const;
     [[nodiscard]] ImU32 colourOf(int index) const;
 
     // Whether a control's `onlyWhen` is met.

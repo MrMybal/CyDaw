@@ -220,7 +220,8 @@ constexpr std::array<Material, 5> kMaterialModes { {
 } };
 
 // An engine's shape in analog: sine, triangle, saw, square, a morph across them.
-double analogSample(const double morph, const double phase, const double increment, const double width) noexcept
+double analogSample(const PhaseWaveforms& oscillator, const double morph, const double phase, const double increment,
+                    const double width) noexcept
 {
     const auto at = std::clamp(morph, 0.0, 1.0) * 3.0;
     const auto lower = std::min(static_cast<int>(at), 2);
@@ -817,9 +818,10 @@ public:
                         case analog: {
                             if (shape.syncRatio > 1.0001) {
                                 const auto slave = state.master * shape.syncRatio;
-                                x = analogSample(shape.morph, slave - std::floor(slave), std::min(0.45, state.increment * shape.syncRatio), shape.width);
+                                x = analogSample(oscillator, shape.morph, slave - std::floor(slave),
+                                                 std::min(0.45, state.increment * shape.syncRatio), shape.width);
                             } else {
-                                x = analogSample(shape.morph, state.master, state.increment, shape.width);
+                                x = analogSample(oscillator, shape.morph, state.master, state.increment, shape.width);
                             }
                             state.master += state.increment;
                             state.master -= std::floor(state.master);
@@ -1028,6 +1030,7 @@ std::unique_ptr<Engine> makeMosaique()
 
 std::vector<float> mosaiquePicture(const Values& values, const std::string_view part, const int points)
 {
+    const PhaseWaveforms oscillator;
     // One engine as it sounds: two periods of the note for a shape, the first
     // tens of milliseconds of the ring for a modal one.
     const auto engine = part == "a" ? 0 : part == "b" ? 1 : -1;
@@ -1072,7 +1075,7 @@ std::vector<float> mosaiquePicture(const Values& values, const std::string_view 
         switch (kind) {
         case analog: {
             const auto slave = wrapped * syncRatio;
-            x = analogSample(v(base + eWave), syncRatio > 1.0001 ? slave - std::floor(slave) : wrapped, 0.0, v(base + ePw));
+            x = analogSample(oscillator, v(base + eWave), syncRatio > 1.0001 ? slave - std::floor(slave) : wrapped, 0.0, v(base + ePw));
             break;
         }
         case wavetable:

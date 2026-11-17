@@ -1,3 +1,8 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "MidiDevices.h"
 
 #include <imgui.h>
@@ -10,24 +15,24 @@ namespace cydaw::v2::midi_devices {
 namespace {
 
 struct Lists {
-    juce::Array<juce::MidiDeviceInfo> inputs;
-    juce::Array<juce::MidiDeviceInfo> outputs;
+    cydaw::base::Array<cydaw::midi::DeviceInfo> inputs;
+    cydaw::base::Array<cydaw::midi::DeviceInfo> outputs;
     double readAt { -1.0e9 };
 };
 
 Lists& lists()
 {
     static Lists cached;
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (now - cached.readAt > 2.0) {
-        cached.inputs = juce::MidiInput::getAvailableDevices();
-        cached.outputs = juce::MidiOutput::getAvailableDevices();
+        cached.inputs = cydaw::midi::Input::getAvailableDevices();
+        cached.outputs = cydaw::midi::Output::getAvailableDevices();
         cached.readAt = now;
     }
     return cached;
 }
 
-juce::String nameIn(const juce::Array<juce::MidiDeviceInfo>& devices, const juce::String& identifier)
+cydaw::base::Text nameIn(const cydaw::base::Array<cydaw::midi::DeviceInfo>& devices, const cydaw::base::Text& identifier)
 {
     for (const auto& device : devices)
         if (device.identifier == identifier)
@@ -37,22 +42,22 @@ juce::String nameIn(const juce::Array<juce::MidiDeviceInfo>& devices, const juce
 
 } // namespace
 
-const juce::Array<juce::MidiDeviceInfo>& inputs()
+const cydaw::base::Array<cydaw::midi::DeviceInfo>& inputs()
 {
     return lists().inputs;
 }
 
-const juce::Array<juce::MidiDeviceInfo>& outputs()
+const cydaw::base::Array<cydaw::midi::DeviceInfo>& outputs()
 {
     return lists().outputs;
 }
 
-juce::String inputName(const juce::String& identifier)
+cydaw::base::Text inputName(const cydaw::base::Text& identifier)
 {
     return nameIn(inputs(), identifier);
 }
 
-juce::String outputName(const juce::String& identifier)
+cydaw::base::Text outputName(const cydaw::base::Text& identifier)
 {
     return nameIn(outputs(), identifier);
 }

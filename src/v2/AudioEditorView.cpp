@@ -1,3 +1,10 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "AudioEditorView.h"
 
 #include "Icons.h"
@@ -146,13 +153,13 @@ Bounds boundsOf(const AudioClip& clip)
 
 // "-1.3", "1.1", "2": bars and beats counted from the loop's start (the bar
 // before it is -1, as Bitwig counts).
-juce::String barsBeats(const double beats, const int numerator, const bool withBeat)
+cydaw::base::Text barsBeats(const double beats, const int numerator, const bool withBeat)
 {
     const auto whole = static_cast<long long>(std::floor(beats + 1.0e-6));
     const auto bar = static_cast<long long>(std::floor(static_cast<double>(whole) / numerator));
     const auto beat = whole - bar * numerator + 1;
     const auto shown = bar >= 0 ? bar + 1 : bar;
-    return withBeat ? juce::String(shown) + "." + juce::String(beat) : juce::String(shown);
+    return withBeat ? cydaw::base::Text(shown) + "." + cydaw::base::Text(beat) : cydaw::base::Text(shown);
 }
 
 } // namespace
@@ -162,7 +169,7 @@ AudioEditorView::AudioEditorView(Studio& studio, UiState& state, WaveformCache& 
 {
 }
 
-void AudioEditorView::report(const juce::String& message, const bool error)
+void AudioEditorView::report(const cydaw::base::Text& message, const bool error)
 {
     state_.status = message;
     state_.statusIsError = error;
@@ -226,15 +233,15 @@ double AudioEditorView::snap(const double seconds) const
 
 // ---- The clip, wherever it is -------------------------------------------------------------------
 
-const AudioEditorView::Format& AudioEditorView::formatOf(const juce::File& file)
+const AudioEditorView::Format& AudioEditorView::formatOf(const cydaw::base::File& file)
 {
     const auto key = file.getFullPathName();
     if (const auto found = formats_.find(key); found != formats_.end())
         return found->second;
     Format format;
-    juce::AudioFormatManager manager;
-    manager.registerBasicFormats();
-    if (std::unique_ptr<juce::AudioFormatReader> reader(manager.createReaderFor(file)); reader != nullptr && reader->sampleRate > 0.0) {
+    cydaw::audio::AudioFormatManager manager;
+    cydaw::integration::registerCyAudioCoreReaders(manager);
+    if (std::unique_ptr<cydaw::audio::AudioFormatReader> reader(manager.createReaderFor(file)); reader != nullptr && reader->sampleRate > 0.0) {
         format.rate = reader->sampleRate;
         format.channels = static_cast<int>(reader->numChannels);
         format.bits = static_cast<int>(reader->bitsPerSample);
@@ -254,7 +261,7 @@ AudioEditorView::AudioClip AudioEditorView::launcherView(const TrackRef& track, 
     view.sourceDurationSeconds = clip.durationSeconds;
     view.colour = clip.colour;
     view.sourceFile = clip.sourceFile;
-    view.sourceLengthSeconds = clip.sourceFile == juce::File() ? 0.0 : formatOf(clip.sourceFile).length;
+    view.sourceLengthSeconds = clip.sourceFile == cydaw::base::File() ? 0.0 : formatOf(clip.sourceFile).length;
     view.events = clip.events;
     view.usesEventTimeline = clip.usesEventTimeline;
     view.playStartSeconds = clip.playStartSeconds;
@@ -291,12 +298,12 @@ std::vector<AudioEditorView::AudioEvent> AudioEditorView::eventsOf(const AudioCl
 {
     if (clip.usesEventTimeline)
         return clip.events;
-    if (clip.sourceFile == juce::File())
+    if (clip.sourceFile == cydaw::base::File())
         return {};
     return { soleEvent(clip) };
 }
 
-void AudioEditorView::remember(const TrackRef& track, const juce::String& label)
+void AudioEditorView::remember(const TrackRef& track, const cydaw::base::Text& label)
 {
     if (!launcher())
         return;
@@ -404,7 +411,7 @@ bool AudioEditorView::removeEvent(const TrackRef& track, const AudioClip& clip, 
     return engine.removeLauncherClipEvent(track.audioIndex, scene_, event);
 }
 
-juce::Result AudioEditorView::replaceEvents(const TrackRef& track, const AudioClip& clip, std::vector<AudioEvent> events)
+cydaw::base::Result AudioEditorView::replaceEvents(const TrackRef& track, const AudioClip& clip, std::vector<AudioEvent> events)
 {
     auto& engine = studio_.engine();
     if (!launcher())
@@ -461,7 +468,7 @@ bool AudioEditorView::setBounds(const TrackRef& track, const AudioClip& clip, co
 }
 
 bool AudioEditorView::commitTimeline(const TrackRef& track, const AudioClip& clip, std::vector<AudioEvent> events, AudioClipBounds next,
-                                     const juce::String& label, const bool eventsChanged)
+                                     const cydaw::base::Text& label, const bool eventsChanged)
 {
     auto& engine = studio_.engine();
     const auto index = track.audioIndex;
@@ -514,7 +521,7 @@ bool AudioEditorView::commitTimeline(const TrackRef& track, const AudioClip& cli
                                              next.looping);
 }
 
-void AudioEditorView::addEvent(const TrackRef& track, const AudioClip& clip, const juce::File& file, const double at)
+void AudioEditorView::addEvent(const TrackRef& track, const AudioClip& clip, const cydaw::base::File& file, const double at)
 {
     if (!clip.usesEventTimeline && (clip.takes.size() > 1 || !clip.comp.empty())) {
         report(ui::Ls("Ce clip a plusieurs prises : mettez-les d'abord à plat (vue Prises)",
@@ -527,7 +534,7 @@ void AudioEditorView::addEvent(const TrackRef& track, const AudioClip& clip, con
     if (launcher()) {
         remember(track, ui::Ls("Son ajouté", "Sound added"));
         // A launcher clip of one sound keeps it as its first event.
-        if (!clip.usesEventTimeline && clip.sourceFile != juce::File() && launcherEvent(track, clip, clip.id) == 0) {
+        if (!clip.usesEventTimeline && clip.sourceFile != cydaw::base::File() && launcherEvent(track, clip, clip.id) == 0) {
             report(ui::Ls("Le clip n'a pas pu devenir une suite de sons", "The clip could not become a timeline of sounds"), true);
             return;
         }
@@ -544,16 +551,16 @@ void AudioEditorView::addEvent(const TrackRef& track, const AudioClip& clip, con
 }
 
 void AudioEditorView::process(const TrackRef& track, const AudioClip& clip, const AudioEvent& event, const app::AudioEditRequest& request,
-                              const juce::String& label, const std::optional<std::pair<double, double>> part)
+                              const cydaw::base::Text& label, const std::optional<std::pair<double, double>> part)
 {
     const auto start = part ? part->first : -1.0;
     const auto length = part ? part->second : 0.0;
-    juce::Result done = juce::Result::ok();
+    cydaw::base::Result done = cydaw::base::Result::ok();
     if (launcher()) {
         remember(track, label);
         const auto id = launcherEvent(track, clip, event.id);
         done = id != 0 ? studio_.editLauncherAudioEvent(track, scene_, id, request, start, length)
-                       : juce::Result::fail(ui::Ls("Son introuvable", "No such sound"));
+                       : cydaw::base::Result::fail(ui::Ls("Son introuvable", "No such sound"));
     } else if (!clip.usesEventTimeline && event.id == clip.id) {
         // The clip's own sound: a new version, the history kept.
         done = studio_.editAudioClip(track, clip.id, request, part ? part->first : event.sourceOffsetSeconds,
@@ -720,7 +727,7 @@ void AudioEditorView::drawClip(const TrackRef& track, const AudioClip& clip)
         const auto eventsTall = std::max(dp(60.0f), left - lanesTall - splitter);
         list->AddRectFilled(ImVec2(start.x, eventsTop), ImVec2(headerRight - dp(2.0f), eventsTop + eventsTall), p.bg1);
         ImGui::SetCursorScreenPos(ImVec2(start.x + dp(4.0f), eventsTop + dp(4.0f)));
-        ui::sectionTitle((ui::Ls("SONS (", "SOUNDS (") + juce::String(static_cast<int>(events.size())) + ")").toRawUTF8());
+        ui::sectionTitle((ui::Ls("SONS (", "SOUNDS (") + cydaw::base::Text(static_cast<int>(events.size())) + ")").toRawUTF8());
         ImGui::SetCursorScreenPos(ImVec2(start.x + dp(4.0f), ImGui::GetCursorScreenPos().y));
         ImGui::PushTextWrapPos(wrapAt);
         ImGui::TextColored(theme::vec(p.textFaint), "%s", L("Double-clic en bas : point d'étirement. En haut : couper. Clic droit : menu. Molette : zoom (Maj : défiler).",
@@ -788,7 +795,7 @@ void AudioEditorView::drawToolbar(const TrackRef& track, const AudioClip& clip, 
     ImGui::TextUnformatted((clip.name.isNotEmpty() ? clip.name : clip.sourceFile.getFileNameWithoutExtension()).toRawUTF8());
     ImGui::PopFont();
     ImGui::SameLine();
-    const auto where = launcher() ? ui::Ls("lanceur, scène ", "launcher, scene ") + juce::String(scene_ + 1) : ui::Ls("arrangement", "arrangement");
+    const auto where = launcher() ? ui::Ls("lanceur, scène ", "launcher, scene ") + cydaw::base::Text(scene_ + 1) : ui::Ls("arrangement", "arrangement");
     ImGui::TextDisabled("%s  |  %s", studio_.trackName(track).toRawUTF8(), where.toRawUTF8());
     ImGui::SameLine(0.0f, dp(14.0f));
     // Heard: a launcher clip from its slot, an arrangement one as the track plays it.
@@ -872,12 +879,12 @@ void AudioEditorView::drawToolbar(const TrackRef& track, const AudioClip& clip, 
         const auto clipId = clip.id;
         const auto at = cursor_;
         const auto scene = scene_;
-        chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour ce clip", "A sound for this clip"), juce::File(),
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un son pour ce clip", "A sound for this clip"), cydaw::base::File(),
                                                        "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this, track, clipId, at, scene](const juce::FileChooser& chosen) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                              [this, track, clipId, at, scene](const cydaw::base::FileDialog& chosen) {
                                   const auto file = chosen.getResult();
-                                  if (file == juce::File())
+                                  if (file == cydaw::base::File())
                                       return;
                                   scene_ = scene;
                                   if (scene >= 0) {
@@ -1354,7 +1361,7 @@ void AudioEditorView::drawEvents(const TrackRef& track, const AudioClip& clip, c
                 host_.wake(2);
             const auto channels = std::clamp(thumbnail->getNumChannels(), 1, 2);
             const auto laneHeight = (waveBottom - waveTop) / static_cast<float>(channels);
-            const auto gain = std::min(2.0f, juce::Decibels::decibelsToGain(event.gainDb));
+            const auto gain = std::min(2.0f, cydaw::audio::Decibels::decibelsToGain(event.gainDb));
             for (int channel = 0; channel < channels; ++channel) {
                 const auto centre = waveTop + laneHeight * (static_cast<float>(channel) + 0.5f);
                 const auto half = laneHeight * 0.46f;
@@ -1417,9 +1424,9 @@ void AudioEditorView::drawEvents(const TrackRef& track, const AudioClip& clip, c
         ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
         auto label = event.name.isNotEmpty() ? event.name : event.sourceFile.getFileNameWithoutExtension();
         if (std::abs(event.gainDb) > 0.05f)
-            label << "  " << (event.gainDb > 0 ? "+" : "") << juce::String(event.gainDb, 1) << " dB";
+            label << "  " << (event.gainDb > 0 ? "+" : "") << cydaw::base::Text(event.gainDb, 1) << " dB";
         if (!event.stretchMarkers.empty())
-            label << juce::String::fromUTF8("  \xc2\xb7  ") << juce::String(static_cast<int>(event.stretchMarkers.size()))
+            label << cydaw::base::Text::fromUTF8("  \xc2\xb7  ") << cydaw::base::Text(static_cast<int>(event.stretchMarkers.size()))
                   << ui::Ls(" point(s)", " point(s)");
         const auto badgeText = modeShort(event.stretchMode);
         const auto badgeWidth = ImGui::CalcTextSize(badgeText).x + dp(10.0f);
@@ -1490,14 +1497,14 @@ void AudioEditorView::drawEvents(const TrackRef& track, const AudioClip& clip, c
     ImGui::InvisibleButton("##audioLane", size, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
     if (ImGui::BeginDragDropTarget()) {
         if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload != nullptr && payload->DataSize > 1)
-            addEvent(track, clip, juce::File(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), std::max(0.0, snap(at)));
+            addEvent(track, clip, cydaw::base::File(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data))), std::max(0.0, snap(at)));
         ImGui::EndDragDropTarget();
     }
     const auto laneHovered = ImGui::IsItemHovered();
     if (laneHovered && hoveredBadge != 0)
         for (const auto& event : events)
             if (event.id == hoveredBadge)
-                ui::tooltip((juce::String(modeName(event.stretchMode)) + "\n" + modeHelp(event.stretchMode)
+                ui::tooltip((cydaw::base::Text(modeName(event.stretchMode)) + "\n" + modeHelp(event.stretchMode)
                              + ui::Ls("\nClic : changer de mode", "\nClick: change the mode"))
                                 .toRawUTF8());
     if (ImGui::BeginPopup("##soundMode")) {
@@ -1771,12 +1778,12 @@ void AudioEditorView::eventMenu(const TrackRef& track, const AudioClip& clip, co
             const auto clipId = clip.id;
             const auto at = cursor_;
             const auto scene = scene_;
-            chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour ce clip", "A sound for this clip"), juce::File(),
+            chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un son pour ce clip", "A sound for this clip"), cydaw::base::File(),
                                                            "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-            chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                                  [this, track, clipId, at, scene](const juce::FileChooser& chosen) {
+            chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                                  [this, track, clipId, at, scene](const cydaw::base::FileDialog& chosen) {
                                       const auto file = chosen.getResult();
-                                      if (file == juce::File())
+                                      if (file == cydaw::base::File())
                                           return;
                                       scene_ = scene;
                                       if (scene >= 0) {
@@ -1846,7 +1853,7 @@ void AudioEditorView::eventMenu(const TrackRef& track, const AudioClip& clip, co
             if (const auto tempo = app::AudioTrackController::detectAudioTempo(event.sourceFile)) {
                 if (setEventProperties(track, clip, event.id, event.gainDb, tempo->bpm, event.stretchMode))
                     studio_.markDirty();
-                report(ui::Ls("Tempo trouvé : ", "Tempo found: ") + juce::String(tempo->bpm, 2) + " BPM", false);
+                report(ui::Ls("Tempo trouvé : ", "Tempo found: ") + cydaw::base::Text(tempo->bpm, 2) + " BPM", false);
             } else {
                 report(ui::Ls("Aucun tempo net dans ce son", "No clear tempo in this sound"), true);
             }
@@ -1880,7 +1887,7 @@ void AudioEditorView::eventMenu(const TrackRef& track, const AudioClip& clip, co
                 request.operation = kind.op;
                 request.levelDb = kind.op == Op::amplify ? gainDb_ : normaliseDb_;
                 request.curve = static_cast<app::FadeCurve>(std::clamp(fadeCurve_, 0, 3));
-                process(track, clip, event, request, juce::String::fromUTF8(L(kind.french, kind.english)), part);
+                process(track, clip, event, request, cydaw::base::Text::fromUTF8(L(kind.french, kind.english)), part);
             }
         }
         ImGui::EndMenu();
@@ -1897,8 +1904,8 @@ void AudioEditorView::eventMenu(const TrackRef& track, const AudioClip& clip, co
 
 // ---- The clip's automation, under its sounds ----------------------------------------------------
 
-bool AudioEditorView::setLanes(const TrackRef& track, const AudioClip& clip, std::map<juce::String, std::vector<AutomationPoint>> lanes,
-                               const juce::String& label)
+bool AudioEditorView::setLanes(const TrackRef& track, const AudioClip& clip, std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes,
+                               const cydaw::base::Text& label)
 {
     auto& engine = studio_.engine();
     bool done {};
@@ -1915,7 +1922,7 @@ bool AudioEditorView::setLanes(const TrackRef& track, const AudioClip& clip, std
     return done;
 }
 
-std::vector<juce::String> AudioEditorView::laneRows(const AudioClip& clip, const std::vector<AudioEvent>& events)
+std::vector<cydaw::base::Text> AudioEditorView::laneRows(const AudioClip& clip, const std::vector<AudioEvent>& events)
 {
     // One lane at least (the volume's), then those picked, then any with
     // points not shown yet (the clip's, the shown sound's): no automation
@@ -1936,12 +1943,12 @@ std::vector<juce::String> AudioEditorView::laneRows(const AudioClip& clip, const
     return shown;
 }
 
-bool AudioEditorView::isSoundLane(const juce::String& name)
+bool AudioEditorView::isSoundLane(const cydaw::base::Text& name)
 {
     return name.startsWith("sound.");
 }
 
-juce::String AudioEditorView::soundKeyOf(const juce::String& name)
+cydaw::base::Text AudioEditorView::soundKeyOf(const cydaw::base::Text& name)
 {
     return name.substring(6);
 }
@@ -1954,15 +1961,15 @@ const AudioEditorView::AudioEvent* AudioEditorView::soundTarget(const std::vecto
     return events.size() == 1 ? &events.front() : nullptr;
 }
 
-juce::String AudioEditorView::editorKey(const juce::String& name, const std::vector<AudioEvent>& events) const
+cydaw::base::Text AudioEditorView::editorKey(const cydaw::base::Text& name, const std::vector<AudioEvent>& events) const
 {
     if (!isSoundLane(name))
         return name;
     const auto* sound = soundTarget(events);
-    return name + "@" + juce::String(static_cast<juce::int64>(sound != nullptr ? sound->id : 0));
+    return name + "@" + cydaw::base::Text(static_cast<std::int64_t>(sound != nullptr ? sound->id : 0));
 }
 
-juce::String AudioEditorView::laneLabel(const std::vector<Studio::MasterLaneChoice>& choices, const juce::String& name)
+cydaw::base::Text AudioEditorView::laneLabel(const std::vector<Studio::MasterLaneChoice>& choices, const cydaw::base::Text& name)
 {
     if (isSoundLane(name)) {
         const auto key = soundKeyOf(name);
@@ -2034,13 +2041,13 @@ void AudioEditorView::wheel(const AudioClip& clip, const std::vector<AudioEvent>
     ui::takeWheel();
 }
 
-curves::Lane AudioEditorView::laneDescription(const std::vector<Studio::MasterLaneChoice>& choices, const juce::String& name) const
+curves::Lane AudioEditorView::laneDescription(const std::vector<Studio::MasterLaneChoice>& choices, const cydaw::base::Text& name) const
 {
     curves::Lane lane;
     const auto panText = [](const double value) {
         char text[48];
         std::snprintf(text, sizeof(text), std::abs(value) < 0.005 ? "C" : value < 0.0 ? "G %.0f %%" : "D %.0f %%", std::abs(value) * 100.0);
-        return juce::String::fromUTF8(text);
+        return cydaw::base::Text::fromUTF8(text);
     };
     if (isSoundLane(name)) {
         // A sound's own: its volume over its gain, its pan, its pitch over
@@ -2058,7 +2065,7 @@ curves::Lane AudioEditorView::laneDescription(const std::vector<Studio::MasterLa
             lane.formatValue = [](const double value) {
                 char text[32];
                 std::snprintf(text, sizeof(text), "%+.2f st", value);
-                return juce::String(text);
+                return cydaw::base::Text(text);
             };
         } else {
             lane.minimum = -60.0;
@@ -2066,7 +2073,7 @@ curves::Lane AudioEditorView::laneDescription(const std::vector<Studio::MasterLa
             lane.formatValue = [](const double value) {
                 char text[32];
                 std::snprintf(text, sizeof(text), "%+.1f dB", value);
-                return juce::String(text);
+                return cydaw::base::Text(text);
             };
         }
     } else {
@@ -2079,7 +2086,7 @@ curves::Lane AudioEditorView::laneDescription(const std::vector<Studio::MasterLa
         lane.logarithmic = choice != nullptr && choice->logarithmic && lane.minimum > 0.0;
         lane.fallback = choice != nullptr ? choice->value : lane.minimum;
         lane.colour = theme::palette().modulation;
-        const auto unit = choice != nullptr ? choice->unit : juce::String();
+        const auto unit = choice != nullptr ? choice->unit : cydaw::base::Text();
         if (name == Studio::clipPanLane)
             lane.formatValue = panText;
         else
@@ -2089,7 +2096,7 @@ curves::Lane AudioEditorView::laneDescription(const std::vector<Studio::MasterLa
                     std::snprintf(text, sizeof(text), "%.3g %s", value, unit.toRawUTF8());
                 else
                     std::snprintf(text, sizeof(text), "%.3g", value);
-                return juce::String::fromUTF8(text);
+                return cydaw::base::Text::fromUTF8(text);
             };
     }
     const auto origin = gridOrigin_;
@@ -2099,12 +2106,12 @@ curves::Lane AudioEditorView::laneDescription(const std::vector<Studio::MasterLa
         const auto beats = (seconds - origin) / std::max(1.0e-9, beat);
         const auto whole = std::floor(beats + 1.0e-6);
         const auto sixteenth = static_cast<int>(std::floor((beats - whole) * 4.0 + 1.0e-6)) + 1;
-        return barsBeats(beats, numerator, true) + "." + juce::String(sixteenth) + "  (" + juce::String(seconds, 3) + " s)";
+        return barsBeats(beats, numerator, true) + "." + cydaw::base::Text(sixteenth) + "  (" + cydaw::base::Text(seconds, 3) + " s)";
     };
     return lane;
 }
 
-std::vector<curves::Point> AudioEditorView::curvePoints(const AudioClip& clip, const std::vector<AudioEvent>& events, const juce::String& name) const
+std::vector<curves::Point> AudioEditorView::curvePoints(const AudioClip& clip, const std::vector<AudioEvent>& events, const cydaw::base::Text& name) const
 {
     std::vector<curves::Point> points;
     // A sound's points are its own seconds: on the clip's, from its start.
@@ -2123,7 +2130,7 @@ std::vector<curves::Point> AudioEditorView::curvePoints(const AudioClip& clip, c
     return points;
 }
 
-bool AudioEditorView::setCurve(const TrackRef& track, const AudioClip& clip, const std::vector<AudioEvent>& events, const juce::String& name,
+bool AudioEditorView::setCurve(const TrackRef& track, const AudioClip& clip, const std::vector<AudioEvent>& events, const cydaw::base::Text& name,
                                const std::vector<curves::Point>& points)
 {
     // Back to the lane's points, their shapes and handles with them.
@@ -2190,7 +2197,7 @@ void AudioEditorView::drawCurveBar(const TrackRef& track, const AudioClip& clip)
     auto label = laneLabel(choices, name);
     if (isSoundLane(name))
         if (const auto* sound = soundTarget(events))
-            label << juce::String::fromUTF8(" \xc2\xb7 ") << (sound->name.isNotEmpty() ? sound->name : sound->sourceFile.getFileNameWithoutExtension());
+            label << cydaw::base::Text::fromUTF8(" \xc2\xb7 ") << (sound->name.isNotEmpty() ? sound->name : sound->sourceFile.getFileNameWithoutExtension());
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(theme::vec(isSoundLane(name) ? p.accent : p.modulation), "%s", label.toRawUTF8());
     ImGui::SameLine(0.0f, dp(10.0f));
@@ -2210,19 +2217,19 @@ void AudioEditorView::drawLanes(const TrackRef& track, const AudioClip& clip, co
     const auto rowHeight = height / static_cast<float>(std::max<std::size_t>(1, rows.size()));
     const auto headerWidth = laneLeft_ - headerLeft;
     const auto bounds = shownBounds(clip);
-    const auto soundName = sound == nullptr ? juce::String()
+    const auto soundName = sound == nullptr ? cydaw::base::Text()
                            : sound->name.isNotEmpty() ? sound->name
                                                       : sound->sourceFile.getFileNameWithoutExtension();
-    const juce::String soundLanes[] { juce::String("sound.") + app::AudioTrackController::soundVolumeLane,
-                                      juce::String("sound.") + app::AudioTrackController::soundPanLane,
-                                      juce::String("sound.") + app::AudioTrackController::soundPitchLane };
-    const auto hasPoints = [&](const juce::String& name) {
+    const cydaw::base::Text soundLanes[] { cydaw::base::Text("sound.") + app::AudioTrackController::soundVolumeLane,
+                                      cydaw::base::Text("sound.") + app::AudioTrackController::soundPanLane,
+                                      cydaw::base::Text("sound.") + app::AudioTrackController::soundPitchLane };
+    const auto hasPoints = [&](const cydaw::base::Text& name) {
         if (isSoundLane(name))
             return sound != nullptr && sound->lanes.contains(soundKeyOf(name)) && !sound->lanes.at(soundKeyOf(name)).empty();
         return clip.lanes.contains(name) && !clip.lanes.at(name).empty();
     };
     std::optional<std::size_t> removeRow;
-    std::optional<std::pair<std::size_t, juce::String>> changeRow;
+    std::optional<std::pair<std::size_t, cydaw::base::Text>> changeRow;
     curves::View base;
     base.xOf = [this](const double time) { return xOf(time); };
     base.timeAt = [this](const float x) { return secondsAt(x); };
@@ -2248,11 +2255,11 @@ void AudioEditorView::drawLanes(const TrackRef& track, const AudioClip& clip, co
             list->AddRectFilled(ImVec2(headerLeft, rowTop), ImVec2(headerLeft + dp(3.0f), rowTop + rowHeight - dp(2.0f)), p.accent);
         ImGui::SetCursorScreenPos(ImVec2(headerLeft + dp(4.0f), rowTop + dp(3.0f)));
         ImGui::SetNextItemWidth(headerWidth - dp(10.0f));
-        const auto preview = label + (points.empty() ? juce::String() : juce::String::fromUTF8("  \xe2\x97\x8f"));
+        const auto preview = label + (points.empty() ? cydaw::base::Text() : cydaw::base::Text::fromUTF8("  \xe2\x97\x8f"));
         if (ImGui::BeginCombo("##laneParameter", preview.toRawUTF8(), ImGuiComboFlags_HeightLarge)) {
             ImGui::TextDisabled("%s", L("La piste, dans ce clip", "The track, in this clip"));
             for (const auto& option : choices) {
-                const auto text = option.label + (hasPoints(option.binding) ? juce::String::fromUTF8("  \xe2\x97\x8f") : juce::String());
+                const auto text = option.label + (hasPoints(option.binding) ? cydaw::base::Text::fromUTF8("  \xe2\x97\x8f") : cydaw::base::Text());
                 if (ImGui::Selectable((text + "##" + option.binding).toRawUTF8(), option.binding == name))
                     changeRow = std::make_pair(row, option.binding);
             }
@@ -2262,7 +2269,7 @@ void AudioEditorView::drawLanes(const TrackRef& track, const AudioClip& clip, co
             ImGui::TextDisabled("%s", sound != nullptr ? (ui::Ls("Le son « ", "The sound \"") + soundName + ui::Ls(" »", "\"")).toRawUTF8()
                                                        : L("Un son (choisissez-en un)", "A sound (pick one)"));
             for (const auto& option : soundLanes) {
-                const auto text = laneLabel(choices, option) + (hasPoints(option) ? juce::String::fromUTF8("  \xe2\x97\x8f") : juce::String());
+                const auto text = laneLabel(choices, option) + (hasPoints(option) ? cydaw::base::Text::fromUTF8("  \xe2\x97\x8f") : cydaw::base::Text());
                 if (ImGui::Selectable((text + "##" + option).toRawUTF8(), option == name, sound != nullptr ? 0 : ImGuiSelectableFlags_Disabled))
                     changeRow = std::make_pair(row, option);
             }
@@ -2278,7 +2285,7 @@ void AudioEditorView::drawLanes(const TrackRef& track, const AudioClip& clip, co
                 ImGui::OpenPopup("##addLaneRow");
             ui::tooltip(L("Un autre couloir d'automation", "Another automation lane"));
             ImGui::SameLine(0.0f, dp(2.0f));
-            if (ImGui::SmallButton(juce::String::fromUTF8("\xc3\x97").toRawUTF8()))
+            if (ImGui::SmallButton(cydaw::base::Text::fromUTF8("\xc3\x97").toRawUTF8()))
                 removeRow = row;
             ui::tooltip(L("Retirer ce couloir (ses points avec ; Ctrl+Z les rend)", "Remove this lane (its points too; Ctrl+Z gives them back)"));
             ImGui::SameLine(0.0f, dp(6.0f));
@@ -2489,7 +2496,7 @@ void AudioEditorView::drawDetails(const TrackRef& track, const AudioClip& clip, 
         const auto numerator = std::max(1, engine.timeSignatureNumerator());
         char text[48];
         std::snprintf(text, sizeof(text), "%.2f %s", beats / numerator, L("mesures", "bars"));
-        return juce::String(text);
+        return cydaw::base::Text(text);
     };
 
     // ---- The clip ----
@@ -2558,10 +2565,10 @@ void AudioEditorView::drawDetails(const TrackRef& track, const AudioClip& clip, 
     ImGui::PopFont();
     const auto& format = formatOf(event.sourceFile);
     if (format.rate > 0.0)
-        ImGui::TextColored(theme::vec(p.textDim), "%d Hz  \xc2\xb7  %s  \xc2\xb7  %d bits  \xc2\xb7  %.3f s", juce::roundToInt(format.rate),
+        ImGui::TextColored(theme::vec(p.textDim), "%d Hz  \xc2\xb7  %s  \xc2\xb7  %d bits  \xc2\xb7  %.3f s", cydaw::base::roundToInt(format.rate),
                            format.channels == 1   ? L("mono", "mono")
                            : format.channels == 2 ? L("stéréo", "stereo")
-                                                  : (juce::String(format.channels) + ui::Ls(" canaux", " channels")).toRawUTF8(),
+                                                  : (cydaw::base::Text(format.channels) + ui::Ls(" canaux", " channels")).toRawUTF8(),
                            format.bits, format.length);
     else
         ImGui::TextColored(theme::vec(p.record), "%s", L("Fichier introuvable ou illisible", "File missing or unreadable"));
@@ -2617,7 +2624,7 @@ void AudioEditorView::drawDetails(const TrackRef& track, const AudioClip& clip, 
         if (const auto detected = app::AudioTrackController::detectAudioTempo(event.sourceFile)) {
             if (setEventProperties(track, clip, event.id, event.gainDb, detected->bpm, event.stretchMode))
                 studio_.markDirty();
-            report(ui::Ls("Tempo trouvé : ", "Tempo found: ") + juce::String(detected->bpm, 2) + " BPM", false);
+            report(ui::Ls("Tempo trouvé : ", "Tempo found: ") + cydaw::base::Text(detected->bpm, 2) + " BPM", false);
         } else {
             report(ui::Ls("Aucun tempo net dans ce son", "No clear tempo in this sound"), true);
         }
@@ -2722,7 +2729,7 @@ void AudioEditorView::drawProcesses(const TrackRef& track, const AudioClip& clip
         return;
     }
     const auto part = selectionIn(*found);
-    const auto on = part ? ui::Ls("La sélection, ", "The selection, ") + juce::String(part->second, 3) + " s, "
+    const auto on = part ? ui::Ls("La sélection, ", "The selection, ") + cydaw::base::Text(part->second, 3) + " s, "
                                + ui::Ls("de « ", "of « ") + found->name + ui::Ls(" »", " »")
                          : ui::Ls("Tout le son « ", "The whole sound « ") + found->name + ui::Ls(" »", " »");
     ImGui::PushTextWrapPos(0.0f);
@@ -2747,7 +2754,7 @@ void AudioEditorView::drawProcesses(const TrackRef& track, const AudioClip& clip
         request.operation = kind.op;
         request.levelDb = kind.op == Op::amplify ? gainDb_ : normaliseDb_;
         request.curve = static_cast<app::FadeCurve>(std::clamp(fadeCurve_, 0, 3));
-        process(track, clip, *found, request, juce::String::fromUTF8(L(kind.french, kind.english)), part);
+        process(track, clip, *found, request, cydaw::base::Text::fromUTF8(L(kind.french, kind.english)), part);
     }
     ImGui::Spacing();
     ImGui::PushTextWrapPos(0.0f);
@@ -2816,24 +2823,24 @@ void AudioEditorView::drawTakes(const TrackRef& track, const AudioClip& clip)
     }
     // Its takes: the clip's own source when it has none listed.
     struct TakeView {
-        juce::String name;
-        juce::File file;
+        cydaw::base::Text name;
+        cydaw::base::File file;
         double shift {};
     };
     std::vector<TakeView> takes;
     for (const auto& take : clip.takes)
-        takes.push_back({ take.name, take.sourceFile != juce::File {} ? take.sourceFile : clip.sourceFile, take.shiftSeconds });
+        takes.push_back({ take.name, take.sourceFile != cydaw::base::File {} ? take.sourceFile : clip.sourceFile, take.shiftSeconds });
     if (takes.empty())
         takes.push_back({ clip.name, clip.sourceFile, 0.0 });
     // The toolbar.
     if (ImGui::SmallButton(L("+ Prise depuis un fichier\xe2\x80\xa6", "+ Take from a file\xe2\x80\xa6"))) {
         const auto clipId = clip.id;
-        chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Une prise pour ce clip", "A take for this clip"), juce::File(),
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Une prise pour ce clip", "A take for this clip"), cydaw::base::File(),
                                                        "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this, track, clipId](const juce::FileChooser& chosen) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                              [this, track, clipId](const cydaw::base::FileDialog& chosen) {
                                   const auto file = chosen.getResult();
-                                  if (file == juce::File())
+                                  if (file == cydaw::base::File())
                                       return;
                                   std::vector<app::AudioTrackController::AudioTake> added { { {}, file, 0.0, 0.0 } };
                                   const auto done = studio_.engine().addAudioTakes(track.audioIndex, clipId, std::move(added), true);

@@ -13,7 +13,7 @@ endif()
 set(CYUI_MODULES "${CYDAW_UI_MODULES}")
 FetchContent_Declare(CyUI
     GIT_REPOSITORY https://github.com/MrMybal/CyUI.git
-    GIT_TAG 8367401fe45fc22bfed5e227cb3de343177f676b
+    GIT_TAG 7a793e9281e78572818d85e9cf856d779a7792a1
     GIT_SHALLOW FALSE)
 FetchContent_MakeAvailable(CyUI)
 # Runtime notices are copied by each UI target's packaging step.

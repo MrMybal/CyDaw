@@ -1,3 +1,7 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/audio/Sources.h>
+#include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "ModeProcessing.h"
 #include "DeviceEditorView.h"
@@ -24,20 +28,20 @@ using ui::dp;
 using ui::L;
 namespace
 {
-juce::var object()
+cydaw::base::Value object()
 {
-    return juce::var(new juce::DynamicObject());
+    return cydaw::base::Value(new cydaw::base::Object());
 }
-void put(juce::var &v, const char *k, const juce::var &x)
+void put(cydaw::base::Value &v, const char *k, const cydaw::base::Value &x)
 {
     v.getDynamicObject()->setProperty(k, x);
 }
-double num(const juce::var &v, const char *k, double fallback = 0)
+double num(const cydaw::base::Value &v, const char *k, double fallback = 0)
 {
     return static_cast<double>(v.getProperty(k, fallback));
 }
 } // namespace
-struct ModeProcessing::Input final : juce::AudioSource
+struct ModeProcessing::Input final : cydaw::audio::AudioSource
 {
     std::uint64_t id{};
     const float *left{};
@@ -52,7 +56,7 @@ struct ModeProcessing::Input final : juce::AudioSource
     void releaseResources() override
     {
     }
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo &out) override
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo &out) override
     {
         out.clearActiveBufferRegion();
         if (!left || !out.buffer)
@@ -126,7 +130,7 @@ std::optional<TrackRef> ModeProcessing::inputTrack(std::uint64_t id) const
     const auto it = trackKeys_.find(id);
     return it == trackKeys_.end() ? std::nullopt : studio_.trackForKey(it->second);
 }
-void ModeProcessing::ensureInput(std::uint64_t id, const juce::String &name, const bool midi, const bool bus)
+void ModeProcessing::ensureInput(std::uint64_t id, const cydaw::base::Text &name, const bool midi, const bool bus)
 {
     if (auto track = inputTrack(id))
     {
@@ -168,7 +172,7 @@ void ModeProcessing::syncFoundry(const engine::foundry::Session &session)
     for (const auto &t : session.tracks)
     {
         present.insert(t.id);
-        ensureInput(t.id, juce::String::fromUTF8(t.name.c_str()), t.midi, t.bus);
+        ensureInput(t.id, cydaw::base::Text::fromUTF8(t.name.c_str()), t.midi, t.bus);
         if (auto track = inputTrack(t.id))
         {
             auto mix = studio_.trackMix(*track);
@@ -211,7 +215,7 @@ void ModeProcessing::syncFoundry(const engine::foundry::Session &session)
                 const auto beatsPerFrame = engine.tempo() / 60.0 / session.rate;
                 for (const auto &c : t.clips)
                 {
-                    const auto id = engine.addMidiClip(track->midiId, juce::String::fromUTF8(c.name.c_str()), c.start * beatsPerFrame,
+                    const auto id = engine.addMidiClip(track->midiId, cydaw::base::Text::fromUTF8(c.name.c_str()), c.start * beatsPerFrame,
                                                        c.length * beatsPerFrame, false);
                     std::vector<app::AudioTrackController::MidiNote> notes;
                     for (const auto &note : c.notes)
@@ -240,7 +244,7 @@ void ModeProcessing::syncFoundry(const engine::foundry::Session &session)
                     std::vector<Studio::AutomationPoint> points;
                     for (const auto &point : lane.points)
                         points.push_back({0, point.frame / session.rate, point.value});
-                    studio_.setLanePoints(*track, juce::String::fromUTF8(lane.binding.c_str()), points);
+                    studio_.setLanePoints(*track, cydaw::base::Text::fromUTF8(lane.binding.c_str()), points);
                 }
             }
             studio_.engine().setModeGainAutomation(track->midi, track->midi ? track->midiId : track->audioIndex, std::move(gain));
@@ -254,7 +258,7 @@ void ModeProcessing::syncFoundry(const engine::foundry::Session &session)
     masterGainAutomation_.store(std::move(masterGain));
     std::vector<app::NativeDspRuntime::AutomationLane> master;
     for (const auto &lane : session.masterAutomation)
-        if (const auto target = modulation::nativeTargetFor(juce::String::fromUTF8(lane.binding.c_str())))
+        if (const auto target = modulation::nativeTargetFor(cydaw::base::Text::fromUTF8(lane.binding.c_str())))
         {
             app::NativeDspRuntime::AutomationLane out;
             out.nodeId = target->nodeId;
@@ -348,25 +352,25 @@ void ModeProcessing::chooseInstrument(std::uint64_t id)
     openLibrary();
     state_.libraryTab = 1;
 }
-juce::Result ModeProcessing::loadSample(std::uint64_t id, const juce::File &file)
+cydaw::base::Result ModeProcessing::loadSample(std::uint64_t id, const cydaw::base::File &file)
 {
     const auto track = inputTrack(id);
     if (!track || !track->midi)
-        return juce::Result::fail("No MIDI track");
+        return cydaw::base::Result::fail("No MIDI track");
     if (const auto result = studio_.replaceInstrument(*track, "simple-sampler-instrument"); result.failed())
         return result;
-    juce::String error;
+    cydaw::base::Text error;
     if (!studio_.loadSamplerFile(file, track, error))
-        return juce::Result::fail(error);
-    return juce::Result::ok();
+        return cydaw::base::Result::fail(error);
+    return cydaw::base::Result::ok();
 }
-juce::var ModeProcessing::inputRuntimeState(std::uint64_t id) const
+cydaw::base::Value ModeProcessing::inputRuntimeState(std::uint64_t id) const
 {
     const auto track = inputTrack(id);
     if (!track)
         return {};
     const auto *slot = studio_.graphFor(*track);
-    return slot != nullptr ? slot->graph().createVst3RuntimeState() : juce::var();
+    return slot != nullptr ? slot->graph().createVst3RuntimeState() : cydaw::base::Value();
 }
 std::vector<ModeProcessing::Parameter> ModeProcessing::parameters(std::uint64_t id) const
 {
@@ -419,7 +423,7 @@ void ModeProcessing::process(const app::ModeInput *inputs, int count, float *lef
             for (int i = 0; i < frames; ++i)
             {
                 const auto level =
-                    juce::Decibels::decibelsToGain(engine::foundry::automationValue(gain->lane, (at + i / rate_) * gain->rate));
+                    cydaw::audio::Decibels::decibelsToGain(engine::foundry::automationValue(gain->lane, (at + i / rate_) * gain->rate));
                 left[i] *= level;
                 right[i] *= level;
             }
@@ -613,10 +617,10 @@ void ModeProcessing::openLibrary()
     state_.libraryFocus = true;
 }
 
-juce::var ModeProcessing::serialise() const
+cydaw::base::Value ModeProcessing::serialise() const
 {
     std::set<std::uint64_t> live;
-    const auto snapshot = [&](std::uint64_t key, const GraphSlot& slot) -> juce::var {
+    const auto snapshot = [&](std::uint64_t key, const GraphSlot& slot) -> cydaw::base::Value {
         live.insert(key);
         auto& cached = graphSnapshots_[key];
         if (cached.source != &slot || cached.revision != slot.revision()) {
@@ -628,15 +632,15 @@ juce::var ModeProcessing::serialise() const
     };
     auto state = object();
     put(state, "version", 1);
-    juce::Array<juce::var> tracks;
+    cydaw::base::Array<cydaw::base::Value> tracks;
     for (const auto &track : studio_.tracks())
     {
         auto t = object();
         const auto key = studio_.routingKey(track);
-        put(t, "key", static_cast<juce::int64>(key));
+        put(t, "key", static_cast<std::int64_t>(key));
         for (const auto &[id, k] : trackKeys_)
             if (k == key)
-                put(t, "inputId", static_cast<juce::int64>(id));
+                put(t, "inputId", static_cast<std::int64_t>(id));
         put(t, "name", studio_.trackName(track));
         put(t, "bus", studio_.isBusTrack(track));
         put(t, "midi", track.midi);
@@ -647,13 +651,13 @@ juce::var ModeProcessing::serialise() const
         put(t, "pan", mix.pan);
         put(t, "mute", mix.muted);
         put(t, "solo", mix.solo);
-        juce::Array<juce::var> outputs;
+        cydaw::base::Array<cydaw::base::Value> outputs;
         for (const auto &o : studio_.trackOutputs(track))
         {
             auto v = object();
-            put(v, "destination", static_cast<juce::int64>(o.destination));
+            put(v, "destination", static_cast<std::int64_t>(o.destination));
             put(v, "gain", o.gainDb);
-            put(v, "input", static_cast<juce::int64>(o.input));
+            put(v, "input", static_cast<std::int64_t>(o.input));
             put(v, "pre", o.preFader);
             outputs.add(v);
         }
@@ -671,14 +675,14 @@ namespace
 {
 // The library's classes a graph state does not carry, added to it (those it
 // carries kept as they are).
-juce::var withMissingClasses(const juce::var &graphState, const juce::var &library)
+cydaw::base::Value withMissingClasses(const cydaw::base::Value &graphState, const cydaw::base::Value &library)
 {
     const auto *graph = graphState.getDynamicObject();
     const auto *shared = library.getArray();
     if (graph == nullptr || shared == nullptr)
         return graphState;
-    std::set<juce::String> present;
-    juce::Array<juce::var> modules;
+    std::set<cydaw::base::Text> present;
+    cydaw::base::Array<cydaw::base::Value> modules;
     if (const auto *local = graph->getProperty("modules").getArray())
         for (const auto &module : *local)
         {
@@ -694,15 +698,15 @@ juce::var withMissingClasses(const juce::var &graphState, const juce::var &libra
         }
     if (!added)
         return graphState;
-    auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto copy = cydaw::base::Object::Ptr(new cydaw::base::Object());
     for (const auto &property : graph->getProperties())
         copy->setProperty(property.name, property.value);
-    copy->setProperty("modules", juce::var(modules));
-    return juce::var(copy.get());
+    copy->setProperty("modules", cydaw::base::Value(modules));
+    return cydaw::base::Value(copy.get());
 }
 } // namespace
 
-void ModeProcessing::restore(const juce::var &state)
+void ModeProcessing::restore(const cydaw::base::Value &state)
 {
     if (!state.getDynamicObject())
         return;
@@ -798,10 +802,10 @@ std::uint64_t ModeProcessing::revision() const
     mix(studio_.engine().isMasterMuted());
     return h;
 }
-juce::var ModeProcessing::command(const juce::var &request)
+cydaw::base::Value ModeProcessing::command(const cydaw::base::Value &request)
 {
     const auto action = request.getProperty("op", "status").toString();
-    juce::String error;
+    cydaw::base::Text error;
     auto track = Studio::masterTrack();
     const auto id = static_cast<std::uint64_t>(num(request, "inputId"));
     const auto key = static_cast<std::uint64_t>(num(request, "trackKey"));
@@ -873,7 +877,7 @@ juce::var ModeProcessing::command(const juce::var &request)
     put(result, "result", state);
     return result;
 }
-engine::foundry::Sound ModeProcessing::render(const engine::foundry::Session &session, const juce::var &state, std::int64_t start,
+engine::foundry::Sound ModeProcessing::render(const engine::foundry::Session &session, const cydaw::base::Value &state, std::int64_t start,
                                               std::int64_t end, double tail)
 {
     ModeProcessing processor;

@@ -1,3 +1,7 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -65,12 +69,12 @@ constexpr int patternBase = 20'480;
 struct Channel {
     int index {};
     int type {};
-    juce::String name;
-    juce::String internalName;
-    juce::String samplePath;
-    juce::String pluginName;
-    juce::String pluginVendor;
-    juce::String pluginPath;
+    cydaw::base::Text name;
+    cydaw::base::Text internalName;
+    cydaw::base::Text samplePath;
+    cydaw::base::Text pluginName;
+    cydaw::base::Text pluginVendor;
+    cydaw::base::Text pluginPath;
     float gainDb {};
     float pan {};
 };
@@ -84,8 +88,8 @@ struct Note {
 };
 
 struct Pattern {
-    juce::String name;
-    juce::uint32 colour {};
+    cydaw::base::Text name;
+    std::uint32_t colour {};
     std::vector<Note> notes;
 };
 
@@ -100,22 +104,22 @@ struct Item {
 
 struct Arrangement {
     int index {};
-    juce::String name;
+    cydaw::base::Text name;
     std::vector<Item> items;
 };
 
-juce::uint32 readU32(const juce::uint8* at)
+std::uint32_t readU32(const std::uint8_t* at)
 {
-    return static_cast<juce::uint32>(at[0]) | (static_cast<juce::uint32>(at[1]) << 8) | (static_cast<juce::uint32>(at[2]) << 16)
-           | (static_cast<juce::uint32>(at[3]) << 24);
+    return static_cast<std::uint32_t>(at[0]) | (static_cast<std::uint32_t>(at[1]) << 8) | (static_cast<std::uint32_t>(at[2]) << 16)
+           | (static_cast<std::uint32_t>(at[3]) << 24);
 }
 
-int readU16(const juce::uint8* at)
+int readU16(const std::uint8_t* at)
 {
     return static_cast<int>(at[0]) | (static_cast<int>(at[1]) << 8);
 }
 
-float readF32(const juce::uint8* at)
+float readF32(const std::uint8_t* at)
 {
     const auto bits = readU32(at);
     float value {};
@@ -125,49 +129,49 @@ float readF32(const juce::uint8* at)
 
 // FL 11.5 and later write their text in UTF-16 (little-endian), earlier
 // ones in single bytes; told apart by the zero bytes.
-juce::String textOf(const juce::uint8* data, const std::size_t size)
+cydaw::base::Text textOf(const std::uint8_t* data, const std::size_t size)
 {
     auto zeros = 0;
     for (std::size_t index = 1; index < size; index += 2)
         zeros += data[index] == 0 ? 1 : 0;
-    juce::String text;
+    cydaw::base::Text text;
     if (size >= 2 && zeros * 2 >= static_cast<int>(size / 2)) {
-        std::vector<juce::juce_wchar> characters;
+        std::vector<char32_t> characters;
         for (std::size_t index = 0; index + 1 < size; index += 2) {
-            const auto unit = static_cast<juce::juce_wchar>(readU16(data + index));
+            const auto unit = static_cast<char32_t>(readU16(data + index));
             if (unit == 0)
                 break;
             characters.push_back(unit);
         }
         characters.push_back(0);
-        text = juce::String(juce::CharPointer_UTF32(reinterpret_cast<const juce::CharPointer_UTF32::CharType*>(characters.data())));
+        text = cydaw::base::Text(reinterpret_cast<const char32_t*>(characters.data()));
     } else {
-        text = juce::String::fromUTF8(reinterpret_cast<const char*>(data), static_cast<int>(size));
+        text = cydaw::base::Text::fromUTF8(reinterpret_cast<const char*>(data), static_cast<int>(size));
     }
-    // (A juce::String ends at its first zero: the terminator goes with it.)
+    // (A cydaw::base::Text ends at its first zero: the terminator goes with it.)
     return text.trim();
 }
 
 class FlStudioReader {
 public:
-    FlStudioReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
+    FlStudioReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
-        juce::MemoryBlock bytes;
+        cydaw::base::MemoryBlock bytes;
         if (!file_.loadFileAsData(bytes))
-            return juce::Result::fail("The file could not be opened: " + file_.getFullPathName());
-        const auto* data = static_cast<const juce::uint8*>(bytes.getData());
+            return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
+        const auto* data = static_cast<const std::uint8_t*>(bytes.getData());
         const auto size = bytes.getSize();
         if (size < 22 || std::memcmp(data, "FLhd", 4) != 0)
-            return juce::Result::fail("Not an FL Studio project: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not an FL Studio project: " + file_.getFileName());
         const auto headerLength = readU32(data + 4);
         if (headerLength < 6 || static_cast<std::uint64_t>(headerLength) + 16u > static_cast<std::uint64_t>(size))
-            return juce::Result::fail("The FL Studio project's header is damaged");
+            return cydaw::base::Result::fail("The FL Studio project's header is damaged");
         ppq_ = std::max(1, readU16(data + 12));
         auto at = static_cast<std::size_t>(8 + headerLength);
         if (std::memcmp(data + at, "FLdt", 4) != 0)
-            return juce::Result::fail("The FL Studio project holds no data chunk");
+            return cydaw::base::Result::fail("The FL Studio project holds no data chunk");
         const auto dataLength = readU32(data + at + 4);
         at += 8;
         const auto end = std::min<std::size_t>(size, at + dataLength);
@@ -183,7 +187,7 @@ public:
             } else if (event < 128) {
                 if (at + 2 > end)
                     break;
-                onNumber(event, static_cast<juce::uint32>(readU16(data + at)));
+                onNumber(event, static_cast<std::uint32_t>(readU16(data + at)));
                 at += 2;
             } else if (event < 192) {
                 if (at + 4 > end)
@@ -207,25 +211,25 @@ public:
             }
         }
         build();
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
     enum class Context { project, channel, pattern, arrangement, mixer };
 
-    void onNumber(const int event, const juce::uint32 value)
+    void onNumber(const int event, const std::uint32_t value)
     {
         switch (event) {
-        case id::tempo: out_.tempo = juce::jlimit(10.0, 999.0, value / 1'000.0); return;
+        case id::tempo: out_.tempo = cydaw::base::limit(10.0, 999.0, value / 1'000.0); return;
         case id::tempoCoarse:
             if (!fineTempo_)
-                out_.tempo = juce::jlimit(10.0, 999.0, static_cast<double>(value));
+                out_.tempo = cydaw::base::limit(10.0, 999.0, static_cast<double>(value));
             return;
         case id::tempoFine:
             fineTempo_ = true;
             return;
-        case id::timeSignatureNumerator: out_.numerator = juce::jlimit(1, 32, static_cast<int>(value)); return;
-        case id::timeSignatureBeat: out_.denominator = juce::jlimit(1, 32, static_cast<int>(value)); return;
+        case id::timeSignatureNumerator: out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(value)); return;
+        case id::timeSignatureBeat: out_.denominator = cydaw::base::limit(1, 32, static_cast<int>(value)); return;
         case id::channelNew:
             context_ = Context::channel;
             channel_ = static_cast<int>(value);
@@ -256,7 +260,7 @@ private:
         }
     }
 
-    void onData(const int event, const juce::uint8* data, const std::size_t size)
+    void onData(const int event, const std::uint8_t* data, const std::size_t size)
     {
         switch (event) {
         case id::version:
@@ -308,7 +312,7 @@ private:
             if (size >= 8) {
                 const auto pan = static_cast<int>(readU32(data));
                 const auto volume = static_cast<int>(readU32(data + 4));
-                channel.pan = juce::jlimit(-1.0f, 1.0f, (static_cast<float>(pan) - 6'400.0f) / 6'400.0f);
+                channel.pan = cydaw::base::limit(-1.0f, 1.0f, (static_cast<float>(pan) - 6'400.0f) / 6'400.0f);
                 channel.gainDb = linearToDb(volume / 10'000.0);
             }
             return;
@@ -319,7 +323,7 @@ private:
 
     // A hosted plug-in's wrapper: a kind, then records (id, 64-bit length,
     // bytes): 54 its name, 55 its file, 56 its maker.
-    static void readWrapper(Channel& channel, const juce::uint8* data, const std::size_t size)
+    static void readWrapper(Channel& channel, const std::uint8_t* data, const std::size_t size)
     {
         if (size < 4)
             return;
@@ -333,7 +337,7 @@ private:
             at += 12;
             if (at + length > size)
                 break;
-            const auto text = juce::String::fromUTF8(reinterpret_cast<const char*>(data + at), static_cast<int>(length)).trim();
+            const auto text = cydaw::base::Text::fromUTF8(reinterpret_cast<const char*>(data + at), static_cast<int>(length)).trim();
             if (record == 54)
                 channel.pluginName = text;
             else if (record == 55)
@@ -344,7 +348,7 @@ private:
         }
     }
 
-    void readPlaylist(const juce::uint8* data, const std::size_t size)
+    void readPlaylist(const std::uint8_t* data, const std::size_t size)
     {
         // 32 bytes an item before FL 21, 60 since.
         const auto major = version_.upToFirstOccurrenceOf(".", false, false).getIntValue();
@@ -381,7 +385,7 @@ private:
     }
 
     // FL's own instruments: what CyDAW reads them as (ImportedInstruments).
-    static ImportedDevice deviceOf(const Channel& channel, const juce::File& sample)
+    static ImportedDevice deviceOf(const Channel& channel, const cydaw::base::File& sample)
     {
         ImportedDevice device;
         device.instrument = true;
@@ -392,7 +396,7 @@ private:
             device.format = channel.pluginPath.endsWithIgnoreCase(".vst3") ? "VST3" : "VST2";
             return device;
         }
-        device.type = channel.internalName.isNotEmpty() ? channel.internalName : juce::String("Sampler");
+        device.type = channel.internalName.isNotEmpty() ? channel.internalName : cydaw::base::Text("Sampler");
         device.name = device.type;
         device.sample = sample;
         return device;
@@ -422,7 +426,7 @@ private:
             auto [found, made] = tracks.try_emplace(index);
             if (made) {
                 const auto& channel = channels_[index];
-                found->second.name = channel.name.isNotEmpty() ? channel.name : juce::String("Channel ") + juce::String(index + 1);
+                found->second.name = channel.name.isNotEmpty() ? channel.name : cydaw::base::Text("Channel ") + cydaw::base::Text(index + 1);
                 found->second.gainDb = channel.gainDb;
                 found->second.pan = channel.pan;
             }
@@ -443,7 +447,7 @@ private:
                     auto& track = trackOf(channelIndex);
                     track.midi = true;
                     ImportedMidiClip clip;
-                    clip.name = pattern.name.isNotEmpty() ? pattern.name : juce::String("Pattern ") + juce::String(item.pattern);
+                    clip.name = pattern.name.isNotEmpty() ? pattern.name : cydaw::base::Text("Pattern ") + cydaw::base::Text(item.pattern);
                     clip.startBeats = beats(item.position);
                     clip.lengthBeats = std::max(0.25, beats(item.length));
                     clip.colour = pattern.colour;
@@ -484,7 +488,7 @@ private:
         for (auto& [index, track] : tracks) {
             const auto& channel = channels_[index];
             if (track.midi) {
-                const auto sample = channel.samplePath.isNotEmpty() ? audioFile(folder_, channel.samplePath, out_) : juce::File();
+                const auto sample = channel.samplePath.isNotEmpty() ? audioFile(folder_, channel.samplePath, out_) : cydaw::base::File();
                 auto device = deviceOf(channel, sample);
                 track.devices.add(device.name);
                 track.hadInstrument = true;
@@ -493,17 +497,17 @@ private:
             out_.tracks.push_back(std::move(track));
         }
         if (channels_.size() > tracks.size())
-            out_.warnings.add(juce::String(static_cast<int>(channels_.size() - tracks.size()))
+            out_.warnings.add(cydaw::base::Text(static_cast<int>(channels_.size() - tracks.size()))
                               + " channel(s) not played on the playlist were left out.");
         out_.warnings.add("The mixer's inserts and their effects were left out (FL routes channels to inserts).");
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
     int ppq_ { 96 };
     bool fineTempo_ {};
-    juce::String version_;
+    cydaw::base::Text version_;
     Context context_ { Context::project };
     int channel_ {};
     int pattern_ {};
@@ -515,7 +519,7 @@ private:
 
 } // namespace
 
-juce::Result importFlStudioProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importFlStudioProject(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     FlStudioReader reader(file, out);

@@ -1,7 +1,10 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Process.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
-#include <juce_audio_formats/juce_audio_formats.h>
 
 #include <map>
 #include <optional>
@@ -34,47 +37,47 @@ using namespace shared;
 class CompoundFile {
 public:
     struct Entry {
-        juce::String name;
+        cydaw::base::Text name;
         int type {};          // 1 storage, 2 stream, 5 root
-        juce::uint32 left { kNone };
-        juce::uint32 right { kNone };
-        juce::uint32 child { kNone };
-        std::array<juce::uint8, 16> clsid {};
-        juce::uint32 start {};
-        juce::uint64 size {};
+        std::uint32_t left { kNone };
+        std::uint32_t right { kNone };
+        std::uint32_t child { kNone };
+        std::array<std::uint8_t, 16> clsid {};
+        std::uint32_t start {};
+        std::uint64_t size {};
     };
-    static constexpr juce::uint32 kNone = 0xffffffffu;
+    static constexpr std::uint32_t kNone = 0xffffffffu;
 
-    juce::Result open(const juce::File& file)
+    cydaw::base::Result open(const cydaw::base::File& file)
     {
-        map_ = std::make_unique<juce::MemoryMappedFile>(file, juce::MemoryMappedFile::readOnly);
+        map_ = std::make_unique<cydaw::base::MemoryMappedFile>(file, cydaw::base::MemoryMappedFile::readOnly);
         if (map_->getData() == nullptr || map_->getSize() < 512)
-            return juce::Result::fail("The file could not be read: " + file.getFullPathName());
-        data_ = static_cast<const juce::uint8*>(map_->getData());
+            return cydaw::base::Result::fail("The file could not be read: " + file.getFullPathName());
+        data_ = static_cast<const std::uint8_t*>(map_->getData());
         size_ = map_->getSize();
-        static constexpr juce::uint8 signature[] { 0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1 };
+        static constexpr std::uint8_t signature[] { 0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1 };
         if (std::memcmp(data_, signature, 8) != 0)
-            return juce::Result::fail("Not an AAF file (no compound file signature): " + file.getFileName());
+            return cydaw::base::Result::fail("Not an AAF file (no compound file signature): " + file.getFileName());
         sectorShift_ = u16(0x1e);
         miniShift_ = u16(0x20);
         if (sectorShift_ < 7 || sectorShift_ > 16)
-            return juce::Result::fail("The AAF file's sectors are of an unknown size");
+            return cydaw::base::Result::fail("The AAF file's sectors are of an unknown size");
         if (miniShift_ < 4 || miniShift_ > sectorShift_)
-            return juce::Result::fail("The AAF file's small sectors are of an unknown size");
+            return cydaw::base::Result::fail("The AAF file's small sectors are of an unknown size");
         const auto fatSectors = u32(0x2c);
         // No more FAT sectors than the file holds sectors.
         if (fatSectors > size_ / sectorSize() + 1)
-            return juce::Result::fail("The AAF file's FAT is larger than the file");
+            return cydaw::base::Result::fail("The AAF file's FAT is larger than the file");
         const auto firstDirectory = u32(0x30);
         miniCutoff_ = u32(0x38);
         const auto firstMiniFat = u32(0x3c);
         auto difatSector = u32(0x44);
         // The FAT, from the header's 109 DIFAT entries and the DIFAT chain.
-        std::vector<juce::uint32> fatList;
+        std::vector<std::uint32_t> fatList;
         for (int index = 0; index < 109 && fatList.size() < fatSectors; ++index)
             fatList.push_back(u32(0x4c + static_cast<std::size_t>(index) * 4));
         const auto perSector = sectorSize() / 4;
-        std::set<juce::uint32> difatSeen;
+        std::set<std::uint32_t> difatSeen;
         for (auto guard = 0; difatSector < 0xfffffffau && fatList.size() < fatSectors && guard < 1'000'000; ++guard) {
             if (!difatSeen.insert(difatSector).second)
                 break;
@@ -88,22 +91,22 @@ public:
         for (const auto sector : fatList) {
             const auto base = offsetOf(sector);
             if (base + sectorSize() > size_)
-                return juce::Result::fail("The AAF file's FAT is cut short");
+                return cydaw::base::Result::fail("The AAF file's FAT is cut short");
             for (std::size_t index = 0; index < perSector; ++index)
                 fat_.push_back(u32(base + index * 4));
         }
         // The directory.
         const auto directory = readChain(firstDirectory, false, 0);
         for (std::size_t at = 0; at + 128 <= directory.getSize(); at += 128) {
-            const auto* raw = static_cast<const juce::uint8*>(directory.getData()) + at;
+            const auto* raw = static_cast<const std::uint8_t*>(directory.getData()) + at;
             Entry entry;
             const auto nameBytes = std::min<int>(64, raw[64] | (raw[65] << 8));
-            juce::String name;
+            cydaw::base::Text name;
             for (int index = 0; index + 1 < nameBytes; index += 2) {
-                const auto unit = static_cast<juce::juce_wchar>(raw[index] | (raw[index + 1] << 8));
+                const auto unit = static_cast<char32_t>(raw[index] | (raw[index + 1] << 8));
                 if (unit == 0)
                     break;
-                name += juce::String::charToString(unit);
+                name += cydaw::base::Text::charToString(unit);
             }
             entry.name = name;
             entry.type = raw[66];
@@ -112,29 +115,29 @@ public:
             entry.child = read32(raw + 76);
             std::memcpy(entry.clsid.data(), raw + 80, 16);
             entry.start = read32(raw + 116);
-            entry.size = static_cast<juce::uint64>(read32(raw + 120)) | (static_cast<juce::uint64>(read32(raw + 124)) << 32);
+            entry.size = static_cast<std::uint64_t>(read32(raw + 120)) | (static_cast<std::uint64_t>(read32(raw + 124)) << 32);
             if (sectorShift_ == 9)
                 entry.size &= 0xffffffffu;
             entries_.push_back(std::move(entry));
         }
         if (entries_.empty() || entries_[0].type != 5)
-            return juce::Result::fail("The AAF file holds no root storage");
+            return cydaw::base::Result::fail("The AAF file holds no root storage");
         // The mini stream (the root's stream) and its FAT.
         const auto miniFat = readChain(firstMiniFat, false, 0);
         for (std::size_t at = 0; at + 4 <= miniFat.getSize(); at += 4)
-            miniFat_.push_back(read32(static_cast<const juce::uint8*>(miniFat.getData()) + at));
+            miniFat_.push_back(read32(static_cast<const std::uint8_t*>(miniFat.getData()) + at));
         miniStream_ = readChain(entries_[0].start, false, entries_[0].size);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
     [[nodiscard]] const Entry& entry(const int index) const { return entries_[static_cast<std::size_t>(index)]; }
 
     // A storage's children by name.
-    [[nodiscard]] std::map<juce::String, int> children(const int storage) const
+    [[nodiscard]] std::map<cydaw::base::Text, int> children(const int storage) const
     {
-        std::map<juce::String, int> found;
-        std::set<juce::uint32> visited;
-        std::vector<juce::uint32> pending { entries_[static_cast<std::size_t>(storage)].child };
+        std::map<cydaw::base::Text, int> found;
+        std::set<std::uint32_t> visited;
+        std::vector<std::uint32_t> pending { entries_[static_cast<std::size_t>(storage)].child };
         while (!pending.empty()) {
             const auto at = pending.back();
             pending.pop_back();
@@ -148,7 +151,7 @@ public:
         return found;
     }
 
-    [[nodiscard]] juce::MemoryBlock read(const int index) const
+    [[nodiscard]] cydaw::base::MemoryBlock read(const int index) const
     {
         const auto& item = entries_[static_cast<std::size_t>(index)];
         if (item.size < miniCutoff_ && item.type == 2)
@@ -158,26 +161,26 @@ public:
 
 private:
     [[nodiscard]] std::size_t sectorSize() const { return static_cast<std::size_t>(1) << sectorShift_; }
-    [[nodiscard]] std::size_t offsetOf(const juce::uint32 sector) const { return (static_cast<std::size_t>(sector) + 1) << sectorShift_; }
-    [[nodiscard]] static juce::uint32 read32(const juce::uint8* at)
+    [[nodiscard]] std::size_t offsetOf(const std::uint32_t sector) const { return (static_cast<std::size_t>(sector) + 1) << sectorShift_; }
+    [[nodiscard]] static std::uint32_t read32(const std::uint8_t* at)
     {
-        return static_cast<juce::uint32>(at[0]) | (static_cast<juce::uint32>(at[1]) << 8) | (static_cast<juce::uint32>(at[2]) << 16)
-               | (static_cast<juce::uint32>(at[3]) << 24);
+        return static_cast<std::uint32_t>(at[0]) | (static_cast<std::uint32_t>(at[1]) << 8) | (static_cast<std::uint32_t>(at[2]) << 16)
+               | (static_cast<std::uint32_t>(at[3]) << 24);
     }
-    [[nodiscard]] juce::uint32 u32(const std::size_t at) const { return at + 4 <= size_ ? read32(data_ + at) : kNone; }
-    [[nodiscard]] juce::uint16 u16(const std::size_t at) const
+    [[nodiscard]] std::uint32_t u32(const std::size_t at) const { return at + 4 <= size_ ? read32(data_ + at) : kNone; }
+    [[nodiscard]] std::uint16_t u16(const std::size_t at) const
     {
-        return at + 2 <= size_ ? static_cast<juce::uint16>(data_[at] | (data_[at + 1] << 8)) : 0;
+        return at + 2 <= size_ ? static_cast<std::uint16_t>(data_[at] | (data_[at + 1] << 8)) : 0;
     }
 
     // A chain of sectors (or of mini sectors, in the mini stream), up to
     // `size` bytes (0: the whole chain).
-    [[nodiscard]] juce::MemoryBlock readChain(juce::uint32 sector, const bool mini, const juce::uint64 size) const
+    [[nodiscard]] cydaw::base::MemoryBlock readChain(std::uint32_t sector, const bool mini, const std::uint64_t size) const
     {
-        juce::MemoryOutputStream out;
+        cydaw::base::MemoryOutputStream out;
         const auto& table = mini ? miniFat_ : fat_;
         const auto unit = mini ? (static_cast<std::size_t>(1) << miniShift_) : sectorSize();
-        std::set<juce::uint32> seen;
+        std::set<std::uint32_t> seen;
         while (sector < 0xfffffffau && (size == 0 || out.getDataSize() < size)) {
             if (!seen.insert(sector).second)
                 break;
@@ -185,7 +188,7 @@ private:
                 const auto at = static_cast<std::size_t>(sector) * unit;
                 if (at + unit > miniStream_.getSize())
                     break;
-                out.write(static_cast<const juce::uint8*>(miniStream_.getData()) + at, unit);
+                out.write(static_cast<const std::uint8_t*>(miniStream_.getData()) + at, unit);
             } else {
                 const auto at = offsetOf(sector);
                 if (at >= size_)
@@ -202,16 +205,16 @@ private:
         return block;
     }
 
-    std::unique_ptr<juce::MemoryMappedFile> map_;
-    const juce::uint8* data_ {};
+    std::unique_ptr<cydaw::base::MemoryMappedFile> map_;
+    const std::uint8_t* data_ {};
     std::size_t size_ {};
     int sectorShift_ { 9 };
     int miniShift_ { 6 };
-    juce::uint32 miniCutoff_ { 4'096 };
-    std::vector<juce::uint32> fat_;
-    std::vector<juce::uint32> miniFat_;
+    std::uint32_t miniCutoff_ { 4'096 };
+    std::vector<std::uint32_t> fat_;
+    std::vector<std::uint32_t> miniFat_;
     std::vector<Entry> entries_;
-    juce::MemoryBlock miniStream_;
+    cydaw::base::MemoryBlock miniStream_;
 };
 
 // ---- AAF objects ---------------------------------------------------------------------------
@@ -265,28 +268,28 @@ constexpr int aifcSummary = 0x3101;
 
 struct Object {
     int storage { -1 };
-    juce::uint16 classId {}; // the class AUID's third field (0x3500: a CompositionMob…)
-    std::map<int, std::pair<int, juce::MemoryBlock>> properties; // pid: (stored form, value)
+    std::uint16_t classId {}; // the class AUID's third field (0x3500: a CompositionMob…)
+    std::map<int, std::pair<int, cydaw::base::MemoryBlock>> properties; // pid: (stored form, value)
 
     [[nodiscard]] bool has(const int key) const { return properties.contains(key); }
-    [[nodiscard]] const juce::MemoryBlock* value(const int key) const
+    [[nodiscard]] const cydaw::base::MemoryBlock* value(const int key) const
     {
         const auto found = properties.find(key);
         return found != properties.end() ? &found->second.second : nullptr;
     }
-    [[nodiscard]] juce::int64 integer(const int key, const juce::int64 fallback = 0) const
+    [[nodiscard]] std::int64_t integer(const int key, const std::int64_t fallback = 0) const
     {
         const auto* block = value(key);
         if (block == nullptr || block->getSize() == 0)
             return fallback;
-        juce::int64 result = 0;
-        const auto* bytes = static_cast<const juce::uint8*>(block->getData());
+        std::int64_t result = 0;
+        const auto* bytes = static_cast<const std::uint8_t*>(block->getData());
         const auto count = std::min<std::size_t>(8, block->getSize());
         for (std::size_t index = 0; index < count; ++index)
-            result |= static_cast<juce::int64>(bytes[index]) << (8 * index);
+            result |= static_cast<std::int64_t>(bytes[index]) << (8 * index);
         // Sign-extend a shorter value.
         if (count < 8 && (bytes[count - 1] & 0x80) != 0)
-            result |= ~((static_cast<juce::int64>(1) << (8 * count)) - 1);
+            result |= ~((static_cast<std::int64_t>(1) << (8 * count)) - 1);
         return result;
     }
     [[nodiscard]] double rational(const int key, const double fallback) const
@@ -294,43 +297,43 @@ struct Object {
         const auto* block = value(key);
         if (block == nullptr || block->getSize() < 8)
             return fallback;
-        const auto* bytes = static_cast<const juce::uint8*>(block->getData());
-        const auto numerator = static_cast<juce::int32>(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
-        const auto denominator = static_cast<juce::int32>(bytes[4] | (bytes[5] << 8) | (bytes[6] << 16) | (bytes[7] << 24));
+        const auto* bytes = static_cast<const std::uint8_t*>(block->getData());
+        const auto numerator = static_cast<std::int32_t>(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
+        const auto denominator = static_cast<std::int32_t>(bytes[4] | (bytes[5] << 8) | (bytes[6] << 16) | (bytes[7] << 24));
         return denominator != 0 && numerator != 0 ? static_cast<double>(numerator) / denominator : fallback;
     }
-    [[nodiscard]] juce::String text(const int key) const
+    [[nodiscard]] cydaw::base::Text text(const int key) const
     {
         const auto* block = value(key);
         if (block == nullptr)
             return {};
-        juce::String result;
-        const auto* bytes = static_cast<const juce::uint8*>(block->getData());
+        cydaw::base::Text result;
+        const auto* bytes = static_cast<const std::uint8_t*>(block->getData());
         for (std::size_t index = 0; index + 1 < block->getSize(); index += 2) {
-            const auto unit = static_cast<juce::juce_wchar>(bytes[index] | (bytes[index + 1] << 8));
+            const auto unit = static_cast<char32_t>(bytes[index] | (bytes[index + 1] << 8));
             if (unit == 0)
                 break;
-            result += juce::String::charToString(unit);
+            result += cydaw::base::Text::charToString(unit);
         }
         return result;
     }
     // A weak reference's key: the AUID it names.
-    [[nodiscard]] juce::MemoryBlock referenceKey(const int key) const
+    [[nodiscard]] cydaw::base::MemoryBlock referenceKey(const int key) const
     {
         const auto* block = value(key);
         if (block == nullptr || block->getSize() < 5)
             return {};
-        const auto* bytes = static_cast<const juce::uint8*>(block->getData());
+        const auto* bytes = static_cast<const std::uint8_t*>(block->getData());
         const auto size = std::min<std::size_t>(bytes[4], block->getSize() - 5);
-        return juce::MemoryBlock(bytes + 5, size);
+        return cydaw::base::MemoryBlock(bytes + 5, size);
     }
 };
 
 class AafReader {
 public:
-    AafReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
+    AafReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         if (const auto opened = cfb_.open(file_); opened.failed())
             return opened;
@@ -343,11 +346,11 @@ public:
             if (name == "header" || name.startsWith("header-"))
                 header = index;
         if (header < 0)
-            return juce::Result::fail("The AAF file holds no header");
+            return cydaw::base::Result::fail("The AAF file holds no header");
         const auto headerObject = load(header);
         const auto content = strongChild(headerObject, pid::headerContent);
         if (!content)
-            return juce::Result::fail("The AAF file's header holds no content");
+            return cydaw::base::Result::fail("The AAF file's header holds no content");
         application(header);
         for (const auto& mob : strongChildren(*content, pid::mobs)) {
             const auto* id = mob.value(pid::mobId);
@@ -364,8 +367,8 @@ public:
             if (mob.classId != 0x3500)
                 continue;
             const auto usage = mob.referenceKey(pid::usage);
-            const auto topLevel = usage.getSize() >= 8 && static_cast<const juce::uint8*>(usage.getData())[6] == 0x00
-                                  && static_cast<const juce::uint8*>(usage.getData())[7] == 0x05;
+            const auto topLevel = usage.getSize() >= 8 && static_cast<const std::uint8_t*>(usage.getData())[6] == 0x00
+                                  && static_cast<const std::uint8_t*>(usage.getData())[7] == 0x05;
             if (composition == nullptr || topLevel
                 || (strongChildren(mob, pid::slots).size() > strongChildren(*composition, pid::slots).size()
                     && composition->referenceKey(pid::usage).getSize() == 0))
@@ -374,7 +377,7 @@ public:
                 break;
         }
         if (composition == nullptr)
-            return juce::Result::fail("The AAF file holds no composition");
+            return cydaw::base::Result::fail("The AAF file holds no composition");
         out_.name = composition->text(pid::mobName);
         auto number = 0;
         for (const auto& slot : strongChildren(*composition, pid::slots)) {
@@ -384,7 +387,7 @@ public:
             ImportedTrack track;
             track.name = slot.text(pid::slotName);
             if (track.name.isEmpty())
-                track.name = "Audio " + juce::String(++number);
+                track.name = "Audio " + cydaw::base::Text(++number);
             const auto rate = slot.rational(pid::editRate, 48'000.0);
             walk(*segment, 0, rate, track);
             out_.tracks.push_back(std::move(track));
@@ -400,12 +403,12 @@ public:
             for (auto& track : out_.tracks)
                 for (auto& clip : track.audioClips)
                     clip.startSeconds -= hours * 3'600.0;
-            out_.warnings.add("The timeline started at " + juce::String(static_cast<int>(hours)).paddedLeft('0', 2)
+            out_.warnings.add("The timeline started at " + cydaw::base::Text(static_cast<int>(hours)).paddedLeft('0', 2)
                               + ":00:00:00; it now starts at 0.");
         }
         if (gains_)
             out_.warnings.add("Clip and track gain and pan changes were left out.");
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -415,13 +418,13 @@ private:
         Object object;
         object.storage = storage;
         const auto& entry = cfb_.entry(storage);
-        object.classId = static_cast<juce::uint16>(entry.clsid[6] | (entry.clsid[7] << 8));
+        object.classId = static_cast<std::uint16_t>(entry.clsid[6] | (entry.clsid[7] << 8));
         const auto children = cfb_.children(storage);
         const auto stream = children.find("properties");
         if (stream == children.end())
             return object;
         const auto block = cfb_.read(stream->second);
-        const auto* bytes = static_cast<const juce::uint8*>(block.getData());
+        const auto* bytes = static_cast<const std::uint8_t*>(block.getData());
         if (block.getSize() < 4)
             return object;
         const auto count = static_cast<int>(bytes[2] | (bytes[3] << 8));
@@ -435,22 +438,22 @@ private:
             const auto size = static_cast<std::size_t>(at[4] | (at[5] << 8));
             if (value + size > block.getSize())
                 break;
-            object.properties[key] = { stored, juce::MemoryBlock(bytes + value, size) };
+            object.properties[key] = { stored, cydaw::base::MemoryBlock(bytes + value, size) };
             value += size;
         }
         return object;
     }
 
     // The UTF-16 name a reference holds.
-    static juce::String nameIn(const juce::MemoryBlock& block, const std::size_t from = 0)
+    static cydaw::base::Text nameIn(const cydaw::base::MemoryBlock& block, const std::size_t from = 0)
     {
-        juce::String name;
-        const auto* bytes = static_cast<const juce::uint8*>(block.getData());
+        cydaw::base::Text name;
+        const auto* bytes = static_cast<const std::uint8_t*>(block.getData());
         for (auto index = from; index + 1 < block.getSize(); index += 2) {
-            const auto unit = static_cast<juce::juce_wchar>(bytes[index] | (bytes[index + 1] << 8));
+            const auto unit = static_cast<char32_t>(bytes[index] | (bytes[index + 1] << 8));
             if (unit == 0)
                 break;
-            name += juce::String::charToString(unit);
+            name += cydaw::base::Text::charToString(unit);
         }
         return name;
     }
@@ -482,11 +485,11 @@ private:
         if (indexStream == children.end())
             return list;
         const auto index = cfb_.read(indexStream->second);
-        const auto* bytes = static_cast<const juce::uint8*>(index.getData());
+        const auto* bytes = static_cast<const std::uint8_t*>(index.getData());
         if (index.getSize() < 12)
             return list;
         const auto read32 = [&](const std::size_t at) {
-            return at + 4 <= index.getSize() ? static_cast<juce::uint32>(bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16)
+            return at + 4 <= index.getSize() ? static_cast<std::uint32_t>(bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16)
                                                                          | (bytes[at + 3] << 24))
                                              : 0u;
         };
@@ -500,9 +503,9 @@ private:
             stride = 8 + bytes[14];
             at = 15;
         }
-        for (juce::uint32 item = 0; item < count && at + 4 <= index.getSize(); ++item, at += stride) {
+        for (std::uint32_t item = 0; item < count && at + 4 <= index.getSize(); ++item, at += stride) {
             const auto local = read32(at);
-            const auto child = children.find((name + "{" + juce::String::toHexString(static_cast<int>(local)) + "}").toLowerCase());
+            const auto child = children.find((name + "{" + cydaw::base::Text::toHexString(static_cast<int>(local)) + "}").toLowerCase());
             if (child != children.end())
                 list.push_back(load(child->second));
         }
@@ -520,7 +523,7 @@ private:
         const auto company = last.text(0x3c01);
         const auto product = last.text(0x3c02);
         if (product.isNotEmpty())
-            out_.application = (company.isNotEmpty() ? company + " " : juce::String()) + product + " (AAF)";
+            out_.application = (company.isNotEmpty() ? company + " " : cydaw::base::Text()) + product + " (AAF)";
     }
 
     // A segment of sound: its data definition says so (the legacy and the
@@ -529,8 +532,8 @@ private:
     {
         const auto key = segment.referenceKey(pid::dataDefinition);
         if (key.getSize() >= 8) {
-            const auto* bytes = static_cast<const juce::uint8*>(key.getData());
-            const auto first = static_cast<juce::uint32>(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
+            const auto* bytes = static_cast<const std::uint8_t*>(key.getData());
+            const auto first = static_cast<std::uint32_t>(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
             const auto second = bytes[4] | (bytes[5] << 8);
             const auto third = bytes[6] | (bytes[7] << 8);
             // Sound: the legacy identifier, or SMPTE's (urn:smpte:ul:060e2b34.04010101.01030202.02000000, its last
@@ -542,13 +545,13 @@ private:
     }
 
     struct Source {
-        juce::File file;
+        cydaw::base::File file;
         double offsetSeconds {};
-        juce::String name;
+        cydaw::base::Text name;
     };
 
     // The file a mob's slot plays at `offset` seconds into it.
-    std::vector<Source> resolve(const juce::MemoryBlock& mobId, const juce::int64 slotId, const double offset, const int depth = 0)
+    std::vector<Source> resolve(const cydaw::base::MemoryBlock& mobId, const std::int64_t slotId, const double offset, const int depth = 0)
     {
         if (depth > 8 || ++resolveSteps_ > 100'000)
             return {};
@@ -557,7 +560,7 @@ private:
             return {};
         const auto& mob = found->second;
         if (mob.has(pid::essenceDescription)) {
-            if (auto file = essenceFile(mob); file != juce::File())
+            if (auto file = essenceFile(mob); file != cydaw::base::File())
                 return { { file, offset, mob.text(pid::mobName) } };
             // Its file is not here: a source by its name still (reported missing).
             if (!hasDeeperSource(mob))
@@ -621,15 +624,15 @@ private:
 
     // A source mob's file: where its locator says, else its essence embedded
     // in the AAF (written out once).
-    juce::File essenceFile(const Object& mob)
+    cydaw::base::File essenceFile(const Object& mob)
     {
         const auto* id = mob.value(pid::mobId);
-        const auto key = id != nullptr ? id->toBase64Encoding() : juce::String();
+        const auto key = id != nullptr ? cydaw::base::Text(id->toBase64Encoding()) : cydaw::base::Text();
         if (const auto known = files_.find(key); known != files_.end())
             return known->second;
         auto descriptor = strongChild(mob, pid::essenceDescription);
-        juce::File file;
-        juce::String locator;
+        cydaw::base::File file;
+        cydaw::base::Text locator;
         if (descriptor) {
             auto described = *descriptor;
             if (described.has(pid::fileDescriptors))
@@ -642,13 +645,13 @@ private:
             for (const auto& place : places) {
                 locator = place.text(pid::urlString);
                 if (locator.isNotEmpty())
-                    if ((file = resolveProjectAudioFile(folder_, locator)) != juce::File())
+                    if ((file = resolveProjectAudioFile(folder_, locator)) != cydaw::base::File())
                         break;
             }
-            if (file == juce::File())
+            if (file == cydaw::base::File())
                 file = extract(mob, described, key);
         }
-        if (file == juce::File() && locator.isNotEmpty())
+        if (file == cydaw::base::File() && locator.isNotEmpty())
             out_.missingFiles.addIfNotAlreadyThere(locator);
         files_[key] = file;
         return file;
@@ -656,7 +659,7 @@ private:
 
     // An essence stored in the AAF, as a WAV or AIFF file beside the AAF
     // (or in CyDAW's folder for imported audio).
-    juce::File extract(const Object& mob, const Object& descriptor, const juce::String& key)
+    cydaw::base::File extract(const Object& mob, const Object& descriptor, const cydaw::base::Text& key)
     {
         const auto found = essences_.find(key);
         if (found == essences_.end())
@@ -673,19 +676,19 @@ private:
         const auto block = cfb_.read(data->second);
         auto where = folder_.getChildFile("CyDAW Imported Audio");
         if (where.createDirectory().failed())
-            where = importedAudioFolder().getChildFile(juce::File::createLegalFileName(file_.getFileNameWithoutExtension()));
+            where = importedAudioFolder().getChildFile(cydaw::base::File::createLegalFileName(file_.getFileNameWithoutExtension()));
         (void) where.createDirectory();
-        auto name = juce::File::createLegalFileName(mob.text(pid::mobName));
+        auto name = cydaw::base::File::createLegalFileName(mob.text(pid::mobName));
         if (name.isEmpty())
             name = "Essence";
-        const auto* bytes = static_cast<const juce::uint8*>(block.getData());
+        const auto* bytes = static_cast<const std::uint8_t*>(block.getData());
         const auto riff = block.getSize() >= 12 && std::memcmp(bytes, "RIFF", 4) == 0;
         const auto form = block.getSize() >= 12 && std::memcmp(bytes, "FORM", 4) == 0;
         // Named after its mob (its name and its id): the same essence is the
         // same file, written once.
-        const auto tag = juce::String::toHexString(static_cast<juce::int64>(juce::DefaultHashFunctions::generateHash(key, 0x7fffffff)));
+        const auto tag = cydaw::base::Text::toHexString(static_cast<std::int64_t>(([&] { std::uint32_t hash=0; for(auto c:key)hash=31u*hash+std::uint32_t(c); return hash % 0x7fffffffu; }())));
         auto target = where.getChildFile(name + " " + tag + (form ? ".aif" : ".wav"));
-        if (target.existsAsFile() && target.getSize() >= static_cast<juce::int64>(block.getSize()))
+        if (target.existsAsFile() && target.getSize() >= static_cast<std::int64_t>(block.getSize()))
             return target;
         if (riff || form) {
             if (!target.replaceWithData(block.getData(), block.getSize()))
@@ -698,7 +701,7 @@ private:
         auto channelCount = static_cast<int>(descriptor.integer(pid::channels, 1));
         auto bits = static_cast<int>(descriptor.integer(pid::quantization, 16));
         if (const auto* summary = descriptor.value(pid::waveSummary); summary != nullptr && summary->getSize() >= 36) {
-            const auto* header = static_cast<const juce::uint8*>(summary->getData());
+            const auto* header = static_cast<const std::uint8_t*>(summary->getData());
             for (std::size_t at = 12; at + 24 <= summary->getSize(); ++at)
                 if (std::memcmp(header + at, "fmt ", 4) == 0) {
                     channelCount = header[at + 10] | (header[at + 11] << 8);
@@ -709,9 +712,9 @@ private:
         }
         if (channelCount < 1 || channelCount > 8 || (bits != 8 && bits != 16 && bits != 24 && bits != 32) || rate < 1'000.0)
             return {};
-        juce::MemoryOutputStream wav;
-        const auto dataSize = static_cast<juce::uint32>(block.getSize());
-        const auto blockAlign = static_cast<juce::uint16>(channelCount * bits / 8);
+        cydaw::base::MemoryOutputStream wav;
+        const auto dataSize = static_cast<std::uint32_t>(block.getSize());
+        const auto blockAlign = static_cast<std::uint16_t>(channelCount * bits / 8);
         wav.write("RIFF", 4);
         wav.writeInt(static_cast<int>(36 + dataSize));
         wav.write("WAVEfmt ", 8);
@@ -732,9 +735,9 @@ private:
 
     // A clip's sources made one file: the same stereo file twice is that
     // file; two mono files (left, right) are joined.
-    juce::File fileOf(const std::vector<Source>& sources, const juce::String& name)
+    cydaw::base::File fileOf(const std::vector<Source>& sources, const cydaw::base::Text& name)
     {
-        if (sources.empty() || std::any_of(sources.begin(), sources.end(), [](const Source& source) { return source.file == juce::File(); }))
+        if (sources.empty() || std::any_of(sources.begin(), sources.end(), [](const Source& source) { return source.file == cydaw::base::File(); }))
             return {};
         if (sources.size() == 1 || sources[0].file == sources[1].file)
             return sources[0].file;
@@ -750,15 +753,15 @@ private:
     }
 
     // A composition slot's segment, from `position` (edit units).
-    juce::int64 walk(const Object& segment, juce::int64 position, const double rate, ImportedTrack& track, const int depth = 0)
+    std::int64_t walk(const Object& segment, std::int64_t position, const double rate, ImportedTrack& track, const int depth = 0)
     {
         if (depth > 64)
             return position;
         if (segment.has(pid::components)) {
             // The clip before (by its place: the list grows), where it ends.
             std::optional<std::size_t> previous;
-            auto previousEnd = juce::int64 {};
-            juce::int64 transition = 0;
+            auto previousEnd = std::int64_t {};
+            std::int64_t transition = 0;
             for (const auto& component : strongChildren(segment, pid::components)) {
                 const auto length = component.integer(pid::length);
                 if (component.has(pid::transitionGroup)) {
@@ -815,14 +818,14 @@ private:
         return position + segment.integer(pid::length);
     }
 
-    void place(const Object& clipObject, const std::vector<Source>& sources, const juce::int64 position, const double rate,
-               ImportedTrack& track, const juce::int64 groupLength = 0)
+    void place(const Object& clipObject, const std::vector<Source>& sources, const std::int64_t position, const double rate,
+               ImportedTrack& track, const std::int64_t groupLength = 0)
     {
         const auto length = groupLength > 0 ? groupLength : clipObject.integer(pid::length);
         if (length <= 0)
             return;
         ImportedAudioClip clip;
-        clip.name = sources.empty() ? juce::String("Clip") : sources.front().name;
+        clip.name = sources.empty() ? cydaw::base::Text("Clip") : sources.front().name;
         clip.file = fileOf(sources, clip.name);
         clip.originalPath = clip.name;
         clip.startSeconds = static_cast<double>(position) / rate;
@@ -830,26 +833,26 @@ private:
         clip.sourceOffsetSeconds = sources.empty() ? 0.0 : std::max(0.0, sources.front().offsetSeconds);
         clip.fadeInSeconds = static_cast<double>(clipObject.integer(pid::fadeIn)) / rate;
         clip.fadeOutSeconds = static_cast<double>(clipObject.integer(pid::fadeOut)) / rate;
-        if (clip.file == juce::File() && sources.empty())
+        if (clip.file == cydaw::base::File() && sources.empty())
             out_.missingFiles.addIfNotAlreadyThere(clip.name);
         track.audioClips.push_back(std::move(clip));
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
     CompoundFile cfb_;
-    std::map<juce::String, Object> mobs_;
+    std::map<cydaw::base::Text, Object> mobs_;
     // Steps taken resolving sources (a hostile file could branch without end).
     int resolveSteps_ {};
-    std::map<juce::String, Object> essences_;
-    std::map<juce::String, juce::File> files_;
+    std::map<cydaw::base::Text, Object> essences_;
+    std::map<cydaw::base::Text, cydaw::base::File> files_;
     bool gains_ {};
 };
 
 } // namespace
 
-juce::Result importAafComposition(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importAafComposition(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     AafReader reader(file, out);

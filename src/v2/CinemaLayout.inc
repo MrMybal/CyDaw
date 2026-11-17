@@ -114,5 +114,5 @@ void FoundryView::drawCinema()
     }else t.processing->draw({},false);
     commitProcessing(t);
     if(player().playing()||(t.video&&t.video->snapshot().loading))host_.wake(2);
-    if(cinemaPending_.isObject()){const auto request=cinemaPending_;cinemaPending_=juce::var();(void)command(request);}
+    if(cinemaPending_.isObject()){const auto request=cinemaPending_;cinemaPending_=cydaw::base::Value();(void)command(request);}
 }

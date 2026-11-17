@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "selected_license": "GPL-3.0-only for Steinberg ASIO SDK; PortAudio files retain their MIT-style license",
+  "asio_sdk": {
+    "version": "2.3.4 (2025-10-15 GPL release)",
+    "source": "https://download.steinberg.net/sdk_downloads/ASIO-SDK_2.3.4_2025-10-15.zip",
+    "archive_sha256": "d5ebf0c20dd2c5f43771fd0c1418f4b361bf52434ee670097cfa6b3a335e2eca"
+  },
+  "portaudio": {
+    "repository": "https://github.com/PortAudio/portaudio",
+    "revision": "147dd722548358763a8b649b3e4b41dfffbcfbb6"
+  },
+  "files": [
+    {
+      "path": "third_party/asio-sdk/common/asio.cpp",
+      "sha256": "4ecee2bfaebd8b0777db96175d2b2ea8d0cd684dfaf9651480c44b0ebec0fd61"
+    },
+    {
+      "path": "third_party/asio-sdk/common/asio.h",
+      "sha256": "93d2f80d49b4ac9c963514e7c1307ab5111d8104246192233745beb058534ea1"
+    },
+    {
+      "path": "third_party/asio-sdk/common/asiodrvr.cpp",
+      "sha256": "47cf72e30cc04bc37fe609a467f833e85434f76b27b9cd19186358e4c50a6982"
+    },
+    {
+      "path": "third_party/asio-sdk/common/asiodrvr.h",
+      "sha256": "ca2d65191d4914cb405b5c0b9e0af932195b2734e8781cd4d8c94e6526fb8926"
+    },
+    {
+      "path": "third_party/asio-sdk/common/asiosys.h",
+      "sha256": "f44a1ed0fd7c056ff047aeebc4c05a8c185f0585a24d8debc55c70107777dbef"
+    },
+    {
+      "path": "third_party/asio-sdk/common/combase.cpp",
+      "sha256": "1f8ef8b79de26c0435ff6544352af36327643421491c353b059d86e0e344cd23"
+    },
+    {
+      "path": "third_party/asio-sdk/common/combase.h",
+      "sha256": "29d1ccf49c332fdcdc7abddb32f5adf9d475198eb0283b2ca19c450f35222b21"
+    },
+    {
+      "path": "third_party/asio-sdk/common/debugmessage.cpp",
+      "sha256": "5f0d92d18695f4b7847aed3a2108bfb552ffa5e17dbd20440eac0fbf32a04d62"
+    },
+    {
+      "path": "third_party/asio-sdk/common/dllentry.cpp",
+      "sha256": "f7b813e0d6191f0c973409780c3305e6ba1e72e3e6e5cf8f5125e7decdf589a2"
+    },
+    {
+      "path": "third_party/asio-sdk/common/iasiodrv.h",
+      "sha256": "86ad4788452c74823653cf57d4bd557c48bb6542d7e6eb7fff80102c705a066d"
+    },
+    {
+      "path": "third_party/asio-sdk/common/LICENSE.txt",
+      "sha256": "61e56814f24b32216884b2db0b4dcc317111a5ab354d54d19dd9fc13d71b1c7a"
+    },
+    {
+      "path": "third_party/asio-sdk/common/register.cpp",
+      "sha256": "b1a09ddd5245f336ee9c1a0a38099cf146daff5212990a052245e14d5798e22d"
+    },
+    {
+      "path": "third_party/asio-sdk/common/wxdebug.h",
+      "sha256": "b4c7293a3c7b8cdf6dd19ce7ae5766674d7f581522bd508dc6e6d6b0384785da"
+    },
+    {
+      "path": "third_party/asio-sdk/COPYING",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "path": "third_party/asio-sdk/host/ASIOConvertSamples.cpp",
+      "sha256": "1257966155c3b35719b5454813fad8170e818b9079003f82d3845db61a7dd437"
+    },
+    {
+      "path": "third_party/asio-sdk/host/ASIOConvertSamples.h",
+      "sha256": "f1613470d008aec5e11905c8597c445390950d254e83956673d2b3f3c0b0ae6a"
+    },
+    {
+      "path": "third_party/asio-sdk/host/asiodrivers.cpp",
+      "sha256": "6f5c7529047c482998201df4b9c9e6bcdeee782ed764e6324d49b3bca4340601"
+    },
+    {
+      "path": "third_party/asio-sdk/host/asiodrivers.h",
+      "sha256": "23f78334ed9aff7f9db4b0d36b228595005c6f6a3ad842e9d0ad33edfb041a8f"
+    },
+    {
+      "path": "third_party/asio-sdk/host/ginclude.h",
+      "sha256": "96db001a91c469702afac88178f289bd50f78dd43ed12c174f898a44a7a56676"
+    },
+    {
+      "path": "third_party/asio-sdk/host/pc/asiolist.cpp",
+      "sha256": "d3f7d83f561eaafed17393c3c95ba077f2ec109e2f7c762dcdf905f0e5c17f02"
+    },
+    {
+      "path": "third_party/asio-sdk/host/pc/asiolist.h",
+      "sha256": "daab5066bcb9ca79552541bc2981cf43cde7ac72bd4572286764097c9cc92010"
+    },
+    {
+      "path": "third_party/asio-sdk/LICENSE.txt",
+      "sha256": "61e56814f24b32216884b2db0b4dcc317111a5ab354d54d19dd9fc13d71b1c7a"
+    },
+    {
+      "path": "third_party/asio-sdk/README.md",
+      "sha256": "50ca264d2f71c877732689a9613a104d9ce75147f9cf4313e4802d0e36922d5f"
+    },
+    {
+      "path": "third_party/portaudio-asio/iasiothiscallresolver.cpp",
+      "sha256": "fcc1522f4f11f3f3913d5d65509354408152795a85a79be3f548e9b0579639b5"
+    },
+    {
+      "path": "third_party/portaudio-asio/iasiothiscallresolver.h",
+      "sha256": "947d361528b37014deb94d7eb3cff256eea11f0c71106e0607d95cf5e1205c22"
+    },
+    {
+      "path": "third_party/portaudio-asio/pa_asio.cpp",
+      "sha256": "f8067ee84e7ff9798c08fbbae52001c9fb00e7a1df24bb47378d10a7d40274f4"
+    },
+    {
+      "path": "third_party/portaudio-asio/pa_asio.h",
+      "sha256": "bb6b63ebdf43156fe1f6a10027e2d4156913a9d6a8807d5a1496e2c2da6f2a06"
+    }
+  ],
+  "notice": "SDK dual-license choice: GPL v3. Individual BSD-style Steinberg host helper and PortAudio notices are preserved verbatim. The extension is application-owned; the standalone MIT libraries are unchanged."
+}

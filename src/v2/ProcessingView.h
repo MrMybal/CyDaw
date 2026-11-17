@@ -1,3 +1,5 @@
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/File.h>
 #pragma once
 #include "SourceEditor.h"
 
@@ -6,7 +8,6 @@
 
 #include <cydaw/engine/FoundrySession.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <atomic>
 #include <memory>
@@ -38,9 +39,9 @@ public:
     AudioTrial(const AudioTrial&) = delete;
     AudioTrial& operator=(const AudioTrial&) = delete;
 
-    void setSound(engine::repair::Channels channels, double rate, const juce::String& name);
+    void setSound(engine::repair::Channels channels, double rate, const cydaw::base::Text& name);
     [[nodiscard]] bool hasSound() const noexcept { return before_ != nullptr; }
-    [[nodiscard]] const juce::String& soundName() const noexcept { return soundName_; }
+    [[nodiscard]] const cydaw::base::Text& soundName() const noexcept { return soundName_; }
     // The processing tried (its parameters back to its own values).
     void setProcessing(const processing::Processing& processing);
     [[nodiscard]] const processing::Processing& processing() const noexcept { return processing_; }
@@ -81,7 +82,7 @@ private:
     processing::Values values_;
     engine::repair::Channels source_;
     double rate_ { 48'000.0 };
-    juce::String soundName_;
+    cydaw::base::Text soundName_;
     std::shared_ptr<const engine::foundry::Sound> before_;
     std::shared_ptr<const engine::foundry::Sound> after_;
     processing::AudioResult result_;
@@ -114,7 +115,7 @@ public:
     bool drawParameters(const std::vector<processing::Parameter>& parameters);
     void drawBeforeAfter(float width);
     // The processed notes made the clip's (one undo step).
-    juce::Result apply();
+    cydaw::base::Result apply();
     void stopListening();
     [[nodiscard]] const TrackRef& track() const noexcept { return track_; }
     [[nodiscard]] std::uint64_t clipId() const noexcept { return clipId_; }
@@ -155,11 +156,11 @@ public:
     void openApply(const ClipRef& clip);
     void drawApply();
     // A sound dropped on the mode: the sound tried.
-    bool dropFiles(const juce::StringArray& files);
+    bool dropFiles(const cydaw::base::TextList& files);
     // The `processing` command.
-    [[nodiscard]] juce::var command(const juce::var& request);
+    [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value& request);
     // Unsaved changes to the processing edited (empty: none).
-    [[nodiscard]] juce::String unsaved() const;
+    [[nodiscard]] cydaw::base::Text unsaved() const;
 
 private:
     void reload();
@@ -189,7 +190,7 @@ private:
     int step_ { -1 };
     std::vector<char> code_;      // the code step's / the note script's text
     int codeFor_ { -2 };          // the step the code buffer holds (-1: the script)
-    juce::String codeError_;
+    cydaw::base::Text codeError_;
     bool codeChanged_ {};
     double codeDueAt_ { -1.0 };
     std::unique_ptr<ModeProcessing> chain_;
@@ -197,19 +198,19 @@ private:
     std::uint64_t chainRevision_ {};
     AudioTrial trial_;
     MidiTrial midiTrial_;
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
     char nameBuffer_[128] {};
     char descriptionBuffer_[512] {};
     // The apply window.
     bool applyOpen_ {};
     bool applyRequested_ {};
     ClipRef applyClip_;
-    juce::String applyClipName_;
+    cydaw::base::Text applyClipName_;
     std::vector<processing::Processing> applyChoices_;
     int applyChoice_ {};
     AudioTrial applyTrial_;
     MidiTrial applyMidi_;
-    juce::String applyError_;
+    cydaw::base::Text applyError_;
 };
 
 } // namespace cydaw::v2

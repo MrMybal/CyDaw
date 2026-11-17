@@ -1,9 +1,20 @@
+#include <cydaw/base/Compression.h>
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Process.h>
+#include <cydaw/base/EventLoop.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/Properties.h>
+#include <cydaw/base/File.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SampleLibrary.h"
 
 #include "AudioTrackController.h"
 
-#include <juce_dsp/juce_dsp.h>
-#include <juce_events/juce_events.h>
+#include <cydsp/processors/RealFft.h>
+#include <cydsp/math/Window.h>
+
 
 #include <algorithm>
 #include <array>
@@ -23,7 +34,7 @@ constexpr auto classifyBatch = 24;
 // with a tail has no tempo, whatever the detector's best guess.
 constexpr auto tempoConfidenceFloor = 0.3;
 
-juce::String lower(const juce::String& text)
+cydaw::base::Text lower(const cydaw::base::Text& text)
 {
     return text.toLowerCase();
 }
@@ -110,23 +121,23 @@ constexpr Keyword keywords[] = {
 // Whether a word is in a text: anywhere for a long word, as a word of its
 // own (split at what is not a letter or a digit, and at a capital following
 // a small letter) for a short one.
-bool containsKeyword(const juce::String& original, const juce::String& lowered, const juce::String& word)
+bool containsKeyword(const cydaw::base::Text& original, const cydaw::base::Text& lowered, const cydaw::base::Text& word)
 {
     if (word.length() > 3)
         return lowered.contains(word);
     auto start = 0;
     while (start < original.length()) {
-        while (start < original.length() && !juce::CharacterFunctions::isLetterOrDigit(original[start]))
+        while (start < original.length() && !cydaw::base::CharacterFunctions::isLetterOrDigit(original[start]))
             ++start;
         auto end = start;
-        while (end < original.length() && juce::CharacterFunctions::isLetterOrDigit(original[end])) {
+        while (end < original.length() && cydaw::base::CharacterFunctions::isLetterOrDigit(original[end])) {
             // FloorTom, 808Kick: a capital after a small letter, a letter
             // after a digit, begin a word.
             if (end > start) {
                 const auto previous = original[end - 1];
                 const auto current = original[end];
-                if ((juce::CharacterFunctions::isLowerCase(previous) && juce::CharacterFunctions::isUpperCase(current))
-                    || (juce::CharacterFunctions::isDigit(previous) != juce::CharacterFunctions::isDigit(current)))
+                if ((cydaw::base::CharacterFunctions::isLowerCase(previous) && cydaw::base::CharacterFunctions::isUpperCase(current))
+                    || (cydaw::base::CharacterFunctions::isDigit(previous) != cydaw::base::CharacterFunctions::isDigit(current)))
                     break;
             }
             ++end;
@@ -198,13 +209,13 @@ std::mutex& formatManagerMutex()
 // One format manager per analysis thread: registering formats is not a
 // thing to do twice, and a manager is not a thing to share between readers
 // being created at once.
-juce::AudioFormatManager& threadFormatManager()
+cydaw::audio::AudioFormatManager& threadFormatManager()
 {
-    thread_local std::unique_ptr<juce::AudioFormatManager> manager;
+    thread_local std::unique_ptr<cydaw::audio::AudioFormatManager> manager;
     if (manager == nullptr) {
         std::lock_guard<std::mutex> lock(formatManagerMutex());
-        manager = std::make_unique<juce::AudioFormatManager>();
-        manager->registerBasicFormats();
+        manager = std::make_unique<cydaw::audio::AudioFormatManager>();
+        cydaw::integration::registerCyAudioCoreReaders(*manager);
     }
     return *manager;
 }
@@ -220,14 +231,14 @@ float toDb(const double amplitude)
 
 // ------------------------------------------------------------------ helpers
 
-juce::StringArray SampleLibrary::supportedExtensions()
+cydaw::base::TextList SampleLibrary::supportedExtensions()
 {
     return { "wav", "wave", "aif", "aiff", "flac", "ogg", "mp3", "wv", "caf" };
 }
 
-juce::StringArray SampleLibrary::categoryVocabulary()
+cydaw::base::TextList SampleLibrary::categoryVocabulary()
 {
-    juce::StringArray out;
+    cydaw::base::TextList out;
     for (const auto& category : taxonomy())
         out.add(category.key);
     return out;
@@ -243,7 +254,7 @@ const std::vector<SampleFamily>& SampleLibrary::categoryFamilies()
     return families();
 }
 
-const SampleCategory* SampleLibrary::categoryInfo(const juce::String& key)
+const SampleCategory* SampleLibrary::categoryInfo(const cydaw::base::Text& key)
 {
     for (const auto& category : taxonomy())
         if (key == category.key)
@@ -251,17 +262,17 @@ const SampleCategory* SampleLibrary::categoryInfo(const juce::String& key)
     return nullptr;
 }
 
-juce::String SampleLibrary::familyOf(const juce::String& category)
+cydaw::base::Text SampleLibrary::familyOf(const cydaw::base::Text& category)
 {
     if (const auto* info = categoryInfo(category))
         return info->family;
     return "other";
 }
 
-juce::String SampleLibrary::categoryFromCatalogue(const juce::String& catalogueCategory, const juce::String& name,
-                                                  const juce::String& folder)
+cydaw::base::Text SampleLibrary::categoryFromCatalogue(const cydaw::base::Text& catalogueCategory, const cydaw::base::Text& name,
+                                                  const cydaw::base::Text& folder)
 {
-    static const std::map<juce::String, juce::String> mapped {
+    static const std::map<cydaw::base::Text, cydaw::base::Text> mapped {
         { "pianos", "keys" },       { "electric-pianos", "keys" }, { "harpsichords", "keys" },
         { "organs", "keys" },       { "harps", "strings" },        { "strings", "strings" },
         { "string-sections", "strings" }, { "brass", "brass" },   { "woodwinds", "woodwinds" },
@@ -271,7 +282,7 @@ juce::String SampleLibrary::categoryFromCatalogue(const juce::String& catalogueC
     if (catalogueCategory == "drums" || catalogueCategory == "electro-drums") {
         // A kit's file is what its name says it is, else a percussion.
         const auto named = categoryFromName(name, folder);
-        return familyOf(named) == "drums" ? named : juce::String("perc");
+        return familyOf(named) == "drums" ? named : cydaw::base::Text("perc");
     }
     if (catalogueCategory == "synths") {
         // A synth's pad stays a pad.
@@ -284,22 +295,22 @@ juce::String SampleLibrary::categoryFromCatalogue(const juce::String& catalogueC
     return categoryFromName(name, folder);
 }
 
-juce::StringArray SampleLibrary::tagVocabulary()
+cydaw::base::TextList SampleLibrary::tagVocabulary()
 {
-    juce::StringArray out;
+    cydaw::base::TextList out;
     for (const auto* tag : tags)
         out.add(tag);
     return out;
 }
 
-juce::String SampleLibrary::categoryFromName(const juce::String& name,
-                                             const juce::String& folder)
+cydaw::base::Text SampleLibrary::categoryFromName(const cydaw::base::Text& name,
+                                             const cydaw::base::Text& folder)
 {
     // The file name first, then the folders it sits in, nearest first:
     // "Kicks/808/deep.wav" is a kick before it is an 808.
-    juce::StringArray places { name };
+    cydaw::base::TextList places { name };
     {
-        juce::StringArray parts;
+        cydaw::base::TextList parts;
         parts.addTokens(folder.replaceCharacters("\\", "/"), "/", "");
         parts.removeEmptyStrings();
         for (auto index = parts.size(); --index >= 0;)
@@ -317,11 +328,11 @@ juce::String SampleLibrary::categoryFromName(const juce::String& name,
     return {};
 }
 
-juce::StringArray SampleLibrary::tagsFromPath(const juce::String& name,
-                                              const juce::String& relativeFolder)
+cydaw::base::TextList SampleLibrary::tagsFromPath(const cydaw::base::Text& name,
+                                              const cydaw::base::Text& relativeFolder)
 {
-    juce::StringArray out;
-    juce::StringArray parts;
+    cydaw::base::TextList out;
+    cydaw::base::TextList parts;
     parts.addTokens(lower(relativeFolder).replaceCharacters("\\", "/"), "/", "");
     for (auto part : parts) {
         part = part.trim().removeCharacters("[](){}");
@@ -338,7 +349,7 @@ juce::StringArray SampleLibrary::tagsFromPath(const juce::String& name,
     return out;
 }
 
-juce::String SampleLibrary::keyFromName(const juce::String& name)
+cydaw::base::Text SampleLibrary::keyFromName(const cydaw::base::Text& name)
 {
     // "F#m", "Cmin", "Bbmaj", "A minor": a letter, an accidental, a mode;
     // a bare letter says nothing, "A_kick" is not in A.
@@ -353,15 +364,15 @@ juce::String SampleLibrary::keyFromName(const juce::String& name)
         const auto mode = match[3].str();
         if (!accidental.empty() || !mode.empty()) {
             const auto minor = mode == "m" || mode == "min" || mode == "minor";
-            return juce::String(letter) + juce::String(accidental)
-                   + (minor ? "m" : juce::String());
+            return cydaw::base::Text(letter) + cydaw::base::Text(accidental)
+                   + (minor ? "m" : cydaw::base::Text());
         }
         search = match.suffix().first;
     }
     return {};
 }
 
-double SampleLibrary::bpmFromName(const juce::String& name)
+double SampleLibrary::bpmFromName(const cydaw::base::Text& name)
 {
     static const std::regex withUnit("(\\d{2,3})\\s?bpm", std::regex::icase);
     static const std::regex bare("(?:^|[ _\\-])(\\d{2,3})(?:$|[ _\\-\\.])");
@@ -429,7 +440,7 @@ SampleLibrary::TempoEstimate SampleLibrary::estimateTempo(const double detectedB
     return estimate;
 }
 
-std::vector<float> SampleLibrary::chromaOf(const juce::AudioBuffer<float>& audio,
+std::vector<float> SampleLibrary::chromaOf(const cydaw::audio::SampleBuffer<float>& audio,
                                            const double sampleRate)
 {
     std::vector<float> chroma(12, 0.0f);
@@ -437,10 +448,15 @@ std::vector<float> SampleLibrary::chromaOf(const juce::AudioBuffer<float>& audio
     constexpr auto frameSize = 1 << order;
     if (audio.getNumSamples() < frameSize || sampleRate <= 0.0)
         return chroma;
-    juce::dsp::FFT fft(order);
-    juce::dsp::WindowingFunction<float> window(frameSize,
-                                               juce::dsp::WindowingFunction<float>::hann);
-    std::vector<float> frame(frameSize * 2, 0.0f);
+    cydsp::RealFft<float> fft;
+    std::vector<float> window(frameSize), frame(frameSize);
+    std::vector<std::complex<float>> spectrum(frameSize / 2 + 1);
+    cydsp::WindowParameters windowOptions;
+    windowOptions.type = cydsp::WindowType::hann;
+    windowOptions.normalization = cydsp::WindowNormalization::coherentGain;
+    if (fft.prepare(frameSize) != cydsp::Status::ok
+        || cydsp::makeWindow(windowOptions, window) != cydsp::Status::ok)
+        return chroma;
     const auto hop = frameSize / 2;
     const auto lowestBin = static_cast<int>(std::ceil(55.0 * frameSize / sampleRate));
     const auto highestBin = std::min(frameSize / 2 - 1,
@@ -461,8 +477,12 @@ std::vector<float> SampleLibrary::chromaOf(const juce::AudioBuffer<float>& audio
                 value += audio.getSample(channel, start + index);
             frame[static_cast<std::size_t>(index)] = value / static_cast<float>(audio.getNumChannels());
         }
-        window.multiplyWithWindowingTable(frame.data(), frameSize);
-        fft.performFrequencyOnlyForwardTransform(frame.data());
+        for (std::size_t i = 0; i < frame.size(); ++i)
+            frame[i] *= window[i];
+        if (fft.forward(frame, spectrum) != cydsp::Status::ok)
+            return std::vector<float>(12, 0.0f);
+        for (std::size_t i = 0; i < spectrum.size(); ++i)
+            frame[i] = std::abs(spectrum[i]);
         // The first and last moments carry the tonic more often than not.
         const auto edge = start < edgeSamples
                           || start > audio.getNumSamples() - frameSize - edgeSamples;
@@ -475,7 +495,7 @@ std::vector<float> SampleLibrary::chromaOf(const juce::AudioBuffer<float>& audio
             // or fifth carries most of its energy — says little about the
             // key: the fifth harmonic of every C is an E.
             for (const auto harmonic : { 2, 3, 4, 5 }) {
-                const auto fundamental = juce::roundToInt(static_cast<float>(bin) / harmonic);
+                const auto fundamental = cydaw::base::roundToInt(static_cast<float>(bin) / harmonic);
                 if (fundamental >= lowestBin
                     && frame[static_cast<std::size_t>(fundamental)] >= 0.6f * magnitude) {
                     magnitude *= 0.3f;
@@ -542,14 +562,14 @@ SampleLibrary::KeyEstimate SampleLibrary::estimateKey(const std::vector<float>& 
     };
     auto best = -2.0f;
     auto second = -2.0f;
-    juce::String bestKey;
+    cydaw::base::Text bestKey;
     for (auto tonic = 0; tonic < 12; ++tonic) {
         for (const auto isMinor : { false, true }) {
             const auto score = correlation(isMinor ? minor : major, tonic);
             if (score > best) {
                 second = best;
                 best = score;
-                bestKey = juce::String(names[static_cast<std::size_t>(tonic)])
+                bestKey = cydaw::base::Text(names[static_cast<std::size_t>(tonic)])
                           + (isMinor ? "m" : "");
             } else if (score > second) {
                 second = score;
@@ -561,11 +581,11 @@ SampleLibrary::KeyEstimate SampleLibrary::estimateKey(const std::vector<float>& 
     if (best < 0.6f || best - second < 0.06f)
         return estimate;
     estimate.key = bestKey;
-    estimate.confidence = juce::jlimit(0.0f, 1.0f, (best - 0.5f) / 0.45f);
+    estimate.confidence = cydaw::base::limit(0.0f, 1.0f, (best - 0.5f) / 0.45f);
     return estimate;
 }
 
-bool SampleLibrary::isDrumHit(const juce::String& category, const juce::String& name, const juce::String& folder,
+bool SampleLibrary::isDrumHit(const cydaw::base::Text& category, const cydaw::base::Text& name, const cydaw::base::Text& folder,
                               const double lengthSeconds)
 {
     if (familyOf(category) != "drums" || category == "drums")
@@ -584,7 +604,7 @@ bool SampleLibrary::isDrumHit(const juce::String& category, const juce::String& 
     return false;
 }
 
-juce::String SampleLibrary::typeFor(const double lengthSeconds, const juce::String& name,
+cydaw::base::Text SampleLibrary::typeFor(const double lengthSeconds, const cydaw::base::Text& name,
                                     const double bpm)
 {
     // Short, a single hit; but a bar named for its tempo, or a loop, is one.
@@ -611,7 +631,7 @@ void SampleLibrary::applyHint(SampleRecord& record, const SampleHint& hint)
         const auto ofItsKind = hint.category.isEmpty() || record.category == hint.category
                                || (familyOf(hint.category) == "drums" && familyOf(record.category) == "drums");
         if (record.instrument.isEmpty() || record.classifier == "bank")
-            record.instrument = ofItsKind ? hint.instrument : juce::String();
+            record.instrument = ofItsKind ? hint.instrument : cydaw::base::Text();
         return;
     }
     record.instrument = hint.instrument;
@@ -629,7 +649,7 @@ void SampleLibrary::applyHint(SampleRecord& record, const SampleHint& hint)
     }
 }
 
-SampleRecord SampleLibrary::analyseFile(const juce::File& file, const juce::File& root,
+SampleRecord SampleLibrary::analyseFile(const cydaw::base::File& file, const cydaw::base::File& root,
                                         const SampleRecord* previous, const SampleHint* hint)
 {
     SampleRecord record;
@@ -644,7 +664,7 @@ SampleRecord SampleLibrary::analyseFile(const juce::File& file, const juce::File
     record.analysed = false;
     record.overview.clear();
 
-    std::unique_ptr<juce::AudioFormatReader> reader(
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(
         threadFormatManager().createReaderFor(file));
     if (reader != nullptr && reader->lengthInSamples > 0 && reader->sampleRate > 0.0) {
         record.sampleRate = reader->sampleRate;
@@ -653,30 +673,30 @@ SampleRecord SampleLibrary::analyseFile(const juce::File& file, const juce::File
         record.length = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
         // The measurements read the whole file up to ten minutes; a longer
         // one is measured on its first two.
-        const auto measured = std::min<juce::int64>(
+        const auto measured = std::min<std::int64_t>(
             reader->lengthInSamples,
-            record.length > 600.0 ? static_cast<juce::int64>(reader->sampleRate * 120.0)
+            record.length > 600.0 ? static_cast<std::int64_t>(reader->sampleRate * 120.0)
                                   : reader->lengthInSamples);
         const auto channels = static_cast<int>(std::min<unsigned>(reader->numChannels, 8));
-        juce::AudioBuffer<float> buffer(channels, 65'536);
+        cydaw::audio::SampleBuffer<float> buffer(channels, 65'536);
         // The first thirty seconds, kept for the chroma the key is read from.
-        const auto keptForChroma = static_cast<int>(std::min<juce::int64>(
-            measured, static_cast<juce::int64>(reader->sampleRate * 30.0)));
-        juce::AudioBuffer<float> forChroma(channels, keptForChroma);
+        const auto keptForChroma = static_cast<int>(std::min<std::int64_t>(
+            measured, static_cast<std::int64_t>(reader->sampleRate * 30.0)));
+        cydaw::audio::SampleBuffer<float> forChroma(channels, keptForChroma);
         forChroma.clear();
         std::vector<float> bins(overviewBins, 0.0f);
         double peak = 0.0;
         double sumSquares = 0.0;
-        juce::int64 position = 0;
+        std::int64_t position = 0;
         while (position < measured) {
-            const auto count = static_cast<int>(std::min<juce::int64>(
+            const auto count = static_cast<int>(std::min<std::int64_t>(
                 buffer.getNumSamples(), measured - position));
             if (!reader->read(&buffer, 0, count, position, true, true))
                 break;
             if (position < keptForChroma)
                 for (auto channel = 0; channel < channels; ++channel)
                     forChroma.copyFrom(channel, static_cast<int>(position), buffer, channel, 0,
-                                       static_cast<int>(std::min<juce::int64>(
+                                       static_cast<int>(std::min<std::int64_t>(
                                            count, keptForChroma - position)));
             for (auto frame = 0; frame < count; ++frame) {
                 auto value = 0.0f;
@@ -685,18 +705,18 @@ SampleRecord SampleLibrary::analyseFile(const juce::File& file, const juce::File
                 peak = std::max(peak, static_cast<double>(value));
                 sumSquares += static_cast<double>(value) * value;
                 const auto bin = static_cast<std::size_t>(
-                    std::min<juce::int64>(overviewBins - 1,
+                    std::min<std::int64_t>(overviewBins - 1,
                                           (position + frame) * overviewBins / measured));
                 bins[bin] = std::max(bins[bin], value);
             }
             position += count;
         }
         record.peakDb = toDb(peak);
-        record.rmsDb = toDb(std::sqrt(sumSquares / static_cast<double>(std::max<juce::int64>(1, measured))));
+        record.rmsDb = toDb(std::sqrt(sumSquares / static_cast<double>(std::max<std::int64_t>(1, measured))));
         record.overview.resize(overviewBins);
         for (std::size_t bin = 0; bin < bins.size(); ++bin)
             record.overview[bin] = static_cast<std::uint8_t>(
-                juce::jlimit(0, 255, juce::roundToInt(bins[bin] * 255.0f)));
+                cydaw::base::limit(0, 255, cydaw::base::roundToInt(bins[bin] * 255.0f)));
         record.analysed = true;
         // The key of tonal sounds; drums and very short hits are left out,
         // and an instrument's notes (their name says it, the map plays it).
@@ -741,7 +761,7 @@ SampleRecord SampleLibrary::analyseFile(const juce::File& file, const juce::File
             }
         }
         record.key = keyFromName(record.name);
-        record.keySource = record.key.isNotEmpty() ? "name" : juce::String();
+        record.keySource = record.key.isNotEmpty() ? "name" : cydaw::base::Text();
         record.keyConfidence = record.key.isNotEmpty() ? 1.0f : 0.0f;
         if (record.key.isEmpty() && detectedKey_.key.isNotEmpty()) {
             static const std::array<const char*, 8> drums {
@@ -764,7 +784,7 @@ SampleRecord SampleLibrary::analyseFile(const juce::File& file, const juce::File
         if (record.classifier != "clap") {
             const auto category = categoryFromName(record.name, relative);
             record.category = category;
-            record.classifier = category.isNotEmpty() ? "name" : juce::String();
+            record.classifier = category.isNotEmpty() ? "name" : cydaw::base::Text();
             record.confidence = category.isNotEmpty() ? 1.0f : 0.0f;
             auto guessed = tagsFromPath(record.name, relative);
             if (record.channels == 1 && !guessed.contains("mono"))
@@ -779,10 +799,10 @@ SampleRecord SampleLibrary::analyseFile(const juce::File& file, const juce::File
     return record;
 }
 
-juce::var SampleLibrary::serialise(const SampleRecord& record)
+cydaw::base::Value SampleLibrary::serialise(const SampleRecord& record)
 {
-    auto* object = new juce::DynamicObject();
-    juce::var value(object);
+    auto* object = new cydaw::base::Object();
+    cydaw::base::Value value(object);
     object->setProperty("path", record.path);
     object->setProperty("root", record.root);
     object->setProperty("size", record.size);
@@ -811,12 +831,12 @@ juce::var SampleLibrary::serialise(const SampleRecord& record)
     object->setProperty("source", record.source);
     object->setProperty("instrument", record.instrument);
     if (!record.overview.empty())
-        object->setProperty("overview", juce::Base64::toBase64(
+        object->setProperty("overview", cydaw::base::Base64::toBase64(
                                             record.overview.data(), record.overview.size()));
     return value;
 }
 
-std::optional<SampleRecord> SampleLibrary::restore(const juce::var& value)
+std::optional<SampleRecord> SampleLibrary::restore(const cydaw::base::Value& value)
 {
     const auto* object = value.getDynamicObject();
     if (object == nullptr)
@@ -825,12 +845,12 @@ std::optional<SampleRecord> SampleLibrary::restore(const juce::var& value)
     record.path = object->getProperty("path").toString();
     if (record.path.isEmpty())
         return std::nullopt;
-    const juce::File file(record.path);
+    const cydaw::base::File file(record.path);
     record.name = file.getFileNameWithoutExtension();
     record.extension = file.getFileExtension().trimCharactersAtStart(".").toLowerCase();
     record.root = object->getProperty("root").toString();
-    record.size = static_cast<juce::int64>(object->getProperty("size"));
-    record.modified = static_cast<juce::int64>(object->getProperty("modified"));
+    record.size = static_cast<std::int64_t>(object->getProperty("size"));
+    record.modified = static_cast<std::int64_t>(object->getProperty("modified"));
     record.sampleRate = static_cast<double>(object->getProperty("sampleRate"));
     record.channels = static_cast<int>(object->getProperty("channels"));
     record.bitDepth = static_cast<int>(object->getProperty("bitDepth"));
@@ -857,8 +877,8 @@ std::optional<SampleRecord> SampleLibrary::restore(const juce::var& value)
     record.analysed = static_cast<bool>(object->getProperty("analysed"));
     record.source = object->getProperty("source").toString();
     record.instrument = object->getProperty("instrument").toString();
-    juce::MemoryOutputStream decoded;
-    if (juce::Base64::convertFromBase64(decoded, object->getProperty("overview").toString())
+    cydaw::base::MemoryOutputStream decoded;
+    if (cydaw::base::Base64::convertFromBase64(decoded, object->getProperty("overview").toString())
         && decoded.getDataSize() == overviewBins) {
         record.overview.assign(static_cast<const std::uint8_t*>(decoded.getData()),
                                static_cast<const std::uint8_t*>(decoded.getData()) + overviewBins);
@@ -866,7 +886,7 @@ std::optional<SampleRecord> SampleLibrary::restore(const juce::var& value)
     return record;
 }
 
-void SampleLibrary::write(juce::OutputStream& out, const SampleRecord& record)
+void SampleLibrary::write(cydaw::base::OutputStream& out, const SampleRecord& record)
 {
     // In this order, read back by read(); a field added goes at the end, with
     // the cache's version raised.
@@ -902,13 +922,13 @@ void SampleLibrary::write(juce::OutputStream& out, const SampleRecord& record)
         out.write(record.overview.data(), record.overview.size());
 }
 
-std::optional<SampleRecord> SampleLibrary::read(juce::InputStream& in)
+std::optional<SampleRecord> SampleLibrary::read(cydaw::base::InputStream& in)
 {
     SampleRecord record;
     record.path = in.readString();
     if (record.path.isEmpty() || in.isExhausted())
         return std::nullopt;
-    const juce::File file(record.path);
+    const cydaw::base::File file(record.path);
     record.name = file.getFileNameWithoutExtension();
     record.extension = file.getFileExtension().trimCharactersAtStart(".").toLowerCase();
     record.root = in.readString();
@@ -949,11 +969,11 @@ std::optional<SampleRecord> SampleLibrary::read(juce::InputStream& in)
 
 // ------------------------------------------------------------------ scanner
 
-class SampleLibrary::Scanner final : public juce::Thread {
+class SampleLibrary::Scanner final : public cydaw::base::Thread {
 public:
-    Scanner(SampleLibrary& owner, std::vector<Root> roots, std::map<juce::String, SampleRecord> known,
-            std::shared_ptr<const std::map<juce::String, SampleHint>> hints, const bool full, const bool rename)
-        : juce::Thread("CyDAW sample scan"),
+    Scanner(SampleLibrary& owner, std::vector<Root> roots, std::map<cydaw::base::Text, SampleRecord> known,
+            std::shared_ptr<const std::map<cydaw::base::Text, SampleHint>> hints, const bool full, const bool rename)
+        : cydaw::base::Thread("CyDAW sample scan"),
           owner_(owner), library_(&owner), roots_(std::move(roots)), known_(std::move(known)), hints_(std::move(hints)),
           full_(full), rename_(rename)
     {
@@ -963,15 +983,15 @@ public:
     {
         const auto extensions = supportedExtensions();
         struct Candidate {
-            juce::File file;
+            cydaw::base::File file;
             const Root* root;
         };
         std::vector<Candidate> candidates;
-        std::set<juce::String> present;
+        std::set<cydaw::base::Text> present;
         for (const auto& root : roots_) {
             if (!root.folder.isDirectory())
                 continue;
-            for (const auto& entry : juce::RangedDirectoryIterator(root.folder, true, "*", juce::File::findFiles)) {
+            for (const auto& entry : cydaw::base::RangedDirectoryIterator(root.folder, true, "*", cydaw::base::File::findFiles)) {
                 if (threadShouldExit())
                     return finish(std::move(present), false);
                 const auto file = entry.getFile();
@@ -997,7 +1017,7 @@ public:
                                                       || record.classifier == "bank")) {
                     const auto relative = candidate.file.getParentDirectory().getRelativePathFrom(candidate.root->folder);
                     record.category = categoryFromName(record.name, relative);
-                    record.classifier = record.category.isNotEmpty() ? "name" : juce::String();
+                    record.classifier = record.category.isNotEmpty() ? "name" : cydaw::base::Text();
                     record.instrument.clear();
                     if (isDrumHit(record.category, record.name, relative, record.length) && record.bpmSource != "user") {
                         record.bpm = 0.0;
@@ -1020,7 +1040,7 @@ public:
                     if (!record.userEdited) {
                         record.category = categoryFromName(record.name, candidate.file.getParentDirectory().getRelativePathFrom(
                                                                             candidate.root->folder));
-                        record.classifier = record.category.isNotEmpty() ? "name" : juce::String();
+                        record.classifier = record.category.isNotEmpty() ? "name" : cydaw::base::Text();
                     }
                 }
                 kept.push_back(std::move(record));
@@ -1034,7 +1054,7 @@ public:
 
         // A pool for the reading: every core but one, so the interface and
         // the audio keep theirs.
-        juce::ThreadPool pool(std::max(2, juce::SystemStats::getNumCpus() - 1));
+        cydaw::base::ThreadPool pool(std::max(2, cydaw::base::SystemStats::getNumCpus() - 1));
         for (const auto& candidate : toAnalyse) {
             const auto found = known_.find(candidate.file.getFullPathName());
             pool.addJob(new AnalyseJob(*this, candidate.file, *candidate.root,
@@ -1052,10 +1072,10 @@ public:
     }
 
 private:
-    class AnalyseJob final : public juce::ThreadPoolJob {
+    class AnalyseJob final : public cydaw::base::ThreadPoolJob {
     public:
-        AnalyseJob(Scanner& scanner, juce::File file, Root root, std::optional<SampleRecord> previous)
-            : juce::ThreadPoolJob(file.getFileName()),
+        AnalyseJob(Scanner& scanner, cydaw::base::File file, Root root, std::optional<SampleRecord> previous)
+            : cydaw::base::ThreadPoolJob(file.getFileName()),
               scanner_(scanner), file_(std::move(file)), root_(std::move(root)), previous_(std::move(previous))
         {
         }
@@ -1077,12 +1097,12 @@ private:
 
     private:
         Scanner& scanner_;
-        juce::File file_;
+        cydaw::base::File file_;
         Root root_;
         std::optional<SampleRecord> previous_;
     };
 
-    const SampleHint* hintFor(const juce::String& path, const juce::String& source) const
+    const SampleHint* hintFor(const cydaw::base::Text& path, const cydaw::base::Text& source) const
     {
         return hints_ != nullptr ? hintOf(*hints_, path, source) : nullptr;
     }
@@ -1100,7 +1120,7 @@ private:
 
     // `complete`: every folder was read to its end, so what was not found is
     // gone; an interrupted scan forgets nothing.
-    void finish(std::set<juce::String> present, const bool complete)
+    void finish(std::set<cydaw::base::Text> present, const bool complete)
     {
         std::vector<SampleRecord> batch;
         {
@@ -1110,12 +1130,12 @@ private:
         post(std::move(batch), true, complete, std::move(present));
     }
 
-    void post(std::vector<SampleRecord> batch, const bool finished, const bool complete, std::set<juce::String> present)
+    void post(std::vector<SampleRecord> batch, const bool finished, const bool complete, std::set<cydaw::base::Text> present)
     {
-        std::vector<juce::File> roots;
+        std::vector<cydaw::base::File> roots;
         for (const auto& root : roots_)
             roots.push_back(root.folder);
-        juce::MessageManager::callAsync([library = library_, batch = std::move(batch), finished, complete,
+        cydaw::base::EventLoop::post([library = library_, batch = std::move(batch), finished, complete,
                                          present = std::move(present), roots = std::move(roots)]() mutable {
             if (auto* owner = library.get())
                 owner->mergeRecords(std::move(batch), finished, complete, std::move(present), std::move(roots));
@@ -1123,10 +1143,10 @@ private:
     }
 
     SampleLibrary& owner_;
-    juce::WeakReference<SampleLibrary> library_;
+    cydaw::base::WeakReference<SampleLibrary> library_;
     std::vector<Root> roots_;
-    std::map<juce::String, SampleRecord> known_;
-    std::shared_ptr<const std::map<juce::String, SampleHint>> hints_;
+    std::map<cydaw::base::Text, SampleRecord> known_;
+    std::shared_ptr<const std::map<cydaw::base::Text, SampleHint>> hints_;
     bool full_ {};
     bool rename_ {};
     std::mutex resultsMutex_;
@@ -1135,11 +1155,11 @@ private:
 
 // --------------------------------------------------------------- classifier
 
-class SampleLibrary::Classifier final : public juce::Thread {
+class SampleLibrary::Classifier final : public cydaw::base::Thread {
 public:
-    Classifier(SampleLibrary& owner, juce::StringArray paths, juce::File script,
-               juce::String python, juce::File workFolder)
-        : juce::Thread("CyDAW sample classifier"),
+    Classifier(SampleLibrary& owner, cydaw::base::TextList paths, cydaw::base::File script,
+               cydaw::base::Text python, cydaw::base::File workFolder)
+        : cydaw::base::Thread("CyDAW sample classifier"),
           owner_(owner), library_(&owner), paths_(std::move(paths)), script_(std::move(script)),
           python_(std::move(python)), workFolder_(std::move(workFolder))
     {
@@ -1149,35 +1169,35 @@ public:
     {
         if (!script_.existsAsFile())
             return report({}, true, "script introuvable : " + script_.getFullPathName());
-        juce::String message;
+        cydaw::base::Text message;
         for (auto start = 0; start < paths_.size() && !threadShouldExit();
              start += classifyBatch) {
-            juce::Array<juce::var> files;
+            cydaw::base::Array<cydaw::base::Value> files;
             for (auto index = start; index < std::min(paths_.size(), start + classifyBatch); ++index)
                 files.add(paths_[index]);
-            auto* request = new juce::DynamicObject();
+            auto* request = new cydaw::base::Object();
             request->setProperty("files", files);
-            juce::Array<juce::var> categoryList;
+            cydaw::base::Array<cydaw::base::Value> categoryList;
             for (const auto& category : categoryVocabulary())
                 categoryList.add(category);
-            juce::Array<juce::var> tagList;
+            cydaw::base::Array<cydaw::base::Value> tagList;
             for (const auto& tag : tagVocabulary())
                 tagList.add(tag);
             request->setProperty("categories", categoryList);
             request->setProperty("tags", tagList);
             const auto requestFile = workFolder_.getChildFile("clap-request.json");
-            requestFile.replaceWithText(juce::JSON::toString(juce::var(request)));
-            juce::ChildProcess process;
-            juce::StringArray command { python_, script_.getFullPathName(),
+            requestFile.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(request)));
+            cydaw::base::ChildProcess process;
+            cydaw::base::TextList command { python_, script_.getFullPathName(),
                                         requestFile.getFullPathName() };
-            if (!process.start(command, juce::ChildProcess::wantStdOut))
+            if (!process.start(command, cydaw::base::ChildProcess::wantStdOut))
                 return report({}, true, "impossible de lancer " + python_);
             const auto output = process.readAllProcessOutput();
             std::vector<SampleRecord> results;
-            juce::StringArray lines;
+            cydaw::base::TextList lines;
             lines.addLines(output);
             for (const auto& line : lines) {
-                const auto value = juce::JSON::parse(line);
+                const auto value = cydaw::base::JSON::parse(line);
                 const auto* object = value.getDynamicObject();
                 if (object == nullptr)
                     continue;
@@ -1205,9 +1225,9 @@ public:
     }
 
 private:
-    void report(std::vector<SampleRecord> results, const bool finished, juce::String message)
+    void report(std::vector<SampleRecord> results, const bool finished, cydaw::base::Text message)
     {
-        juce::MessageManager::callAsync(
+        cydaw::base::EventLoop::post(
             [library = library_, results = std::move(results), finished, message = std::move(message)]() mutable {
                 if (auto* owner = library.get())
                     owner->applyClassification(std::move(results), finished, std::move(message));
@@ -1215,30 +1235,30 @@ private:
     }
 
     SampleLibrary& owner_;
-    juce::WeakReference<SampleLibrary> library_;
-    juce::StringArray paths_;
-    juce::File script_;
-    juce::String python_;
-    juce::File workFolder_;
+    cydaw::base::WeakReference<SampleLibrary> library_;
+    cydaw::base::TextList paths_;
+    cydaw::base::File script_;
+    cydaw::base::Text python_;
+    cydaw::base::File workFolder_;
 };
 
 // ------------------------------------------------------------------ library
 
 SampleLibrary::SampleLibrary(const bool startNow)
 {
-    juce::PropertiesFile::Options options;
+    cydaw::base::PropertiesFile::Options options;
     options.applicationName = "CyDAW";
     options.filenameSuffix = ".samples.settings";
     options.folderName = "CyDAW";
     options.osxLibrarySubFolder = "Application Support";
     properties_.setStorageParameters(options);
     // A test's own settings: its folders never become the person's.
-    if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_SAMPLES_SETTINGS", {});
-        other.isNotEmpty() && juce::File::isAbsolutePath(other)) {
+    if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_SAMPLES_SETTINGS", {});
+        other.isNotEmpty() && cydaw::base::File::isAbsolutePath(other)) {
         options.folderName = {};
         properties_.setStorageParameters(options);
         properties_.closeFiles();
-        otherSettings_ = std::make_unique<juce::PropertiesFile>(juce::File(other), options);
+        otherSettings_ = std::make_unique<cydaw::base::PropertiesFile>(cydaw::base::File(other), options);
     }
     loadSettings();
     if (startNow)
@@ -1267,25 +1287,25 @@ void SampleLibrary::start()
     startTimer(2'000);
 }
 
-juce::File SampleLibrary::defaultCacheFolder() const
+cydaw::base::File SampleLibrary::defaultCacheFolder() const
 {
-    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory)
         .getChildFile("CyDAW").getChildFile("samples-cache");
 }
 
-juce::File SampleLibrary::indexFile() const
+cydaw::base::File SampleLibrary::indexFile() const
 {
     return cacheFolder_.getChildFile(indexFileName);
 }
 
-juce::File SampleLibrary::cacheFolder() const
+cydaw::base::File SampleLibrary::cacheFolder() const
 {
     return cacheFolder_;
 }
 
-void SampleLibrary::setCacheFolder(const juce::File& folder)
+void SampleLibrary::setCacheFolder(const cydaw::base::File& folder)
 {
-    if (folder == juce::File {} || folder == cacheFolder_)
+    if (folder == cydaw::base::File {} || folder == cacheFolder_)
         return;
     (void) folder.createDirectory();
     if (!folder.isDirectory())
@@ -1303,18 +1323,18 @@ void SampleLibrary::setCacheFolder(const juce::File& folder)
         loadCache();
 }
 
-void SampleLibrary::useCacheFolder(const juce::File& folder)
+void SampleLibrary::useCacheFolder(const cydaw::base::File& folder)
 {
     cacheFolderGiven_ = true;
     setCacheFolder(folder);
 }
 
-std::vector<juce::File> SampleLibrary::folders() const
+std::vector<cydaw::base::File> SampleLibrary::folders() const
 {
     return folders_;
 }
 
-void SampleLibrary::addFolder(const juce::File& folder)
+void SampleLibrary::addFolder(const cydaw::base::File& folder)
 {
     if (!folder.isDirectory())
         return;
@@ -1327,7 +1347,7 @@ void SampleLibrary::addFolder(const juce::File& folder)
     rescan(false);
 }
 
-void SampleLibrary::removeFolder(const juce::File& folder)
+void SampleLibrary::removeFolder(const cydaw::base::File& folder)
 {
     const auto before = folders_.size();
     std::erase(folders_, folder);
@@ -1339,7 +1359,7 @@ void SampleLibrary::removeFolder(const juce::File& folder)
 
 void SampleLibrary::setBanks(std::vector<Bank> banks)
 {
-    std::erase_if(banks, [](const Bank& bank) { return bank.id.isEmpty() || bank.folder == juce::File {}; });
+    std::erase_if(banks, [](const Bank& bank) { return bank.id.isEmpty() || bank.folder == cydaw::base::File {}; });
     const auto same = banks.size() == banks_.size()
                       && std::equal(banks.begin(), banks.end(), banks_.begin(), [](const Bank& a, const Bank& b) {
                              return a.id == b.id && a.folder == b.folder && a.title == b.title;
@@ -1367,9 +1387,9 @@ void SampleLibrary::setIncludeBanks(const bool include)
         rescan(false);
 }
 
-void SampleLibrary::setHints(std::map<juce::String, SampleHint> hints)
+void SampleLibrary::setHints(std::map<cydaw::base::Text, SampleHint> hints)
 {
-    hints_ = std::make_shared<const std::map<juce::String, SampleHint>>(std::move(hints));
+    hints_ = std::make_shared<const std::map<cydaw::base::Text, SampleHint>>(std::move(hints));
     // What is known now takes them at once; the next scan keeps them.
     auto changed = false;
     for (auto& record : samples_)
@@ -1384,8 +1404,8 @@ void SampleLibrary::setHints(std::map<juce::String, SampleHint> hints)
     }
 }
 
-const SampleHint* SampleLibrary::hintOf(const std::map<juce::String, SampleHint>& hints, const juce::String& path,
-                                        const juce::String& source)
+const SampleHint* SampleLibrary::hintOf(const std::map<cydaw::base::Text, SampleHint>& hints, const cydaw::base::Text& path,
+                                        const cydaw::base::Text& source)
 {
     if (const auto found = hints.find(hintKey(path)); found != hints.end())
         return &found->second;
@@ -1395,12 +1415,12 @@ const SampleHint* SampleLibrary::hintOf(const std::map<juce::String, SampleHint>
     return nullptr;
 }
 
-juce::String SampleLibrary::hintKey(const juce::String& path)
+cydaw::base::Text SampleLibrary::hintKey(const cydaw::base::Text& path)
 {
     return path.replaceCharacter('\\', '/').toLowerCase();
 }
 
-juce::String SampleLibrary::sourceTitle(const SampleRecord& record) const
+cydaw::base::Text SampleLibrary::sourceTitle(const SampleRecord& record) const
 {
     if (record.source.isNotEmpty()) {
         for (const auto& bank : banks_)
@@ -1408,7 +1428,7 @@ juce::String SampleLibrary::sourceTitle(const SampleRecord& record) const
                 return bank.title.isNotEmpty() ? bank.title : bank.id;
         return record.source;
     }
-    return juce::File(record.root).getFileName();
+    return cydaw::base::File(record.root).getFileName();
 }
 
 std::vector<SampleLibrary::Root> SampleLibrary::roots() const
@@ -1419,7 +1439,7 @@ std::vector<SampleLibrary::Root> SampleLibrary::roots() const
     if (includeBanks_)
         for (const auto& bank : banks_) {
             // A folder of the person's holding the banks scans them already.
-            const auto inside = std::any_of(folders_.begin(), folders_.end(), [&bank](const juce::File& folder) {
+            const auto inside = std::any_of(folders_.begin(), folders_.end(), [&bank](const cydaw::base::File& folder) {
                 return bank.folder == folder || bank.folder.isAChildOf(folder);
             });
             if (!inside)
@@ -1447,7 +1467,7 @@ void SampleLibrary::restartScan()
 void SampleLibrary::pruneToRoots()
 {
     restartScan();
-    std::set<juce::String> kept;
+    std::set<cydaw::base::Text> kept;
     for (const auto& root : roots())
         kept.insert(root.folder.getFullPathName());
     const auto before = samples_.size();
@@ -1494,12 +1514,12 @@ void SampleLibrary::setClassifierEnabled(const bool enabled)
         classify(true);
 }
 
-juce::File SampleLibrary::classifierScript() const
+cydaw::base::File SampleLibrary::classifierScript() const
 {
     if (classifierScript_.existsAsFile())
         return classifierScript_;
     // Next to the executable when shipped, in the source tree otherwise.
-    const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    const auto executable = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile);
     for (const auto& candidate : {
              executable.getSiblingFile("tools").getChildFile("samples")
                  .getChildFile("classify_samples.py"),
@@ -1511,13 +1531,13 @@ juce::File SampleLibrary::classifierScript() const
     return classifierScript_;
 }
 
-void SampleLibrary::setClassifierScript(const juce::File& script)
+void SampleLibrary::setClassifierScript(const cydaw::base::File& script)
 {
     classifierScript_ = script;
     saveSettings();
 }
 
-void SampleLibrary::setPythonCommand(const juce::String& command)
+void SampleLibrary::setPythonCommand(const cydaw::base::Text& command)
 {
     pythonCommand_ = command.trim().isNotEmpty() ? command.trim() : "python";
     saveSettings();
@@ -1542,15 +1562,15 @@ void SampleLibrary::rescan(const bool full)
     }
     pendingRescan_ = false;
     pendingFull_ = false;
-    std::map<juce::String, SampleRecord> known;
+    std::map<cydaw::base::Text, SampleRecord> known;
     for (const auto& record : samples_)
         known[record.path] = record;
     found_.store(0);
     analysed_.store(0);
     toAnalyse_.store(0);
     scanner_ = std::make_unique<Scanner>(*this, roots(), std::move(known), hints_, full, rulesOutdated_);
-    scanner_->startThread(juce::Thread::Priority::low);
-    lastScanMs_ = juce::Time::currentTimeMillis();
+    scanner_->startThread(cydaw::base::Thread::Priority::low);
+    lastScanMs_ = cydaw::base::Time::currentTimeMillis();
     notifyProgress();
 }
 
@@ -1590,26 +1610,26 @@ SampleLibrary::Progress SampleLibrary::progress() const
     return progress;
 }
 
-juce::String SampleLibrary::classifierStatus() const
+cydaw::base::Text SampleLibrary::classifierStatus() const
 {
     return classifierMessage_;
 }
 
-const SampleRecord* SampleLibrary::find(const juce::String& path) const
+const SampleRecord* SampleLibrary::find(const cydaw::base::Text& path) const
 {
     const auto found = index_.find(path);
     return found != index_.end() && found->second < samples_.size()
                ? &samples_[found->second] : nullptr;
 }
 
-SampleRecord* SampleLibrary::findMutable(const juce::String& path)
+SampleRecord* SampleLibrary::findMutable(const cydaw::base::Text& path)
 {
     const auto found = index_.find(path);
     return found != index_.end() && found->second < samples_.size()
                ? &samples_[found->second] : nullptr;
 }
 
-bool SampleLibrary::setFavourite(const juce::String& path, const bool favourite)
+bool SampleLibrary::setFavourite(const cydaw::base::Text& path, const bool favourite)
 {
     auto* record = findMutable(path);
     if (record == nullptr)
@@ -1620,18 +1640,18 @@ bool SampleLibrary::setFavourite(const juce::String& path, const bool favourite)
     return true;
 }
 
-bool SampleLibrary::setRating(const juce::String& path, const int rating)
+bool SampleLibrary::setRating(const cydaw::base::Text& path, const int rating)
 {
     auto* record = findMutable(path);
     if (record == nullptr)
         return false;
-    record->rating = juce::jlimit(0, 5, rating);
+    record->rating = cydaw::base::limit(0, 5, rating);
     markDirty();
     notify(false);
     return true;
 }
 
-bool SampleLibrary::setCategory(const juce::String& path, const juce::String& category)
+bool SampleLibrary::setCategory(const cydaw::base::Text& path, const cydaw::base::Text& category)
 {
     auto* record = findMutable(path);
     if (record == nullptr)
@@ -1643,7 +1663,7 @@ bool SampleLibrary::setCategory(const juce::String& path, const juce::String& ca
     return true;
 }
 
-bool SampleLibrary::setType(const juce::String& path, const juce::String& type)
+bool SampleLibrary::setType(const cydaw::base::Text& path, const cydaw::base::Text& type)
 {
     auto* record = findMutable(path);
     if (record == nullptr)
@@ -1655,13 +1675,13 @@ bool SampleLibrary::setType(const juce::String& path, const juce::String& type)
     return true;
 }
 
-bool SampleLibrary::setBpm(const juce::String& path, const double bpm)
+bool SampleLibrary::setBpm(const cydaw::base::Text& path, const double bpm)
 {
     auto* record = findMutable(path);
     if (record == nullptr)
         return false;
-    record->bpm = bpm > 0.0 ? juce::jlimit(20.0, 400.0, std::round(bpm * 10.0) / 10.0) : 0.0;
-    record->bpmSource = bpm > 0.0 ? "user" : juce::String();
+    record->bpm = bpm > 0.0 ? cydaw::base::limit(20.0, 400.0, std::round(bpm * 10.0) / 10.0) : 0.0;
+    record->bpmSource = bpm > 0.0 ? "user" : cydaw::base::Text();
     record->bpmConfidence = bpm > 0.0 ? 1.0f : 0.0f;
     record->type = typeFor(record->length, record->name, record->bpm);
     record->userEdited = true;
@@ -1670,7 +1690,7 @@ bool SampleLibrary::setBpm(const juce::String& path, const double bpm)
     return true;
 }
 
-bool SampleLibrary::setTags(const juce::String& path, const juce::StringArray& tags)
+bool SampleLibrary::setTags(const cydaw::base::Text& path, const cydaw::base::TextList& tags)
 {
     auto* record = findMutable(path);
     if (record == nullptr)
@@ -1687,9 +1707,9 @@ bool SampleLibrary::setTags(const juce::String& path, const juce::StringArray& t
     return true;
 }
 
-juce::StringArray SampleLibrary::distinctCategories() const
+cydaw::base::TextList SampleLibrary::distinctCategories() const
 {
-    juce::StringArray out;
+    cydaw::base::TextList out;
     for (const auto& record : samples_)
         if (record.category.isNotEmpty() && !out.contains(record.category))
             out.add(record.category);
@@ -1697,9 +1717,9 @@ juce::StringArray SampleLibrary::distinctCategories() const
     return out;
 }
 
-juce::StringArray SampleLibrary::distinctTypes() const
+cydaw::base::TextList SampleLibrary::distinctTypes() const
 {
-    juce::StringArray out;
+    cydaw::base::TextList out;
     for (const auto& record : samples_)
         if (record.type.isNotEmpty() && !out.contains(record.type))
             out.add(record.type);
@@ -1707,13 +1727,13 @@ juce::StringArray SampleLibrary::distinctTypes() const
     return out;
 }
 
-juce::StringArray SampleLibrary::distinctTags() const
+cydaw::base::TextList SampleLibrary::distinctTags() const
 {
-    std::set<juce::String> unique;
+    std::set<cydaw::base::Text> unique;
     for (const auto& record : samples_)
         for (const auto& tag : record.tags)
             unique.insert(tag);
-    juce::StringArray out;
+    cydaw::base::TextList out;
     for (const auto& tag : unique)
         out.add(tag);
     return out;
@@ -1723,7 +1743,7 @@ void SampleLibrary::classify(const bool onlyUnclassified)
 {
     if (isClassifying())
         return;
-    juce::StringArray paths;
+    cydaw::base::TextList paths;
     for (const auto& record : samples_)
         if (record.analysed && !record.userEdited
             && (!onlyUnclassified || record.classifier != "clap"))
@@ -1738,12 +1758,12 @@ void SampleLibrary::classify(const bool onlyUnclassified)
     classifierMessage_ = "classification CLAP en cours";
     classifier_ = std::make_unique<Classifier>(*this, std::move(paths), classifierScript(),
                                                pythonCommand_, cacheFolder_);
-    classifier_->startThread(juce::Thread::Priority::low);
+    classifier_->startThread(cydaw::base::Thread::Priority::low);
     notifyProgress();
 }
 
 void SampleLibrary::applyClassification(std::vector<SampleRecord> results, const bool finished,
-                                        juce::String message)
+                                        cydaw::base::Text message)
 {
     for (const auto& result : results) {
         auto* record = findMutable(result.path);
@@ -1764,7 +1784,7 @@ void SampleLibrary::applyClassification(std::vector<SampleRecord> results, const
     if (finished) {
         classifierMessage_ = message.isNotEmpty()
                                  ? message
-                                 : juce::String(classified_.load()) + " classes par CLAP";
+                                 : cydaw::base::Text(classified_.load()) + " classes par CLAP";
         if (classifier_ != nullptr && !classifier_->isThreadRunning())
             classifier_.reset();
     } else if (message.isNotEmpty()) {
@@ -1774,12 +1794,12 @@ void SampleLibrary::applyClassification(std::vector<SampleRecord> results, const
 }
 
 void SampleLibrary::mergeRecords(std::vector<SampleRecord> records, const bool finished, const bool complete,
-                                 std::set<juce::String> present, std::vector<juce::File> roots)
+                                 std::set<cydaw::base::Text> present, std::vector<cydaw::base::File> roots)
 {
     auto structure = false;
     // A folder removed (the banks left out) while it was scanned: what it
     // found is not kept.
-    std::set<juce::String> current;
+    std::set<cydaw::base::Text> current;
     for (const auto& root : this->roots())
         current.insert(root.folder.getFullPathName());
     std::erase_if(records, [&current](const SampleRecord& record) { return !current.contains(record.root); });
@@ -1822,7 +1842,7 @@ void SampleLibrary::mergeRecords(std::vector<SampleRecord> records, const bool f
             setSetting("sampleCategoryRules", categoryRulesVersion);
         }
         if (complete) {
-            std::set<juce::String> scanned;
+            std::set<cydaw::base::Text> scanned;
             for (const auto& root : roots)
                 scanned.insert(root.getFullPathName());
             const auto before = samples_.size();
@@ -1840,7 +1860,7 @@ void SampleLibrary::mergeRecords(std::vector<SampleRecord> records, const bool f
         saveCache();
         if (pendingRescan_) {
             const auto full = pendingFull_;
-            juce::MessageManager::callAsync([this, full] {
+            cydaw::base::EventLoop::post([this, full] {
                 if (!isScanning())
                     rescan(full);
             });
@@ -1885,7 +1905,7 @@ void SampleLibrary::saveNow()
     saveSettings();
 }
 
-juce::var SampleLibrary::setting(const juce::String& key, const juce::var& fallback)
+cydaw::base::Value SampleLibrary::setting(const cydaw::base::Text& key, const cydaw::base::Value& fallback)
 {
     auto& settings = settingsFile();
     if (!settings.containsKey(key))
@@ -1898,10 +1918,10 @@ juce::var SampleLibrary::setting(const juce::String& key, const juce::var& fallb
     return text;
 }
 
-void SampleLibrary::setSetting(const juce::String& key, const juce::var& value)
+void SampleLibrary::setSetting(const cydaw::base::Text& key, const cydaw::base::Value& value)
 {
     auto& settings = settingsFile();
-    settings.setValue(key, value.isBool() ? juce::var(static_cast<bool>(value) ? 1 : 0) : value);
+    settings.setValue(key, value.isBool() ? cydaw::base::Value(static_cast<bool>(value) ? 1 : 0) : value);
     settings.saveIfNeeded();
 }
 
@@ -1916,12 +1936,12 @@ void SampleLibrary::timerCallback()
     if (classifier_ != nullptr && !classifier_->isThreadRunning())
         classifier_.reset();
     if (loaded_ && autoRescanMinutes_ > 0 && !isScanning() && !roots().empty()
-        && juce::Time::currentTimeMillis() - lastScanMs_
-               > static_cast<juce::int64>(autoRescanMinutes_) * 60'000)
+        && cydaw::base::Time::currentTimeMillis() - lastScanMs_
+               > static_cast<std::int64_t>(autoRescanMinutes_) * 60'000)
         rescan(false);
 }
 
-juce::PropertiesFile& SampleLibrary::settingsFile()
+cydaw::base::PropertiesFile& SampleLibrary::settingsFile()
 {
     return otherSettings_ != nullptr ? *otherSettings_ : *properties_.getUserSettings();
 }
@@ -1929,34 +1949,34 @@ juce::PropertiesFile& SampleLibrary::settingsFile()
 void SampleLibrary::loadSettings()
 {
     auto* settings = &settingsFile();
-    cacheFolder_ = juce::File(settings->getValue("sampleCacheFolder"));
-    if (cacheFolder_ == juce::File {} || !cacheFolder_.isDirectory()) {
+    cacheFolder_ = cydaw::base::File(settings->getValue("sampleCacheFolder"));
+    if (cacheFolder_ == cydaw::base::File {} || !cacheFolder_.isDirectory()) {
         cacheFolder_ = defaultCacheFolder();
         (void) cacheFolder_.createDirectory();
     }
-    juce::StringArray folders;
+    cydaw::base::TextList folders;
     folders.addLines(settings->getValue("sampleFolders"));
     if (folders.isEmpty() && otherSettings_ == nullptr) {
         // The folders the narrow browser already knows, so the explorer
         // opens on them.
-        juce::PropertiesFile::Options options;
+        cydaw::base::PropertiesFile::Options options;
         options.applicationName = "CyDAW";
         options.filenameSuffix = ".library.settings";
         options.folderName = "CyDAW";
         options.osxLibrarySubFolder = "Application Support";
-        juce::ApplicationProperties browser;
+        cydaw::base::ApplicationProperties browser;
         browser.setStorageParameters(options);
         folders.addLines(browser.getUserSettings()->getValue("sampleFolders"));
     }
     folders.removeEmptyStrings();
     for (const auto& folder : folders)
-        if (juce::File(folder).isDirectory())
+        if (cydaw::base::File(folder).isDirectory())
             folders_.emplace_back(folder);
     autoRescanMinutes_ = settings->getIntValue("sampleAutoRescanMinutes", 10);
     includeBanks_ = settings->getBoolValue("sampleIncludeBanks", true);
     rulesOutdated_ = settings->getIntValue("sampleCategoryRules", 0) != categoryRulesVersion;
     classifierEnabled_ = settings->getBoolValue("sampleClassifier", false);
-    classifierScript_ = juce::File(settings->getValue("sampleClassifierScript"));
+    classifierScript_ = cydaw::base::File(settings->getValue("sampleClassifierScript"));
     pythonCommand_ = settings->getValue("samplePython", "python");
 }
 
@@ -1965,7 +1985,7 @@ void SampleLibrary::saveSettings()
     auto* settings = &settingsFile();
     if (!cacheFolderGiven_)
         settings->setValue("sampleCacheFolder", cacheFolder_.getFullPathName());
-    juce::StringArray folders;
+    cydaw::base::TextList folders;
     for (const auto& folder : folders_)
         folders.add(folder.getFullPathName());
     settings->setValue("sampleFolders", folders.joinIntoString("\n"));
@@ -1983,11 +2003,11 @@ constexpr int binaryMagic = 0x4c535943; // "CYSL"
 constexpr int binaryVersion = 2;
 } // namespace
 
-std::vector<SampleRecord> SampleLibrary::readCacheFile(const juce::File& folder)
+std::vector<SampleRecord> SampleLibrary::readCacheFile(const cydaw::base::File& folder)
 {
     std::vector<SampleRecord> records;
-    if (juce::FileInputStream in(folder.getChildFile(binaryIndexName)); in.openedOk()) {
-        juce::BufferedInputStream buffered(in, 1 << 16);
+    if (cydaw::base::FileInputStream in(folder.getChildFile(binaryIndexName)); in.openedOk()) {
+        auto& buffered = in;
         if (buffered.readInt() == binaryMagic && buffered.readInt() == binaryVersion) {
             const auto count = buffered.readInt();
             records.reserve(static_cast<std::size_t>(std::clamp(count, 0, 1'000'000)));
@@ -2001,21 +2021,21 @@ std::vector<SampleRecord> SampleLibrary::readCacheFile(const juce::File& folder)
         }
     }
     // The first library, written as JSON.
-    const auto document = juce::JSON::parse(folder.getChildFile(indexFileName));
-    if (const auto* list = document.getProperty("samples", juce::var()).getArray())
+    const auto document = cydaw::base::JSON::parse(folder.getChildFile(indexFileName));
+    if (const auto* list = document.getProperty("samples", cydaw::base::Value()).getArray())
         for (const auto& value : *list)
             if (auto record = restore(value))
                 records.push_back(std::move(*record));
     return records;
 }
 
-bool SampleLibrary::writeCacheFile(const juce::File& folder, const std::vector<SampleRecord>& records)
+bool SampleLibrary::writeCacheFile(const cydaw::base::File& folder, const std::vector<SampleRecord>& records)
 {
     (void) folder.createDirectory();
     const auto target = folder.getChildFile(binaryIndexName);
     const auto temporary = target.getSiblingFile("sample-library.tmp");
     {
-        juce::FileOutputStream out(temporary, 1 << 16);
+        cydaw::base::FileOutputStream out(temporary, 1 << 16);
         if (!out.openedOk())
             return false;
         out.setPosition(0);
@@ -2041,9 +2061,9 @@ void SampleLibrary::loadCache()
     // Read off the message thread: a library of the banks holds tens of
     // thousands of sounds.
     const auto generation = ++loadGeneration_;
-    io_.addJob([library = juce::WeakReference<SampleLibrary>(this), folder = cacheFolder_, generation] {
+    io_.addJob([library = cydaw::base::WeakReference<SampleLibrary>(this), folder = cacheFolder_, generation] {
         auto records = readCacheFile(folder);
-        juce::MessageManager::callAsync([library, records = std::move(records), generation]() mutable {
+        cydaw::base::EventLoop::post([library, records = std::move(records), generation]() mutable {
             if (auto* owner = library.get())
                 owner->cacheLoaded(std::move(records), generation);
         });
@@ -2054,7 +2074,7 @@ void SampleLibrary::cacheLoaded(std::vector<SampleRecord> records, const int gen
 {
     if (generation != loadGeneration_)
         return;
-    std::set<juce::String> kept;
+    std::set<cydaw::base::Text> kept;
     for (const auto& root : roots())
         kept.insert(root.folder.getFullPathName());
     for (auto& record : records)
@@ -2086,9 +2106,9 @@ void SampleLibrary::saveCache()
     saving_ = true;
     saveAgain_ = false;
     dirty_ = false;
-    io_.addJob([library = juce::WeakReference<SampleLibrary>(this), folder = cacheFolder_, snapshot = samples_] {
+    io_.addJob([library = cydaw::base::WeakReference<SampleLibrary>(this), folder = cacheFolder_, snapshot = samples_] {
         const auto written = writeCacheFile(folder, snapshot);
-        juce::MessageManager::callAsync([library, written] {
+        cydaw::base::EventLoop::post([library, written] {
             if (auto* owner = library.get()) {
                 owner->saving_ = false;
                 if (!written || owner->saveAgain_)

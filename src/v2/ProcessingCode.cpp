@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 // The EEL2 headers include windows.h: its min/max macros kept out.
 #ifndef NOMINMAX
  #define NOMINMAX
@@ -25,7 +27,7 @@ namespace {
 // ---- Note scripts ----
 
 // "param1:20<0,100,1>Timing (ms)": its index, default, range and name.
-std::optional<Setting> parseParam(const juce::String& line)
+std::optional<Setting> parseParam(const cydaw::base::Text& line)
 {
     const auto text = line.trim();
     if (!text.startsWithIgnoreCase("param"))
@@ -41,7 +43,7 @@ std::optional<Setting> parseParam(const juce::String& line)
     Setting setting;
     setting.index = number - 1;
     setting.defaultValue = text.substring(colon + 1, open).trim().getDoubleValue();
-    const auto range = juce::StringArray::fromTokens(text.substring(open + 1, close), ",", "");
+    const auto range = cydaw::base::TextList::fromTokens(text.substring(open + 1, close), ",", "");
     setting.minimum = range.size() > 0 ? range[0].trim().getDoubleValue() : 0.0;
     setting.maximum = range.size() > 1 ? range[1].trim().getDoubleValue() : 1.0;
     setting.step = range.size() > 2 ? range[2].trim().getDoubleValue() : 0.0;
@@ -49,22 +51,22 @@ std::optional<Setting> parseParam(const juce::String& line)
         std::swap(setting.minimum, setting.maximum);
     setting.name = text.substring(close + 1).trim();
     if (setting.name.isEmpty())
-        setting.name = "param" + juce::String(number);
+        setting.name = "param" + cydaw::base::Text(number);
     return setting;
 }
 
 struct Sections {
-    juce::String header, init, note, end;
+    cydaw::base::Text header, init, note, end;
     int initLine {}, noteLine {}, endLine {};
 };
 
-Sections split(const juce::String& source)
+Sections split(const cydaw::base::Text& source)
 {
     Sections sections;
-    juce::String* current = &sections.header;
-    juce::String ignored;
+    cydaw::base::Text* current = &sections.header;
+    cydaw::base::Text ignored;
     auto lineNumber = 0;
-    for (const auto& line : juce::StringArray::fromLines(source)) {
+    for (const auto& line : cydaw::base::TextList::fromLines(source)) {
         const auto trimmed = line.trim();
         if (trimmed.startsWith("@")) {
             const auto name = trimmed.substring(1).upToFirstOccurrenceOf(" ", false, false).toLowerCase();
@@ -196,7 +198,7 @@ struct Machine {
     Machine(const Machine&) = delete;
     Machine& operator=(const Machine&) = delete;
     // Null and `error` when it does not compile (an empty part: no code).
-    NSEEL_CODEHANDLE compile(const juce::String& text, const int line, const juce::String& section, juce::String& error)
+    NSEEL_CODEHANDLE compile(const cydaw::base::Text& text, const int line, const cydaw::base::Text& section, cydaw::base::Text& error)
     {
         if (text.trim().isEmpty())
             return nullptr;
@@ -204,7 +206,7 @@ struct Machine {
         auto* handle = NSEEL_code_compile_ex(vm, text.toRawUTF8(), line, 0);
         if (handle == nullptr) {
             const auto* message = NSEEL_code_getcodeerror(vm);
-            error = "@" + section + ": " + (message != nullptr ? juce::String::fromUTF8(message) : juce::String("does not compile"));
+            error = "@" + section + ": " + (message != nullptr ? cydaw::base::Text::fromUTF8(message) : cydaw::base::Text("does not compile"));
         }
         code.push_back(handle);
         return handle;
@@ -218,10 +220,10 @@ enum Variable { pitchVar, startVar, lengthVar, velocityVar, chanceVar, indexVar,
 
 } // namespace
 
-std::vector<Setting> noteScriptSettings(const juce::String& source)
+std::vector<Setting> noteScriptSettings(const cydaw::base::Text& source)
 {
     std::vector<Setting> settings;
-    for (const auto& line : juce::StringArray::fromLines(split(source).header))
+    for (const auto& line : cydaw::base::TextList::fromLines(split(source).header))
         if (auto setting = parseParam(line))
             if (std::none_of(settings.begin(), settings.end(), [&](const Setting& other) { return other.index == setting->index; }))
                 settings.push_back(*setting);
@@ -229,7 +231,7 @@ std::vector<Setting> noteScriptSettings(const juce::String& source)
     return settings;
 }
 
-juce::String checkNoteScript(const juce::String& source)
+cydaw::base::Text checkNoteScript(const cydaw::base::Text& source)
 {
     const auto sections = split(source);
     if (sections.note.trim().isEmpty() && sections.init.trim().isEmpty() && sections.end.trim().isEmpty())
@@ -237,7 +239,7 @@ juce::String checkNoteScript(const juce::String& source)
     Machine machine;
     for (const auto* name : variableNames)
         (void) NSEEL_VM_regvar(machine.vm, name);
-    juce::String error;
+    cydaw::base::Text error;
     (void) machine.compile(sections.init, sections.initLine, "init", error);
     if (error.isEmpty())
         (void) machine.compile(sections.note, sections.noteLine, "note", error);
@@ -246,7 +248,7 @@ juce::String checkNoteScript(const juce::String& source)
     return error;
 }
 
-NoteScriptResult runNoteScript(const juce::String& source, std::vector<ScriptNote> notes, const std::map<int, double>& values,
+NoteScriptResult runNoteScript(const cydaw::base::Text& source, std::vector<ScriptNote> notes, const std::map<int, double>& values,
                                const double tempo, const double clipLength, const std::uint32_t seed)
 {
     NoteScriptResult result;
@@ -353,13 +355,13 @@ NoteScriptResult runNoteScript(const juce::String& source, std::vector<ScriptNot
 namespace {
 
 // The source in a file of its own (ysfx reads files), in the cache.
-juce::File scriptFile(const juce::String& source)
+cydaw::base::File scriptFile(const cydaw::base::Text& source)
 {
     const auto text = source.replace("\r\n", "\n");
     const auto folder = locations::folder(Location::cache).getChildFile("processing");
-    const auto file = folder.getChildFile(juce::String::toHexString(text.hashCode64()) + ".jsfx");
+    const auto file = folder.getChildFile(cydaw::base::Text::toHexString(text.hashCode64()) + ".jsfx");
     static std::mutex lock;
-    static std::set<juce::String> written;
+    static std::set<cydaw::base::Text> written;
     const std::scoped_lock held(lock);
     if (written.count(file.getFullPathName()) > 0 && file.existsAsFile())
         return file;
@@ -373,7 +375,7 @@ juce::File scriptFile(const juce::String& source)
 struct Loaded {
     ysfx_config_u config { ysfx_config_new() };
     ysfx_u fx;
-    juce::String log;
+    cydaw::base::Text log;
     Loaded() = default;
     Loaded(const Loaded&) = delete;
     Loaded& operator=(const Loaded&) = delete;
@@ -383,14 +385,14 @@ struct Loaded {
         fx.reset();
         config.reset();
     }
-    bool load(const juce::String& source, juce::String& error)
+    bool load(const cydaw::base::Text& source, cydaw::base::Text& error)
     {
         const std::scoped_lock lock(eelLock());
         ysfx_set_user_data(config.get(), reinterpret_cast<intptr_t>(this));
         ysfx_set_log_reporter(config.get(), [](intptr_t data, ysfx_log_level level, const char* message) {
             auto* self = reinterpret_cast<Loaded*>(data);
             if (self->log.length() < 16'384)
-                self->log << ysfx_log_level_string(level) << ": " << juce::String::fromUTF8(message) << "\n";
+                self->log << ysfx_log_level_string(level) << ": " << cydaw::base::Text::fromUTF8(message) << "\n";
         });
         const auto file = scriptFile(source);
         ysfx_guess_file_roots(config.get(), file.getFullPathName().toRawUTF8());
@@ -398,7 +400,7 @@ struct Loaded {
         ysfx_register_builtin_audio_formats(config.get());
         fx.reset(ysfx_new(config.get()));
         if (!fx || !ysfx_load_file(fx.get(), file.getFullPathName().toRawUTF8(), 0) || !ysfx_compile(fx.get(), 0)) {
-            error = log.isNotEmpty() ? log.trim() : juce::String("the JSFX does not compile");
+            error = log.isNotEmpty() ? log.trim() : cydaw::base::Text("the JSFX does not compile");
             return false;
         }
         return true;
@@ -407,10 +409,10 @@ struct Loaded {
 
 } // namespace
 
-JsfxInfo inspectJsfx(const juce::String& source)
+JsfxInfo inspectJsfx(const cydaw::base::Text& source)
 {
     static std::mutex lock;
-    static std::map<juce::String, JsfxInfo> seen;
+    static std::map<cydaw::base::Text, JsfxInfo> seen;
     {
         const std::scoped_lock held(lock);
         if (const auto found = seen.find(source); found != seen.end())
@@ -429,34 +431,34 @@ JsfxInfo inspectJsfx(const juce::String& source)
         return info;
     }
     info.ok = true;
-    info.name = juce::String::fromUTF8(ysfx_get_name(loaded.fx.get()));
+    info.name = cydaw::base::Text::fromUTF8(ysfx_get_name(loaded.fx.get()));
     for (int i = 0; i < ysfx_max_sliders; ++i)
         if (ysfx_slider_exists(loaded.fx.get(), static_cast<uint32_t>(i))) {
             ysfx_slider_range_t range {};
             ysfx_slider_get_range(loaded.fx.get(), static_cast<uint32_t>(i), &range);
             Setting setting;
             setting.index = i;
-            setting.name = juce::String::fromUTF8(ysfx_slider_get_name(loaded.fx.get(), static_cast<uint32_t>(i)));
+            setting.name = cydaw::base::Text::fromUTF8(ysfx_slider_get_name(loaded.fx.get(), static_cast<uint32_t>(i)));
             setting.minimum = range.min;
             setting.maximum = range.max;
             setting.step = range.inc;
             setting.defaultValue = range.def;
             if (ysfx_slider_is_enum(loaded.fx.get(), static_cast<uint32_t>(i)))
                 for (uint32_t j = 0; j < ysfx_slider_get_enum_size(loaded.fx.get(), static_cast<uint32_t>(i)); ++j)
-                    setting.choices.add(juce::String::fromUTF8(ysfx_slider_get_enum_name(loaded.fx.get(), static_cast<uint32_t>(i), j)));
+                    setting.choices.add(cydaw::base::Text::fromUTF8(ysfx_slider_get_enum_name(loaded.fx.get(), static_cast<uint32_t>(i), j)));
             info.sliders.push_back(setting);
         }
     remember();
     return info;
 }
 
-juce::Result renderJsfx(const juce::String& source, const std::map<int, double>& values, engine::repair::Channels& channels,
+cydaw::base::Result renderJsfx(const cydaw::base::Text& source, const std::map<int, double>& values, engine::repair::Channels& channels,
                         const double rate, const std::int64_t frames, const std::atomic<bool>* cancel)
 {
     Loaded loaded;
-    juce::String error;
+    cydaw::base::Text error;
     if (!loaded.load(source, error))
-        return juce::Result::fail(error);
+        return cydaw::base::Result::fail(error);
     auto* fx = loaded.fx.get();
     constexpr uint32_t block = 512;
     ysfx_set_sample_rate(fx, rate);
@@ -477,7 +479,7 @@ juce::Result renderJsfx(const juce::String& source, const std::map<int, double>&
     std::int64_t latency = -1;
     for (std::int64_t at = 0;; at += block) {
         if (cancel != nullptr && cancel->load())
-            return juce::Result::fail("cancelled");
+            return cydaw::base::Result::fail("cancelled");
         if (latency < 0)
             latency = std::max<std::int64_t>(0, static_cast<std::int64_t>(std::lround(ysfx_get_pdc_delay(fx))));
         if (at >= frames + latency)
@@ -497,7 +499,7 @@ juce::Result renderJsfx(const juce::String& source, const std::map<int, double>&
             }
     }
     channels = std::move(rendered);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 } // namespace cydaw::v2::processing

@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
 #include "SynthView.h"
 #include "InstrumentPanels.h"
 
@@ -37,13 +39,13 @@ ImU32 fromArgb(const std::uint32_t argb)
 
 std::string upperCase(const std::string& text)
 {
-    auto upper = juce::String::fromUTF8(text.c_str()).toUpperCase();
+    auto upper = cydaw::base::Text::fromUTF8(text.c_str()).toUpperCase();
     static const char* const accents[][2] { { "\xc3\xa0", "\xc3\x80" }, { "\xc3\xa2", "\xc3\x82" }, { "\xc3\xa7", "\xc3\x87" },
                                             { "\xc3\xa8", "\xc3\x88" }, { "\xc3\xa9", "\xc3\x89" }, { "\xc3\xaa", "\xc3\x8a" },
                                             { "\xc3\xab", "\xc3\x8b" }, { "\xc3\xae", "\xc3\x8e" }, { "\xc3\xaf", "\xc3\x8f" },
                                             { "\xc3\xb4", "\xc3\x94" }, { "\xc3\xb9", "\xc3\x99" }, { "\xc3\xbb", "\xc3\x9b" } };
     for (const auto& [lower, capital] : accents)
-        upper = upper.replace(juce::String::fromUTF8(lower), juce::String::fromUTF8(capital));
+        upper = upper.replace(cydaw::base::Text::fromUTF8(lower), cydaw::base::Text::fromUTF8(capital));
     return upper.toStdString();
 }
 
@@ -91,12 +93,12 @@ double hashNoise(const int index)
 
 SynthView::SynthView(DeviceHost& studio, UiState& state) : studio_(studio), state_(state), presets_(studio, state) {}
 
-bool SynthView::handles(const juce::String& typeKey)
+bool SynthView::handles(const cydaw::base::Text& typeKey)
 {
     return synth::modelForType(typeKey.toStdString()) != synth::Model::none;
 }
 
-float SynthView::paneWidth(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const float height)
+float SynthView::paneWidth(app::GraphDocument& graph, const std::uint64_t nodeId, const float height)
 {
     const auto values = graph.editorSynthValues(nodeId);
     if (!values || values->first == synth::Model::none)
@@ -111,7 +113,7 @@ float SynthView::paneWidth(app::NodeGraphComponent& graph, const std::uint64_t n
     return std::max(dp(120.0f), width - dp(4.0f));
 }
 
-bool SynthView::bind(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+bool SynthView::bind(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     const auto values = graph.editorSynthValues(nodeId);
     if (!values || values->first == synth::Model::none)
@@ -124,7 +126,7 @@ bool SynthView::bind(const TrackRef& track, app::NodeGraphComponent& graph, cons
     card_.live = studio_.voiceLive(track, card_.heard);
     // As it plays: the lanes at the playhead, then the voice's modulations.
     card_.played = card_.values;
-    const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + "." + juce::String(synth::info(card_.model).prefix) + ".";
+    const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + "." + cydaw::base::Text(synth::info(card_.model).prefix) + ".";
     for (const auto& binding : studio_.automatedParameters(track))
         if (binding.startsWith(prefix))
             if (const auto index = synth::parameterIndex(card_.model, binding.substring(prefix.length()).toStdString()); index >= 0)
@@ -162,10 +164,10 @@ float SynthView::valueOf(const char* key) const
     return value(indexOf(key));
 }
 
-juce::String SynthView::bindingOf(const int index) const
+cydaw::base::Text SynthView::bindingOf(const int index) const
 {
-    return "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + "." + juce::String(synth::info(card_.model).prefix) + "."
-           + juce::String(synth::parameter(card_.model, index).key);
+    return "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + "." + cydaw::base::Text(synth::info(card_.model).prefix) + "."
+           + cydaw::base::Text(synth::parameter(card_.model, index).key);
 }
 
 void SynthView::set(const int index, const float newValue)
@@ -360,7 +362,7 @@ bool SynthView::knob(const int index, const char* label, const float diameter)
     bool changed {};
     {
         const ui::LearnParameterScope learn(bindingOf(index),
-                                            juce::String::fromUTF8((ui::french() ? parameter.french : parameter.english).c_str()),
+                                            cydaw::base::Text::fromUTF8((ui::french() ? parameter.french : parameter.english).c_str()),
                                             studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
         changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
     }
@@ -369,7 +371,7 @@ bool SynthView::knob(const int index, const char* label, const float diameter)
     const auto active = ImGui::IsItemActive();
     if (changed)
         set(index, synth::denormalise(card_.model, index, normalised));
-    const auto name = juce::String::fromUTF8((ui::french() ? parameter.french : parameter.english).c_str());
+    const auto name = cydaw::base::Text::fromUTF8((ui::french() ? parameter.french : parameter.english).c_str());
     const auto shown = synth::displayValue(card_.model, index, value(index), ui::french());
     // Right click: its default, a lane in the arrangement.
     if (ImGui::BeginPopupContextItem("##knobMenu")) {
@@ -398,9 +400,9 @@ bool SynthView::knob(const int index, const char* label, const float diameter)
                                                       "Double click: default · right click: automate"));
     // Its name, its value while touched; greyed alone, what it waits on.
     const auto waits = greyed && !quietGreyed_ && !hovered && !active;
-    const auto text = hovered || active ? juce::String::fromUTF8(shown.c_str())
-                      : waits           ? juce::String::fromUTF8(greyedWho_.c_str())
-                                        : juce::String::fromUTF8(label != nullptr ? label : "");
+    const auto text = hovered || active ? cydaw::base::Text::fromUTF8(shown.c_str())
+                      : waits           ? cydaw::base::Text::fromUTF8(greyedWho_.c_str())
+                                        : cydaw::base::Text::fromUTF8(label != nullptr ? label : "");
     auto* list = ImGui::GetWindowDrawList();
     ImGui::PushFont(nullptr, ui::currentFontBase() * labelScale());
     const auto textHeight = ImGui::GetFontSize();
@@ -1301,7 +1303,7 @@ void SynthView::drawOrb(ImDrawList* list, const char* prefix, const ImVec2 origi
 
 // ---- The card's pane, the window ------------------------------------------------------------------
 
-void SynthView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
+void SynthView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 origin,
                          const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.
@@ -1336,7 +1338,7 @@ void SynthView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, 
         // Its name in its colour; a double click opens the window (where
         // the rest is, when it did not all fit).
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.78f);
-        const auto title = juce::String::fromUTF8(L(item.french, item.english)) + (more ? juce::String::fromUTF8(" \xe2\x80\xa6") : juce::String());
+        const auto title = cydaw::base::Text::fromUTF8(L(item.french, item.english)) + (more ? cydaw::base::Text::fromUTF8(" \xe2\x80\xa6") : cydaw::base::Text());
         ui::clippedText(list, ImVec2(min.x + padding, min.y + dp(3.0f)), inner, tint, title.toRawUTF8());
         ImGui::PopFont();
         ImGui::SetCursorScreenPos(ImVec2(min.x, min.y));
@@ -1388,8 +1390,8 @@ bool SynthView::drawEditorWindow(const bool focus)
     if (focus)
         ImGui::SetNextWindowFocus();
     auto open = true;
-    const auto title = juce::String::fromUTF8((ui::french() ? info.french : info.english).c_str()) + juce::String::fromUTF8(" \xe2\x80\x94 ")
-                       + studio_.trackName(target.track) + juce::String(windowId_);
+    const auto title = cydaw::base::Text::fromUTF8((ui::french() ? info.french : info.english).c_str()) + cydaw::base::Text::fromUTF8(" \xe2\x80\x94 ")
+                       + studio_.trackName(target.track) + cydaw::base::Text(windowId_);
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, theme::mix(layout.colour, p.bg2 | 0xff000000u, 0.65f));
     const auto visible = ui::beginEditorWindow(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor();
@@ -1409,7 +1411,7 @@ bool SynthView::drawEditorWindow(const bool focus)
             const auto track = target.track;
             const auto nodeId = target.nodeId;
             presets_.bar("synthPresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                         [this, track, nodeId](const juce::var& preset, juce::String& error) {
+                         [this, track, nodeId](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                              return studio_.applyDevicePreset(track, nodeId, preset, error);
                          },
                          dp(330.0f));
@@ -1447,8 +1449,8 @@ bool SynthView::drawEditorWindow(const bool focus)
                     { "limiter", "Limiteur", "Limiter" },
                 };
                 ImGui::BeginChild("##synthEffects", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
-                instrument_effects::draw(studio_, state_, target.track, juce::String(info.typeKey),
-                                         juce::String::fromUTF8((ui::french() ? info.french : info.english).c_str()), effects, layout.colour);
+                instrument_effects::draw(studio_, state_, target.track, cydaw::base::Text(info.typeKey),
+                                         cydaw::base::Text::fromUTF8((ui::french() ? info.french : info.english).c_str()), effects, layout.colour);
                 ImGui::EndChild();
                 ImGui::EndTabItem();
             }

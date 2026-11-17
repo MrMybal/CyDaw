@@ -1,0 +1,193 @@
+{
+  "date": "2026-11-14",
+  "baselineCommit": "c136b4e",
+  "campaign": "output/cyaudio-frame-rate/2026-11-14-fixed-idle",
+  "checks": {
+    "menusEnglishFrench": true,
+    "defaultShutdown": {
+      "ms": 444.5089000000735,
+      "forced": false
+    },
+    "saved30": true,
+    "saved60": true,
+    "saved120": true,
+    "savedShutdown": {
+      "ms": 12073.289499996463,
+      "forced": false
+    }
+  },
+  "fps": [
+    {
+      "label": "restart120",
+      "expected": 120,
+      "actual": 120.1033562125754
+    },
+    {
+      "label": "default60",
+      "expected": 60,
+      "actual": 60.21054228382186,
+      "idle": 11.986477198911897
+    },
+    {
+      "label": "chosen30",
+      "expected": 30,
+      "actual": 29.95886562152192
+    },
+    {
+      "label": "chosen120",
+      "expected": 120,
+      "actual": 120.14637881386268
+    },
+    {
+      "label": "invalidDefaults60",
+      "expected": 60,
+      "actual": 59.941144646311784
+    }
+  ],
+  "performance": {
+    "summary": {
+      "before": {
+        "audio32": {
+          "parentCpuMedian": 21.110670000202255,
+          "min": 18.771218739478428,
+          "max": 22.04452450475933,
+          "values": [
+            18.771218739478428,
+            22.04452450475933,
+            21.110670000202255
+          ],
+          "parentGcyclesPerSecond": 1.6467515343692944,
+          "cyclesValues": [
+            1.3540923147510404,
+            1.6467515343692944,
+            1.741811890756436
+          ]
+        },
+        "effects16": {
+          "parentCpuMedian": 95.8490970873005,
+          "min": 82.9023800590568,
+          "max": 98.05027986579705,
+          "values": [
+            82.9023800590568,
+            98.05027986579705,
+            95.8490970873005
+          ],
+          "parentGcyclesPerSecond": 4.913545571777065,
+          "cyclesValues": [
+            4.394163269639077,
+            5.053140177824136,
+            4.913545571777065
+          ]
+        }
+      },
+      "fixed60": {
+        "audio32": {
+          "parentCpuMedian": 15.143146020741527,
+          "min": 12.40033601934936,
+          "max": 15.79445624347851,
+          "values": [
+            15.143146020741527,
+            12.40033601934936,
+            15.79445624347851
+          ],
+          "parentGcyclesPerSecond": 0.9920043478945144,
+          "cyclesValues": [
+            0.9920043478945144,
+            0.9006179805668838,
+            1.0461479589184879
+          ]
+        },
+        "effects16": {
+          "parentCpuMedian": 70.2049385787292,
+          "min": 67.87957210141752,
+          "max": 70.32868022337556,
+          "values": [
+            67.87957210141752,
+            70.2049385787292,
+            70.32868022337556
+          ],
+          "parentGcyclesPerSecond": 3.6343504007871683,
+          "cyclesValues": [
+            3.5319090425198616,
+            3.6343504007871683,
+            3.6456769360049086
+          ]
+        }
+      }
+    },
+    "protocol": {
+      "sampleRate": 48000,
+      "buffer": 1024,
+      "inputs": 0,
+      "outputs": 2,
+      "silent": true,
+      "hidden": true,
+      "profile": "isolated",
+      "rounds": 3,
+      "warmup": 2,
+      "seconds": 5,
+      "order": "alternated fresh processes",
+      "settings": "before=original monitor pacing; fixed60=default60 preference absent",
+      "topology": "numeric target indices checked",
+      "instrumentation": false
+    },
+    "hashes": {
+      "before": "5e27ee131af975f0bec6b440ad9fe74e3bd21b2dcb6003148cee90679569eab7",
+      "fixed60": "4cacd8249be724327411cfa8e9091a3e49102cbdfe31cb0367647720f5a7d03e"
+    }
+  },
+  "build": {
+    "compiler": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.40.33807\\bin\\Hostx64\\x64\\cl.exe",
+    "oldAbi": "416 8",
+    "newAbi": "416 8",
+    "pacingTest": "Frame pacing: 12/30/60/120 FPS, jitter and stall checks passed\n",
+    "sources": [
+      {
+        "path": "src/v2/ImGuiHost.cpp",
+        "sha256": "733f7aff1ce2eb1b6b5aa86be1d1776f010aa0248d8878cf7b75fa4fc22e2353"
+      },
+      {
+        "path": "src/v2/AppUi.cpp",
+        "sha256": "8a3d88c78c23cfdde2efc102d839f0ccd47f08dcf8def20ae082db3ac19a0126"
+      },
+      {
+        "path": "src/v2/BrowserView.cpp",
+        "sha256": "1b5555b38e021dc035a93268cbf2308402e136dfa57e3d9dd3011f7e186bb1ca"
+      },
+      {
+        "path": "src/v2/LibraryWindow.cpp",
+        "sha256": "f9e00487bdbc534b22b226b43f2fa1337fe426382448f052a8a1d218cc32e64b"
+      },
+      {
+        "path": "src/v2/ImGuiHost.h",
+        "sha256": "c49df7b55bea67068206663bde024d3a5fd87ff51944167a24aea39d8b94b356"
+      },
+      {
+        "path": "src/v2/FramePacing.h",
+        "sha256": "7b60b3bdd59133cccf92bc0573f04543d192afe80ba29eb32f5c3bee52f99fbd"
+      }
+    ],
+    "variants": {
+      "production": {
+        "exe": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-frame-rate\\2026-11-14-fixed-idle\\production\\CyDAW 2.exe",
+        "sha256": "4cacd8249be724327411cfa8e9091a3e49102cbdfe31cb0367647720f5a7d03e"
+      },
+      "instrumented": {
+        "exe": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-frame-rate\\2026-11-14-fixed-idle\\instrumented\\CyDAW 2.exe",
+        "sha256": "3de8e6233ae2318b503a9fbeb7bbb6165bce27487709dea2d07361b0a7639f31"
+      }
+    }
+  },
+  "evidence": [
+    "build-manifest.json",
+    "acceptance/results.json",
+    "performance/raw.json",
+    "performance/summary.json"
+  ],
+  "limits": [
+    "Windows only; local Release relink reuses original audio objects and pinned SDK headers, not a clean complete CMake build.",
+    "FPS localisation uses a QA-only frame counter; performance uses uninstrumented production executables.",
+    "Output-only silent ASIO 48000/1024; no microphone or MIDI input activated.",
+    "No DSP, audio callback, CyAudioCore, CyDSP or CyUI changes."
+  ]
+}

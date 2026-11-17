@@ -25,11 +25,15 @@ class PackageTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        for name in ('CMakeLists.txt', 'LICENSE', 'README.md', 'docs/V2_TEST_BUILD.md', 'juce/LICENSE.md',
+        for name in ('CMakeLists.txt', 'LICENSE', 'README.md', 'docs/V2_TEST_BUILD.md',
                      'content/factory/catalogue.json', 'build/CyDAW 2.exe', 'build/CyDAWPluginWorker.exe',
                      'build/fonts/Roboto-Medium.ttf', 'build/fonts/Cousine-Regular.ttf',
                      'build/i18n/en.json', 'build/Licenses/FFmpeg/LICENSE-LGPL-3.0.txt',
                      'build/Licenses/FFmpeg/sources/ffmpeg.tar.gz', 'build/ControlPlugins/Gamepads.cyctl',
+                     'build/Licenses/nlohmann-json/LICENSE.MIT', 'build/Licenses/pugixml/LICENSE.md',
+                     'build/Licenses/miniz/LICENSE', 'build/Licenses/stb/LICENSE',
+                     'build/Licenses/CyAudioCore/LICENSE', 'build/Licenses/CyAudioCore/manifest.json',
+                     'build/Licenses/CyDSP/LICENSE', 'build/Licenses/CyDSP/manifest.json',
                      'build/Licenses/CyUI/LICENSE', 'build/Licenses/CyUI/THIRD_PARTY_NOTICES.md',
                      'build/Licenses/CyUI/third_party/texteditor/LICENSE',
                      'build/Licenses/CyUI/third_party/lexilla/License.txt',
@@ -37,7 +41,7 @@ class PackageTests(unittest.TestCase):
                      'build/Licenses/CyUI/third_party/SciTE-Properties-License.txt'):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text('project(CyDAW VERSION 0.78.0)' if name == 'CMakeLists.txt' else 'fixture', 'utf-8')
+            path.write_text('project(CyDAW VERSION 0.79.0)' if name == 'CMakeLists.txt' else 'fixture', 'utf-8')
         for component in ('avcodec', 'avformat', 'avutil', 'swscale', 'swresample'):
             (self.root / 'build' / (component + '-1.dll')).write_bytes(b'fixture')
         candidates = [Path(os.environ['CYDAW_TEST_HELP_ROOT'])] if os.environ.get('CYDAW_TEST_HELP_ROOT') else [ROOT/'Documentation',ROOT/'build/cyui-migration/Documentation']
@@ -52,7 +56,7 @@ class PackageTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_complete_alpha_and_checksums(self):
-        archive = pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
+        archive = pack.package(self.root / 'build', self.root / 'out', True)
         with zipfile.ZipFile(archive) as bundle:
             names = bundle.namelist()
             self.assertTrue(any(n.endswith('/ALPHA.txt') for n in names))
@@ -69,36 +73,52 @@ class PackageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             publish.verified_assets(self.root / 'out')
 
+    def test_native_package_has_no_juce_requirement(self):
+        archive = pack.package(self.root / 'build', self.root / 'out', True)
+        with zipfile.ZipFile(archive) as bundle:
+            self.assertFalse(any(n.endswith('/JUCE_LICENSE.md') for n in bundle.namelist()))
+            self.assertTrue(any(n.endswith('/Licenses/CyAudioCore/LICENSE') for n in bundle.namelist()))
+
+    def test_personal_projects_and_models_are_not_packaged(self):
+        for name in ('templates/private-piano.cydaw', 'templates/Audio/private.wav',
+                     'content/factory/Sound Models/private-model.json'):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'personal content')
+        archive = pack.package(self.root / 'build', self.root / 'out', True)
+        with zipfile.ZipFile(archive) as bundle:
+            self.assertFalse(any('private' in name for name in bundle.namelist()))
+
     def test_missing_reader_data_fails(self):
         (self.root / 'build/Documentation/DocData/data.js').unlink()
         with self.assertRaises(ValueError):
-            pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
+            pack.package(self.root / 'build', self.root / 'out', True)
 
     def test_missing_manual_figure_fails(self):
         (self.root / 'build/Documentation/DocData/assets/studio-en.png').unlink()
         with self.assertRaises(ValueError):
-            pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
+            pack.package(self.root / 'build', self.root / 'out', True)
 
     def test_missing_codec_fails_before_packaging(self):
         (self.root / 'build/avcodec-1.dll').unlink()
         with self.assertRaises(FileNotFoundError):
-            pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
+            pack.package(self.root / 'build', self.root / 'out', True)
 
     def test_missing_cyui_licence_fails_before_packaging(self):
         (self.root / 'build/Licenses/CyUI/LICENSE').unlink()
         with self.assertRaises(FileNotFoundError):
-            pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
+            pack.package(self.root / 'build', self.root / 'out', True)
 
     def test_retry_finds_existing_draft(self):
-        existing = {'id': 42, 'tag_name': 'v2-0.78.0-alpha.1', 'draft': True,
+        existing = {'id': 42, 'tag_name': 'v2-0.79.0-alpha.1', 'draft': True,
                     'assets': [{'name': 'already-uploaded.zip'}]}
         request = lambda method, url: [existing]
         self.assertIs(publish.find_release(request, 'https://api.example', existing['tag_name']), existing)
-        self.assertIsNone(publish.find_release(request, 'https://api.example', 'v2-0.78.0-alpha.2'))
+        self.assertIsNone(publish.find_release(request, 'https://api.example', 'v2-0.79.0-alpha.2'))
 
     def test_only_versioned_alpha_tags(self):
-        self.assertEqual(publish.check_tag('v2-0.78.0-alpha.1'), '0.78.0')
-        for tag in ('v0.78.0', 'v2-0.78.0', 'v2-0.79.0-alpha.1', 'v2-0.78.0-alpha.0', '../alpha'):
+        self.assertEqual(publish.check_tag('v2-0.79.0-alpha.1'), '0.79.0')
+        for tag in ('v0.79.0', 'v2-0.79.0', 'v2-0.80.0-alpha.1', 'v2-0.79.0-alpha.0', '../alpha'):
             with self.assertRaises(ValueError):
                 publish.check_tag(tag)
 

@@ -1,6 +1,22 @@
+#include <cassert>
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
+#include <cydaw/audio/Sources.h>
+#include <cydaw/midi/StandardMidiFile.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "MidiEffectsHost.h"
 #include "AudioTrackController.h"
 #include "PlanSynthesiser.h"
+#include "KeyLatencyProbe.h"
 #include "Localization.h"
 
 #include <cydaw/engine/TimeStretch.h>
@@ -82,7 +98,7 @@ void shiftAutomation(
         point.timeSeconds += deltaSeconds;
 }
 
-void shiftLanes(std::map<juce::String, std::vector<AudioTrackController::AutomationPoint>>& lanes, const double deltaSeconds)
+void shiftLanes(std::map<cydaw::base::Text, std::vector<AudioTrackController::AutomationPoint>>& lanes, const double deltaSeconds)
 {
     for (auto& [name, points] : lanes)
         shiftAutomation(points, deltaSeconds);
@@ -124,8 +140,8 @@ bool sameStretchMarkers(
     return true;
 }
 
-bool sameLanes(const std::map<juce::String, std::vector<AudioTrackController::AutomationPoint>>& first,
-               const std::map<juce::String, std::vector<AudioTrackController::AutomationPoint>>& second)
+bool sameLanes(const std::map<cydaw::base::Text, std::vector<AudioTrackController::AutomationPoint>>& first,
+               const std::map<cydaw::base::Text, std::vector<AudioTrackController::AutomationPoint>>& second)
 {
     return first.size() == second.size()
            && std::equal(first.begin(), first.end(), second.begin(),
@@ -168,17 +184,17 @@ bool sameAudioEvents(
 
 void normaliseAudioClipTimeline(AudioTrackController::AudioClip& clip)
 {
-    clip.durationSeconds = juce::jlimit(
+    clip.durationSeconds = cydaw::base::limit(
         0.001, 86'400.0, clip.durationSeconds);
     const auto end = clip.playEndSeconds > clip.playStartSeconds + 0.000001
                          ? clip.playEndSeconds
                          : clip.durationSeconds;
-    clip.playStartSeconds = juce::jlimit(
+    clip.playStartSeconds = cydaw::base::limit(
         0.0, std::max(0.0, clip.durationSeconds - 0.001),
         clip.playStartSeconds);
-    clip.playEndSeconds = juce::jlimit(
+    clip.playEndSeconds = cydaw::base::limit(
         clip.playStartSeconds + 0.001, clip.durationSeconds, end);
-    clip.loopStartSeconds = juce::jlimit(
+    clip.loopStartSeconds = cydaw::base::limit(
         clip.playStartSeconds,
         std::max(clip.playStartSeconds,
                  clip.playEndSeconds - 0.001),
@@ -187,10 +203,10 @@ void normaliseAudioClipTimeline(AudioTrackController::AudioClip& clip)
                                  > clip.loopStartSeconds + 0.000001
                              ? clip.loopEndSeconds
                              : clip.playEndSeconds;
-    clip.loopEndSeconds = juce::jlimit(
+    clip.loopEndSeconds = cydaw::base::limit(
         clip.loopStartSeconds + 0.001, clip.playEndSeconds, loopEnd);
     for (auto& point : clip.automation)
-        point.timeSeconds = juce::jlimit(
+        point.timeSeconds = cydaw::base::limit(
             0.0, clip.durationSeconds, point.timeSeconds);
     std::sort(clip.automation.begin(), clip.automation.end(),
               [](const auto& left, const auto& right) {
@@ -202,7 +218,7 @@ void materialiseLegacyAudioEvent(AudioTrackController::AudioClip& clip)
 {
     if (clip.usesEventTimeline)
         return;
-    if (clip.sourceFile != juce::File {})
+    if (clip.sourceFile != cydaw::base::File {})
         clip.events.push_back({
             clip.id, clip.name, 0.0, clip.sourceOffsetSeconds,
             clip.durationSeconds, clip.sourceDurationSeconds,
@@ -218,7 +234,7 @@ void normaliseLauncherClipTimeline(
 {
     if (clip.usesEventTimeline) {
         if (clip.events.empty()) {
-            clip.sourceFile = juce::File {};
+            clip.sourceFile = cydaw::base::File {};
             clip.sourceOffsetSeconds = 0.0;
         } else {
             clip.sourceFile = clip.events.front().sourceFile;
@@ -226,18 +242,18 @@ void normaliseLauncherClipTimeline(
                 = clip.events.front().sourceOffsetSeconds;
         }
     }
-    clip.durationSeconds = juce::jlimit(
+    clip.durationSeconds = cydaw::base::limit(
         0.001, 86'400.0, clip.durationSeconds);
-    clip.playStartSeconds = juce::jlimit(
+    clip.playStartSeconds = cydaw::base::limit(
         0.0, std::max(0.0, clip.durationSeconds - 0.001),
         clip.playStartSeconds);
     const auto playEnd = clip.playEndSeconds
                                  > clip.playStartSeconds + 0.000001
                              ? clip.playEndSeconds
                              : clip.durationSeconds;
-    clip.playEndSeconds = juce::jlimit(
+    clip.playEndSeconds = cydaw::base::limit(
         clip.playStartSeconds + 0.001, clip.durationSeconds, playEnd);
-    clip.loopStartSeconds = juce::jlimit(
+    clip.loopStartSeconds = cydaw::base::limit(
         clip.playStartSeconds,
         std::max(clip.playStartSeconds,
                  clip.playEndSeconds - 0.001),
@@ -246,10 +262,10 @@ void normaliseLauncherClipTimeline(
                                  > clip.loopStartSeconds + 0.000001
                              ? clip.loopEndSeconds
                              : clip.playEndSeconds;
-    clip.loopEndSeconds = juce::jlimit(
+    clip.loopEndSeconds = cydaw::base::limit(
         clip.loopStartSeconds + 0.001, clip.playEndSeconds, loopEnd);
     for (auto& point : clip.automation)
-        point.timeSeconds = juce::jlimit(
+        point.timeSeconds = cydaw::base::limit(
             0.0, clip.durationSeconds, point.timeSeconds);
     std::sort(clip.automation.begin(), clip.automation.end(),
               [](const auto& left, const auto& right) {
@@ -262,7 +278,7 @@ void materialiseLegacyLauncherEvent(
 {
     if (clip.usesEventTimeline)
         return;
-    if (clip.sourceFile != juce::File {})
+    if (clip.sourceFile != cydaw::base::File {})
         clip.events.push_back({
             0, clip.name, 0.0, clip.sourceOffsetSeconds,
             clip.durationSeconds, clip.durationSeconds, clip.colour,
@@ -343,7 +359,7 @@ double sourceTimeForClipTimeline(
               [](const auto& left, const auto& right) {
                   return left.timeline < right.timeline;
               });
-    const auto safeTime = juce::jlimit(0.0, clip.durationSeconds,
+    const auto safeTime = cydaw::base::limit(0.0, clip.durationSeconds,
                                        timelineSeconds);
     for (std::size_t index = 1; index < points.size(); ++index) {
         if (safeTime > points[index].timeline)
@@ -396,14 +412,14 @@ bool sameMidiNotes(
 }
 } // namespace
 
-LatencyCompensatingAudioSource::LatencyCompensatingAudioSource(juce::AudioSource& input) noexcept
+LatencyCompensatingAudioSource::LatencyCompensatingAudioSource(cydaw::audio::AudioSource& input) noexcept
     : input_(input)
 {
 }
 
 void LatencyCompensatingAudioSource::setDelaySamples(const int delaySamples) noexcept
 {
-    const auto clamped = juce::jlimit(0, maximumDelaySamples, delaySamples);
+    const auto clamped = cydaw::base::limit(0, maximumDelaySamples, delaySamples);
     if (delaySamples_.exchange(clamped, std::memory_order_acq_rel) != clamped)
         requestReset();
 }
@@ -440,7 +456,7 @@ void LatencyCompensatingAudioSource::releaseResources()
 }
 
 void LatencyCompensatingAudioSource::getNextAudioBlock(
-    const juce::AudioSourceChannelInfo& bufferToFill)
+    const cydaw::audio::AudioSourceChannelInfo& bufferToFill)
 {
     input_.getNextAudioBlock(bufferToFill);
     if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0
@@ -480,7 +496,7 @@ void LatencyCompensatingAudioSource::getNextAudioBlock(
 void AudioDelayLine::prepare(const int maximumDelaySamples, const int channels)
 {
     const auto size = std::max(1, maximumDelaySamples) + 1;
-    const auto width = juce::jlimit(1, LatencyCompensatingAudioSource::maximumChannelCount, channels);
+    const auto width = cydaw::base::limit(1, LatencyCompensatingAudioSource::maximumChannelCount, channels);
     if (ring_.getNumSamples() >= size && ring_.getNumChannels() >= width)
         return;
     ring_.setSize(std::max(width, ring_.getNumChannels()), std::max(size, ring_.getNumSamples()), false, true, false);
@@ -490,12 +506,12 @@ void AudioDelayLine::prepare(const int maximumDelaySamples, const int channels)
 
 void AudioDelayLine::setDelaySamples(const int delaySamples) noexcept
 {
-    const auto clamped = juce::jlimit(0, LatencyCompensatingAudioSource::maximumDelaySamples, delaySamples);
+    const auto clamped = cydaw::base::limit(0, LatencyCompensatingAudioSource::maximumDelaySamples, delaySamples);
     if (delay_.exchange(clamped, std::memory_order_acq_rel) != clamped)
         requestReset();
 }
 
-void AudioDelayLine::process(juce::AudioBuffer<float>& buffer, const int startSample, const int numSamples) noexcept
+void AudioDelayLine::process(cydaw::audio::SampleBuffer<float>& buffer, const int startSample, const int numSamples) noexcept
 {
     const auto size = ring_.getNumSamples();
     const auto delay = std::min(delay_.load(std::memory_order_acquire), size - 1);
@@ -524,7 +540,7 @@ void AudioDelayLine::process(juce::AudioBuffer<float>& buffer, const int startSa
     write_ = (write_ + numSamples) % size;
 }
 
-GainPanAudioSource::GainPanAudioSource(juce::AudioSource& input) noexcept
+GainPanAudioSource::GainPanAudioSource(cydaw::audio::AudioSource& input) noexcept
     : input_(input)
 {
     automation_.store(std::make_shared<const std::vector<GainAutomationPoint>>());
@@ -533,7 +549,7 @@ GainPanAudioSource::GainPanAudioSource(juce::AudioSource& input) noexcept
 }
 
 GainPanAudioSource::GainPanAudioSource(
-    juce::AudioSource& input,
+    cydaw::audio::AudioSource& input,
     const std::atomic<double>& timelinePosition) noexcept
     : input_(input), timelinePosition_(&timelinePosition)
 {
@@ -543,7 +559,7 @@ GainPanAudioSource::GainPanAudioSource(
         std::make_shared<const std::vector<PluginParameterAutomationLane>>());
 }
 
-GainPanAudioSource::GainPanAudioSource(juce::AudioTransportSource& input) noexcept
+GainPanAudioSource::GainPanAudioSource(cydaw::audio::AudioTransportSource& input) noexcept
     : input_(input), transport_(&input)
 {
     automation_.store(std::make_shared<const std::vector<GainAutomationPoint>>());
@@ -560,12 +576,12 @@ void GainPanAudioSource::setGain(const float linearGain) noexcept
 
 void GainPanAudioSource::setPan(const float pan) noexcept
 {
-    pan_.store(juce::jlimit(-1.0f, 1.0f, pan), std::memory_order_relaxed);
+    pan_.store(cydaw::base::limit(-1.0f, 1.0f, pan), std::memory_order_relaxed);
 }
 
 void GainPanAudioSource::setChannelCount(const int channels) noexcept
 {
-    graphChannelCount_ = juce::jlimit(1, LatencyCompensatingAudioSource::maximumChannelCount, channels);
+    graphChannelCount_ = cydaw::base::limit(1, LatencyCompensatingAudioSource::maximumChannelCount, channels);
 }
 
 void GainPanAudioSource::setAutomation(
@@ -590,7 +606,7 @@ void GainPanAudioSource::setPluginAutomation(
 
 void GainPanAudioSource::setDrive(const float driveDb) noexcept
 {
-    const auto value = juce::jlimit(0.0f, 36.0f, driveDb);
+    const auto value = cydaw::base::limit(0.0f, 36.0f, driveDb);
     driveDb_.store(value, std::memory_order_relaxed);
     // The track's drive fader reaches every drive card of the chain. Through
     // the runtime's control-thread path: this runs on the message thread or
@@ -602,7 +618,7 @@ void GainPanAudioSource::setDrive(const float driveDb) noexcept
 
 void GainPanAudioSource::setFilterCutoff(const float cutoffHz) noexcept
 {
-    const auto value = juce::jlimit(20.0f, 20'000.0f, cutoffHz);
+    const auto value = cydaw::base::limit(20.0f, 20'000.0f, cutoffHz);
     filterCutoffHz_.store(value, std::memory_order_relaxed);
     updateGraphNodes(cydaw::engine::NativeDspNodeKind::lowpass,
                      [value](cydaw::engine::NativeDspNodeParameters& parameters) { parameters.cutoffHz = value; });
@@ -625,7 +641,7 @@ void GainPanAudioSource::updateGraphNodes(const cydaw::engine::NativeDspNodeKind
     }
 }
 
-juce::Result GainPanAudioSource::setNativeDspGraph(
+cydaw::base::Result GainPanAudioSource::setNativeDspGraph(
     const cydaw::engine::NativeDspGraph& graph)
 {
     const auto result = nativeGraph_.setGraph(graph);
@@ -636,7 +652,7 @@ juce::Result GainPanAudioSource::setNativeDspGraph(
     return result;
 }
 
-juce::Result GainPanAudioSource::updateNativeDspParameters(
+cydaw::base::Result GainPanAudioSource::updateNativeDspParameters(
     const cydaw::engine::NativeDspGraph& graph)
 {
     // One parameter vocabulary for every chain: the runtime applies the
@@ -670,7 +686,7 @@ bool GainPanAudioSource::tryPopAnalysisFrame(
 }
 
 bool GainPanAudioSource::processNativeDspGraph(
-    const juce::AudioSourceChannelInfo& bufferToFill) noexcept
+    const cydaw::audio::AudioSourceChannelInfo& bufferToFill) noexcept
 {
     if (!nativeGraphSet_.load(std::memory_order_acquire)
         || bufferToFill.buffer == nullptr)
@@ -695,7 +711,7 @@ bool GainPanAudioSource::processNativeDspGraph(
     return processed;
 }
 
-juce::Result GainPanAudioSource::addPlugin(const juce::File& pluginFile,
+cydaw::base::Result GainPanAudioSource::addPlugin(const cydaw::base::File& pluginFile,
                                            const double sampleRate,
                                            const int maximumBlockSize,
                                            const int channelCount,
@@ -703,8 +719,8 @@ juce::Result GainPanAudioSource::addPlugin(const juce::File& pluginFile,
 {
     const auto currentCount = pluginCount_.load(std::memory_order_acquire);
     if (currentCount >= maximumPluginCount)
-        return juce::Result::fail(tr("error.pluginChainFull",
-                                     "count", juce::String(maximumPluginCount)));
+        return cydaw::base::Result::fail(tr("error.pluginChainFull",
+                                     "count", cydaw::base::Text(maximumPluginCount)));
 
     auto host = std::make_unique<IsolatedPluginHost>();
     const auto result = host->startPlugin(pluginFile, sampleRate, maximumBlockSize, channelCount);
@@ -719,18 +735,18 @@ juce::Result GainPanAudioSource::addPlugin(const juce::File& pluginFile,
     pluginsAvailable_.store(true, std::memory_order_release);
     if (pluginIndex != nullptr)
         *pluginIndex = currentCount;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result GainPanAudioSource::reloadPlugin(std::size_t index, double rate, int block, int channels) {
-    auto* old=pluginHost(index);if(!old)return juce::Result::fail("Unknown plugin");
+cydaw::base::Result GainPanAudioSource::reloadPlugin(std::size_t index, double rate, int block, int channels) {
+    auto* old=pluginHost(index);if(!old)return cydaw::base::Result::fail("Unknown plugin");
     auto replacement=std::make_unique<IsolatedPluginHost>();
     auto result=replacement->startPlugin(old->pluginFile(),rate,block,channels);if(result.failed())return result;
-    juce::MemoryBlock state;if(old->getState(state).wasOk()&&!state.isEmpty())(void)replacement->setState(state);
+    cydaw::base::MemoryBlock state;if(old->getState(state).wasOk()&&!state.isEmpty())(void)replacement->setState(state);
     pluginsAvailable_.store(false);
     while(pluginCallbacksInFlight_.load()!=0)std::this_thread::yield();
     auto removed=std::move(pluginHosts_[index]);pluginHosts_[index]=std::move(replacement);
-    pluginsAvailable_.store(true,std::memory_order_release);removed->stop();return juce::Result::ok();
+    pluginsAvailable_.store(true,std::memory_order_release);removed->stop();return cydaw::base::Result::ok();
 }
 
 void GainPanAudioSource::removePlugin(const std::size_t pluginIndex, const std::function<void()>& whileHeld)
@@ -803,7 +819,7 @@ bool GainPanAudioSource::followDevice(const double sampleRate, const int blockSi
     const auto count = pluginCount_.load(std::memory_order_acquire);
     for (std::size_t index = 0; index < count; ++index) {
         const auto* host = pluginHosts_[index].get();
-        if (host == nullptr || !host->isRunning() || host->pluginFile() == juce::File {}
+        if (host == nullptr || !host->isRunning() || host->pluginFile() == cydaw::base::File {}
             || (host->preparedSampleRate() == sampleRate && host->preparedBlockSize() == blockSize))
             continue;
         // Tried once for this format: a worker that cannot start at it is
@@ -817,53 +833,53 @@ bool GainPanAudioSource::followDevice(const double sampleRate, const int blockSi
     return restarted;
 }
 
-juce::Result GainPanAudioSource::getPluginState(const std::size_t pluginIndex,
-                                                juce::MemoryBlock& destination)
+cydaw::base::Result GainPanAudioSource::getPluginState(const std::size_t pluginIndex,
+                                                cydaw::base::MemoryBlock& destination)
 {
     if (auto* host = pluginHost(pluginIndex))
         return host->getState(destination);
-    return juce::Result::fail("Unknown plugin slot");
+    return cydaw::base::Result::fail("Unknown plugin slot");
 }
 
-juce::Result GainPanAudioSource::getCachedPluginState(
-    const std::size_t pluginIndex, juce::MemoryBlock& destination) const
+cydaw::base::Result GainPanAudioSource::getCachedPluginState(
+    const std::size_t pluginIndex, cydaw::base::MemoryBlock& destination) const
 {
     if (const auto* host = pluginHost(pluginIndex))
         return host->getCachedState(destination);
-    return juce::Result::fail("Unknown plugin slot");
+    return cydaw::base::Result::fail("Unknown plugin slot");
 }
 
-juce::Result GainPanAudioSource::setPluginState(const std::size_t pluginIndex,
-                                                const juce::MemoryBlock& state)
+cydaw::base::Result GainPanAudioSource::setPluginState(const std::size_t pluginIndex,
+                                                const cydaw::base::MemoryBlock& state)
 {
     if (auto* host = pluginHost(pluginIndex))
         return host->setState(state);
-    return juce::Result::fail("Unknown plugin slot");
+    return cydaw::base::Result::fail("Unknown plugin slot");
 }
 
-juce::Result GainPanAudioSource::showPluginEditor(const std::size_t pluginIndex)
+cydaw::base::Result GainPanAudioSource::showPluginEditor(const std::size_t pluginIndex)
 {
     if (auto* host = pluginHost(pluginIndex))
         return host->showEditor();
-    return juce::Result::fail("Unknown plugin slot");
+    return cydaw::base::Result::fail("Unknown plugin slot");
 }
 
-juce::Result GainPanAudioSource::refreshPluginParameters(
+cydaw::base::Result GainPanAudioSource::refreshPluginParameters(
     const std::size_t pluginIndex,
     std::vector<IsolatedPluginHost::ParameterSnapshot>& destination)
 {
     if (auto* host = pluginHost(pluginIndex))
         return host->refreshParameters(destination);
-    return juce::Result::fail("Unknown plugin slot");
+    return cydaw::base::Result::fail("Unknown plugin slot");
 }
 
-juce::Result GainPanAudioSource::setPluginParameter(const std::size_t pluginIndex,
+cydaw::base::Result GainPanAudioSource::setPluginParameter(const std::size_t pluginIndex,
                                                     const std::uint32_t parameterIndex,
                                                     const float normalisedValue)
 {
     if (auto* host = pluginHost(pluginIndex))
         return host->setParameter(parameterIndex, normalisedValue);
-    return juce::Result::fail("Unknown plugin slot");
+    return cydaw::base::Result::fail("Unknown plugin slot");
 }
 
 std::size_t GainPanAudioSource::pluginCount() const noexcept
@@ -917,7 +933,7 @@ void GainPanAudioSource::releaseResources()
 }
 
 void GainPanAudioSource::publishAnalysisFrame(
-    const juce::AudioSourceChannelInfo& bufferToFill) noexcept
+    const cydaw::audio::AudioSourceChannelInfo& bufferToFill) noexcept
 {
     cydaw::engine::AudioAnalysisFrame frame;
     frame.sequence = ++analysisSequence_;
@@ -965,7 +981,7 @@ void GainPanAudioSource::publishAnalysisFrame(
     (void) analysisFrames_.tryPush(frame);
 }
 
-void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
+void GainPanAudioSource::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& bufferToFill)
 {
     if (auto* source = externalInput_.load(std::memory_order_acquire))
         source->getNextAudioBlock(bufferToFill);
@@ -997,7 +1013,7 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
         const auto time = modeTimeline_ != nullptr ? modeTimeline_->load(std::memory_order_relaxed)
                           : transport_ != nullptr  ? transport_->getCurrentPosition()
                                                    : timelinePosition_->load(std::memory_order_relaxed);
-        pan = juce::jlimit(-1.0f, 1.0f, static_cast<float>(laneValueAt(*lane, time)));
+        pan = cydaw::base::limit(-1.0f, 1.0f, static_cast<float>(laneValueAt(*lane, time)));
         automatedPan_.store(pan, std::memory_order_relaxed);
     }
     const auto channels = bufferToFill.buffer->getNumChannels();
@@ -1011,11 +1027,11 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
     if (!processNativeDspGraph(bufferToFill)) {
         const auto driveDb = driveDb_.load(std::memory_order_relaxed);
         const auto cutoff = filterCutoffHz_.load(std::memory_order_relaxed);
-        const auto driveGain = juce::Decibels::decibelsToGain(driveDb);
+        const auto driveGain = cydaw::audio::Decibels::decibelsToGain(driveDb);
         const auto driveNormalisation = driveDb > 0.001f ? 1.0f / std::tanh(driveGain) : 1.0f;
         const auto shouldFilter = cutoff < static_cast<float>(sampleRate_ * 0.45);
         const auto filterAmount = shouldFilter
-                                      ? static_cast<float>(1.0 - std::exp(-juce::MathConstants<double>::twoPi
+                                      ? static_cast<float>(1.0 - std::exp(-cydaw::base::MathConstants<double>::twoPi
                                                                           * cutoff / sampleRate_))
                                       : 1.0f;
 
@@ -1064,7 +1080,7 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
 
                             const auto value = static_cast<float>(laneValueAt(lane.points, blockStart));
                             values[valueCount++] = { lane.parameterIndex,
-                                                     juce::jlimit(0.0f, 1.0f, value) };
+                                                     cydaw::base::limit(0.0f, 1.0f, value) };
                         }
                     }
                     if (valueCount > 0)
@@ -1120,9 +1136,9 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
         for (int sample = 0; sample < bufferToFill.numSamples; ++sample) {
             const auto time = blockStart + static_cast<double>(sample) / sampleRate_;
             // A curve swinging past its points stays in the lane's range.
-            const auto automationDb = juce::jlimit(-60.0f, 12.0f, static_cast<float>(laneValueAt(*automation, time, &pointIndex)));
+            const auto automationDb = cydaw::base::limit(-60.0f, 12.0f, static_cast<float>(laneValueAt(*automation, time, &pointIndex)));
 
-            const auto automationGain = juce::Decibels::decibelsToGain(automationDb, -60.0f);
+            const auto automationGain = cydaw::audio::Decibels::decibelsToGain(automationDb, -60.0f);
             for (int channel = 0; channel < channels; ++channel)
                 bufferToFill.buffer->getWritePointer(channel, bufferToFill.startSample)[sample]
                     *= channelGains[static_cast<std::size_t>(std::min(channel, static_cast<int>(channelGains.size()) - 1))]
@@ -1141,49 +1157,47 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
 
 InputRecorder::InputRecorder()
 {
-    writerThread_.startThread(juce::Thread::Priority::normal);
 }
 
 InputRecorder::~InputRecorder()
 {
     stop();
-    writerThread_.stopThread(3'000);
 }
 
-juce::Result InputRecorder::start(const juce::File& destination,
+cydaw::base::Result InputRecorder::start(const cydaw::base::File& destination,
                                   const double startDelaySeconds)
 {
     stop();
     const auto sampleRate = sampleRate_.load(std::memory_order_acquire);
     const auto route = inputBus_.current();
     const auto channelCount = route != nullptr
-        ? juce::jlimit(1, VirtualAudioBus::maximumChannels, route->channels)
+        ? cydaw::base::limit(1, VirtualAudioBus::maximumChannels, route->channels)
         : inputChannelCount_.load(std::memory_order_acquire);
     if (sampleRate <= 0.0 || channelCount <= 0)
-        return juce::Result::fail(tr("error.recordInput"));
+        return cydaw::base::Result::fail(tr("error.recordInput"));
 
     auto fileOutput = destination.createOutputStream();
     if (fileOutput == nullptr)
-        return juce::Result::fail(tr("error.recordFile", "file", destination.getFullPathName()));
+        return cydaw::base::Result::fail(tr("error.recordFile", "file", destination.getFullPathName()));
 
     if (!fileOutput->setPosition(0) || fileOutput->truncate().failed())
-        return juce::Result::fail(tr("error.recordFile", "file", destination.getFullPathName()));
+        return cydaw::base::Result::fail(tr("error.recordFile", "file", destination.getFullPathName()));
 
-    std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
+    std::unique_ptr<cydaw::base::OutputStream> output { std::move(fileOutput) };
 
-    juce::WavAudioFormat wav;
-    const auto options = juce::AudioFormatWriterOptions()
+    cydaw::integration::WaveFormat wav;
+    const auto options = cydaw::audio::AudioFormatWriterOptions()
                              .withSampleRate(sampleRate)
                              .withNumChannels(channelCount)
                              .withBitsPerSample(24);
     auto writer = wav.createWriterFor(output, options);
     if (writer == nullptr)
-        return juce::Result::fail(tr("error.recordWriter"));
+        return cydaw::base::Result::fail(tr("error.recordWriter"));
 
     droppedBlocks_.store(0, std::memory_order_relaxed);
-    threadedWriter_ = std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(
-        writer.release(), writerThread_, static_cast<int>(sampleRate * 4.0));
-    const auto startDelaySamples = static_cast<juce::int64>(std::llround(
+    threadedWriter_ = std::make_unique<cydaw::audio::AudioFormatWriter::ThreadedWriter>(
+        writer.release(), static_cast<int>(sampleRate * 4.0));
+    const auto startDelaySamples = static_cast<std::int64_t>(std::llround(
         std::max(0.0, startDelaySeconds) * sampleRate));
     samplesUntilStart_.store(startDelaySamples, std::memory_order_release);
     samplesUntilStop_.store(-1, std::memory_order_release);
@@ -1192,7 +1206,7 @@ juce::Result InputRecorder::start(const juce::File& destination,
     recordingComplete_.store(false, std::memory_order_release);
     recordingChannelCount_.store(channelCount, std::memory_order_release);
     activeWriter_.store(threadedWriter_.get(), std::memory_order_release);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 void InputRecorder::scheduleStop(const double delaySeconds)
@@ -1201,7 +1215,7 @@ void InputRecorder::scheduleStop(const double delaySeconds)
         || recordingComplete_.load(std::memory_order_acquire))
         return;
     const auto sampleRate = sampleRate_.load(std::memory_order_acquire);
-    const auto delaySamples = static_cast<juce::int64>(std::llround(
+    const auto delaySamples = static_cast<std::int64_t>(std::llround(
         std::max(0.0, delaySeconds) * std::max(1.0, sampleRate)));
     samplesUntilStop_.store(delaySamples, std::memory_order_release);
     stopPending_.store(true, std::memory_order_release);
@@ -1273,13 +1287,13 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
                                                      float* const* outputChannelData,
                                                      const int numOutputChannels,
                                                      const int numSamples,
-                                                     const juce::AudioIODeviceCallbackContext&)
+                                                     const cydaw::audio::DeviceCallbackContext&)
 {
     // AudioDeviceManager mixes secondary callbacks into the device output, so
     // a recorder callback must explicitly contribute silence.
     for (int channel = 0; channel < numOutputChannels; ++channel)
         if (outputChannelData != nullptr && outputChannelData[channel] != nullptr)
-            juce::FloatVectorOperations::clear(outputChannelData[channel], numSamples);
+            cydaw::audio::VectorMath::clear(outputChannelData[channel], numSamples);
 
     if (numInputChannels <= 0 || inputChannelData == nullptr)
         return;
@@ -1349,7 +1363,7 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
                 callbacksInFlight_.fetch_sub(1, std::memory_order_release);
                 return;
             }
-            routedChannelCount = juce::jlimit(1, std::min(VirtualAudioBus::maximumChannels, routedInputBuffer_.getNumChannels()),
+            routedChannelCount = cydaw::base::limit(1, std::min(VirtualAudioBus::maximumChannels, routedInputBuffer_.getNumChannels()),
                                               inputBus->channels);
             const auto afterEffects = afterEffects_.load(std::memory_order_acquire);
             // As the router ran it this block (what is heard is what is
@@ -1365,7 +1379,7 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
                 bus.channels = routedChannelCount;
                 VirtualBusRouter::renderInputBus(bus, inputChannelData, numInputChannels, lanes.data(), numSamples);
                 if (afterEffects) {
-                    juce::AudioBuffer<float> view(lanes.data(), routedChannelCount, numSamples);
+                    cydaw::audio::SampleBuffer<float> view(lanes.data(), routedChannelCount, numSamples);
                     (void) inputBusGraph_.process(view, 0, numSamples);
                 }
                 for (auto channel = 0; channel < routedChannelCount; ++channel)
@@ -1389,7 +1403,7 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
         if (stopPending_.load(std::memory_order_acquire)) {
             const auto stopRemaining = samplesUntilStop_.load(
                 std::memory_order_acquire);
-            const auto nextRemaining = std::max<juce::int64>(
+            const auto nextRemaining = std::max<std::int64_t>(
                 0, stopRemaining - samplesToWrite);
             samplesUntilStop_.store(nextRemaining,
                                     std::memory_order_release);
@@ -1401,7 +1415,7 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
     }
 }
 
-void InputRecorder::audioDeviceAboutToStart(juce::AudioIODevice* device)
+void InputRecorder::audioDeviceAboutToStart(cydaw::audio::Device* device)
 {
     sampleRate_.store(device != nullptr ? device->getCurrentSampleRate() : 0.0, std::memory_order_release);
     inputChannelCount_.store(device != nullptr ? device->getActiveInputChannels().countNumberOfSetBits() : 0,
@@ -1424,8 +1438,8 @@ void InputRecorder::audioDeviceStopped()
     inputChannelCount_.store(0, std::memory_order_release);
 }
 
-juce::Result InputRecorder::selfTestScheduledRecording(
-    const juce::File& destination)
+cydaw::base::Result InputRecorder::selfTestScheduledRecording(
+    const cydaw::base::File& destination)
 {
     if (destination.existsAsFile())
         (void) destination.deleteFile();
@@ -1445,12 +1459,12 @@ juce::Result InputRecorder::selfTestScheduledRecording(
         -0.05f, -0.06f, -0.07f, -0.08f
     };
     const std::array<const float*, 2> inputs { left.data(), right.data() };
-    juce::AudioIODeviceCallbackContext context {};
+    cydaw::audio::DeviceCallbackContext context {};
     recorder.audioDeviceIOCallbackWithContext(
         inputs.data(), 2, nullptr, 0, 8, context);
     if (!recorder.hasStarted() || recorder.recordingComplete()) {
         recorder.stop();
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "The scheduled recorder did not start inside the audio block");
     }
     recorder.scheduleStop(4.0 / 48'000.0);
@@ -1458,27 +1472,27 @@ juce::Result InputRecorder::selfTestScheduledRecording(
         inputs.data(), 2, nullptr, 0, 8, context);
     if (!recorder.recordingComplete()) {
         recorder.stop();
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "The scheduled recorder did not stop inside the audio block");
     }
     recorder.stop();
 
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(destination));
     if (reader == nullptr || reader->lengthInSamples != 9
         || reader->numChannels != 2)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "The scheduled recording has an incorrect length");
-    juce::AudioBuffer<float> rendered(2, 9);
+    cydaw::audio::SampleBuffer<float> rendered(2, 9);
     if (!reader->read(&rendered, 0, 9, 0, true, true)
         || std::abs(rendered.getSample(0, 0) - left[3]) > 0.0001f
         || std::abs(rendered.getSample(1, 0) - right[3]) > 0.0001f
         || std::abs(rendered.getSample(0, 8) - left[3]) > 0.0001f)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "The scheduled recording boundaries are not sample accurate");
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 // ---- The tracks' mixer ---------------------------------------------------------------------------
@@ -1488,28 +1502,28 @@ TrackMixer::TrackMixer()
     plan_.store(std::make_shared<const Plan>());
 }
 
-void TrackMixer::addInputSource(juce::AudioSource* source, const bool deleteWhenRemoved)
+void TrackMixer::addInputSource(cydaw::audio::AudioSource* source, const bool deleteWhenRemoved)
 {
-    jassert(!deleteWhenRemoved);
-    juce::ignoreUnused(deleteWhenRemoved);
+    assert(!deleteWhenRemoved);
+    cydaw::base::ignoreUnused(deleteWhenRemoved);
     if (source == nullptr)
         return;
     int block {};
     double rate {};
     bool prepared {};
     {
-        const juce::ScopedLock lock(lock_);
+        const cydaw::base::ScopedLock lock(lock_);
         block = blockSize_;
         rate = sampleRate_;
         prepared = prepared_;
     }
     if (prepared)
         source->prepareToPlay(block, rate);
-    juce::AudioBuffer<float> rendered(maximumChannels, std::max(1, block));
-    std::vector<juce::AudioBuffer<float>> routed;
+    cydaw::audio::SampleBuffer<float> rendered(maximumChannels, std::max(1, block));
+    std::vector<cydaw::audio::SampleBuffer<float>> routed;
     for (std::size_t bus = 0; bus < buses; ++bus)
         routed.emplace_back(maximumChannels, std::max(1, block));
-    const juce::ScopedLock lock(lock_);
+    const cydaw::base::ScopedLock lock(lock_);
     inputs_.push_back(source);
     rendered_.push_back(std::move(rendered));
     for (auto& buffer : routed) {
@@ -1520,10 +1534,10 @@ void TrackMixer::addInputSource(juce::AudioSource* source, const bool deleteWhen
     done_.push_back(0);
 }
 
-void TrackMixer::removeInputSource(juce::AudioSource* source)
+void TrackMixer::removeInputSource(cydaw::audio::AudioSource* source)
 {
     {
-        const juce::ScopedLock lock(lock_);
+        const cydaw::base::ScopedLock lock(lock_);
         const auto index = indexOf(source);
         if (index < 0)
             return;
@@ -1558,7 +1572,7 @@ void TrackMixer::setPlan(std::shared_ptr<const Plan> plan)
     plan_.store(plan != nullptr ? std::move(plan) : std::make_shared<const Plan>());
 }
 
-int TrackMixer::indexOf(const juce::AudioSource* source) const noexcept
+int TrackMixer::indexOf(const cydaw::audio::AudioSource* source) const noexcept
 {
     for (std::size_t index = 0; index < inputs_.size(); ++index)
         if (inputs_[index] == source)
@@ -1568,9 +1582,9 @@ int TrackMixer::indexOf(const juce::AudioSource* source) const noexcept
 
 void TrackMixer::prepareToPlay(const int samplesPerBlockExpected, const double sampleRate)
 {
-    std::vector<juce::AudioSource*> inputs;
+    std::vector<cydaw::audio::AudioSource*> inputs;
     {
-        const juce::ScopedLock lock(lock_);
+        const cydaw::base::ScopedLock lock(lock_);
         blockSize_ = std::max(1, samplesPerBlockExpected);
         sampleRate_ = sampleRate;
         prepared_ = true;
@@ -1591,9 +1605,9 @@ void TrackMixer::prepareToPlay(const int samplesPerBlockExpected, const double s
 
 void TrackMixer::releaseResources()
 {
-    std::vector<juce::AudioSource*> inputs;
+    std::vector<cydaw::audio::AudioSource*> inputs;
     {
-        const juce::ScopedLock lock(lock_);
+        const cydaw::base::ScopedLock lock(lock_);
         prepared_ = false;
         inputs = inputs_;
     }
@@ -1601,7 +1615,7 @@ void TrackMixer::releaseResources()
         input->releaseResources();
 }
 
-const juce::AudioBuffer<float>* TrackMixer::directOutput(const std::uint64_t busId, const int numSamples,
+const cydaw::audio::SampleBuffer<float>* TrackMixer::directOutput(const std::uint64_t busId, const int numSamples,
                                                          const bool beforeEffects) noexcept
 {
     if (directSamples_ != numSamples || busId == 0)
@@ -1612,9 +1626,9 @@ const juce::AudioBuffer<float>* TrackMixer::directOutput(const std::uint64_t bus
     return nullptr;
 }
 
-void TrackMixer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
+void TrackMixer::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output)
 {
-    const juce::ScopedLock lock(lock_);
+    const cydaw::base::ScopedLock lock(lock_);
     output.clearActiveBufferRegion();
     directSamples_ = 0;
     if (output.buffer == nullptr || output.numSamples <= 0)
@@ -1651,7 +1665,7 @@ void TrackMixer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
                               const float gain, const float pan) {
         if (fromChannels == toChannels && (fromChannels != 1 || pan == 0.0f)) {
             for (auto channel = 0; channel < toChannels; ++channel)
-                juce::FloatVectorOperations::addWithMultiply(into[channel], from[channel], gain, count);
+                cydaw::audio::VectorMath::addWithMultiply(into[channel], from[channel], gain, count);
             return;
         }
         cydaw::engine::convertChannels(cydaw::engine::channelConversion(fromChannels, toChannels), from, into, count, gain,
@@ -1663,16 +1677,16 @@ void TrackMixer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
     const auto render = [&](const int index, RoutedInputReceiver* receiver, GainPanAudioSource* fader,
                             const std::vector<Output>* outputs, const int ownChannels) {
         const auto slot = static_cast<std::size_t>(index);
-        const auto channels = juce::jlimit(1, maximumChannels, ownChannels);
-        juce::AudioBuffer<float> buffer(rendered_[slot].getArrayOfWritePointers(), channels, count);
+        const auto channels = cydaw::base::limit(1, maximumChannels, ownChannels);
+        cydaw::audio::SampleBuffer<float> buffer(rendered_[slot].getArrayOfWritePointers(), channels, count);
         buffer.clear();
-        std::array<const juce::AudioBuffer<float>*, buses> reaching {};
+        std::array<const cydaw::audio::SampleBuffer<float>*, buses> reaching {};
         for (std::size_t bus = 0; bus < buses; ++bus)
             if (routedUsed_[slot * buses + bus] != 0)
                 reaching[bus] = &routedViews_[slot * buses + bus];
         if (receiver != nullptr)
             receiver->setRoutedInputs(reaching.data(), count);
-        inputs_[slot]->getNextAudioBlock(juce::AudioSourceChannelInfo(&buffer, 0, count));
+        inputs_[slot]->getNextAudioBlock(cydaw::audio::AudioSourceChannelInfo(&buffer, 0, count));
         if (receiver != nullptr)
             receiver->setRoutedInputs(nullptr, 0);
         done_[slot] = 1;
@@ -1691,7 +1705,7 @@ void TrackMixer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
             if (out.delay != nullptr) {
                 // Lined up with the latest of what reaches its destination;
                 // fed every block, whatever follows.
-                juce::AudioBuffer<float> held(delayed_.getArrayOfWritePointers(), sourceChannels, count);
+                cydaw::audio::SampleBuffer<float> held(delayed_.getArrayOfWritePointers(), sourceChannels, count);
                 for (auto channel = 0; channel < sourceChannels; ++channel)
                     held.copyFrom(channel, 0, *source, channel, 0, count);
                 out.delay->process(held, 0, count);
@@ -1703,10 +1717,10 @@ void TrackMixer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
                 const auto at = static_cast<std::size_t>(out.hardware);
                 if (at >= maximumDirectOutputs)
                     continue;
-                const auto width = juce::jlimit(1, maximumChannels, out.channels);
+                const auto width = cydaw::base::limit(1, maximumChannels, out.channels);
                 if (directUsed_[at] == 0) {
                     directViews_[at].setDataToReferTo(direct_[at].getArrayOfWritePointers(), width, count);
-                    directViews_[at].setNotClear(); // a view widened keeps its old flag
+                     // a view widened keeps its old flag
                     directViews_[at].clear();
                     directUsed_[at] = 1;
                 }
@@ -1721,11 +1735,11 @@ void TrackMixer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
             if (target < 0 || done_[static_cast<std::size_t>(target)] != 0)
                 continue;
             const auto at = static_cast<std::size_t>(target) * buses + std::min<std::size_t>(out.bus, buses - 1);
-            const auto width = juce::jlimit(1, maximumChannels, out.channels);
+            const auto width = cydaw::base::limit(1, maximumChannels, out.channels);
             auto& into = routedViews_[at];
             if (routedUsed_[at] == 0) {
                 into.setDataToReferTo(routed_[at].getArrayOfWritePointers(), width, count);
-                into.setNotClear();
+                
                 into.clear();
                 routedUsed_[at] = 1;
             }
@@ -1743,70 +1757,71 @@ void TrackMixer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
     directSamples_ = count;
 }
 
-MasterOutputAudioSource::MasterOutputAudioSource(juce::AudioSource& input)
+MasterOutputAudioSource::MasterOutputAudioSource(cydaw::audio::AudioSource& input)
     : input_(input),
       analysisFrames_(std::make_unique<cydaw::realtime::SpscRing<
           cydaw::engine::AudioAnalysisFrame, 8>>())
 {
-    writerThread_.startThread(juce::Thread::Priority::normal);
 }
 
 MasterOutputAudioSource::~MasterOutputAudioSource()
 {
     stopCapture();
-    writerThread_.stopThread(3'000);
 }
 
-juce::Result MasterOutputAudioSource::startCapture(
-    const juce::File& destination,
+cydaw::base::Result MasterOutputAudioSource::startCapture(
+    const cydaw::base::File& destination,
     const double durationSeconds,
     const int skipSamples)
 {
     stopCapture();
     const auto sampleRate = sampleRate_.load(std::memory_order_acquire);
     if (sampleRate <= 0.0)
-        return juce::Result::fail(tr("error.masterExportDevice"));
+        return cydaw::base::Result::fail(tr("error.masterExportDevice"));
     if (durationSeconds <= 0.0)
-        return juce::Result::fail(tr("error.masterExportEmpty"));
+        return cydaw::base::Result::fail(tr("error.masterExportEmpty"));
 
     auto fileOutput = destination.createOutputStream();
     if (fileOutput == nullptr
         || !fileOutput->setPosition(0)
         || fileOutput->truncate().failed())
-        return juce::Result::fail(tr("error.masterExportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.masterExportCreate", "file",
                                      destination.getFullPathName()));
 
-    std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat wav;
+    std::unique_ptr<cydaw::base::OutputStream> output { std::move(fileOutput) };
+    cydaw::integration::WaveFormat wav;
     auto writer = wav.createWriterFor(
-        output, juce::AudioFormatWriterOptions()
+        output, cydaw::audio::AudioFormatWriterOptions()
                     .withSampleRate(sampleRate)
                     .withNumChannels(2)
                     .withBitsPerSample(24));
     if (writer == nullptr)
-        return juce::Result::fail(tr("error.masterExportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.masterExportCreate", "file",
                                      destination.getFullPathName()));
 
-    targetSamples_.store(std::max<juce::int64>(
-                             1, static_cast<juce::int64>(
+    targetSamples_.store(std::max<std::int64_t>(
+                             1, static_cast<std::int64_t>(
                                     std::llround(durationSeconds * sampleRate))),
                          std::memory_order_release);
     capturedSamples_.store(0, std::memory_order_release);
     skipSamples_.store(std::max(0, skipSamples), std::memory_order_release);
     captureComplete_.store(false, std::memory_order_release);
     droppedBlocks_.store(0, std::memory_order_relaxed);
-    threadedWriter_ = std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(
-        writer.release(), writerThread_, static_cast<int>(sampleRate * 4.0));
+    threadedWriter_ = std::make_unique<cydaw::audio::AudioFormatWriter::ThreadedWriter>(
+        writer.release(), static_cast<int>(sampleRate * 4.0));
     activeWriter_.store(threadedWriter_.get(), std::memory_order_release);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-void MasterOutputAudioSource::stopCapture()
+cydaw::audio::AudioFormatWriter::ThreadedWriter::Result MasterOutputAudioSource::stopCapture()
 {
     activeWriter_.store(nullptr);
     while (callbacksInFlight_.load() != 0)
         std::this_thread::yield();
+    const auto result = threadedWriter_ ? threadedWriter_->finish()
+        : cydaw::audio::AudioFormatWriter::ThreadedWriter::Result {};
     threadedWriter_.reset();
+    return result;
 }
 
 bool MasterOutputAudioSource::isCapturing() const noexcept
@@ -1824,7 +1839,7 @@ double MasterOutputAudioSource::captureProgress() const noexcept
     const auto target = targetSamples_.load(std::memory_order_acquire);
     if (target <= 0)
         return 0.0;
-    return juce::jlimit(
+    return cydaw::base::limit(
         0.0, 1.0,
         static_cast<double>(capturedSamples_.load(std::memory_order_acquire))
             / static_cast<double>(target));
@@ -1843,12 +1858,12 @@ bool MasterOutputAudioSource::tryPopAnalysisFrame(
 
 void MasterOutputAudioSource::setGain(const float linearGain) noexcept
 {
-    gain_.store(juce::jlimit(0.0f, 4.0f, linearGain),
+    gain_.store(cydaw::base::limit(0.0f, 4.0f, linearGain),
                 std::memory_order_release);
 }
 
 void MasterOutputAudioSource::publishAnalysisFrame(
-    const juce::AudioSourceChannelInfo& bufferToFill) noexcept
+    const cydaw::audio::AudioSourceChannelInfo& bufferToFill) noexcept
 {
     cydaw::engine::AudioAnalysisFrame frame;
     frame.sequence = ++analysisSequence_;
@@ -1894,7 +1909,7 @@ void MasterOutputAudioSource::prepareToPlay(const int samplesPerBlockExpected,
     chain_.prepare(sampleRate, std::max(1, samplesPerBlockExpected), 2);
 }
 
-juce::Result MasterOutputAudioSource::setChainGraph(const cydaw::engine::NativeDspGraph& graph)
+cydaw::base::Result MasterOutputAudioSource::setChainGraph(const cydaw::engine::NativeDspGraph& graph)
 {
     const auto rate = sampleRate_.load(std::memory_order_acquire);
     chain_.prepare(rate > 0.0 ? rate : 48'000.0, blockSize_.load(std::memory_order_acquire), 2);
@@ -1903,7 +1918,7 @@ juce::Result MasterOutputAudioSource::setChainGraph(const cydaw::engine::NativeD
     return result;
 }
 
-juce::Result MasterOutputAudioSource::updateChainParameters(const cydaw::engine::NativeDspGraph& graph)
+cydaw::base::Result MasterOutputAudioSource::updateChainParameters(const cydaw::engine::NativeDspGraph& graph)
 {
     return chain_.updateParameters(graph);
 }
@@ -1916,8 +1931,13 @@ void MasterOutputAudioSource::releaseResources()
 }
 
 void MasterOutputAudioSource::getNextAudioBlock(
-    const juce::AudioSourceChannelInfo& bufferToFill)
+    const cydaw::audio::AudioSourceChannelInfo& bufferToFill)
 {
+    // DSP transport is intentionally per render thread (independent plugin
+    // instances can have different hosts). Publish this session on its actual
+    // callback thread, rather than changing only the UI thread's TLS values.
+    NativeDspRuntime::setSessionTempo(tempo_.load(std::memory_order_relaxed));
+    NativeDspRuntime::setSessionPlaying(clockRunning_.load(std::memory_order_acquire));
     input_.getNextAudioBlock(bufferToFill);
     // Where this block starts on the master's clock (none while stopped:
     // its clip's automation then rests), the clock moved on.
@@ -1930,10 +1950,23 @@ void MasterOutputAudioSource::getNextAudioBlock(
     // The master track's devices, then its fader.
     if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0 && chainActive_.load(std::memory_order_acquire))
         (void) chain_.process(*bufferToFill.buffer, bufferToFill.startSample, bufferToFill.numSamples, blockStart);
-    if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0)
-        bufferToFill.buffer->applyGain(
-            bufferToFill.startSample, bufferToFill.numSamples,
-            gain_.load(std::memory_order_relaxed));
+    if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0) {
+        const auto envelope = gainAutomation_.read();
+        const auto baseGain = gain_.load(std::memory_order_relaxed);
+        const auto rate = sampleRate_.load(std::memory_order_relaxed);
+        if (envelope && !envelope->empty() && std::isfinite(blockStart) && rate > 0.0 && baseGain != 0.0f) {
+            for (int frame = 0; frame < bufferToFill.numSamples; ++frame) {
+                const auto db = std::clamp(NativeDspRuntime::automationValueAt(*envelope, blockStart + frame / rate), -60.0f, 12.0f);
+                const auto gain = cydaw::audio::Decibels::decibelsToGain(db);
+                for (int channel = 0; channel < bufferToFill.buffer->getNumChannels(); ++channel)
+                    bufferToFill.buffer->getWritePointer(channel, bufferToFill.startSample)[frame] *= gain;
+            }
+        } else {
+            bufferToFill.buffer->applyGain(bufferToFill.startSample, bufferToFill.numSamples, baseGain);
+        }
+    }
+    if (bufferToFill.buffer != nullptr)
+        key_latency::output(*bufferToFill.buffer, bufferToFill.startSample, bufferToFill.numSamples);
     publishAnalysisFrame(bufferToFill);
     if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0
         || bufferToFill.buffer->getNumChannels() <= 0
@@ -1963,14 +1996,14 @@ void MasterOutputAudioSource::getNextAudioBlock(
         // The mix's latency first: what comes out before the song does.
         auto offset = 0;
         if (const auto skip = skipSamples_.load(std::memory_order_acquire); skip > 0) {
-            offset = static_cast<int>(std::min<juce::int64>(skip, bufferToFill.numSamples));
+            offset = static_cast<int>(std::min<std::int64_t>(skip, bufferToFill.numSamples));
             skipSamples_.store(skip - offset, std::memory_order_release);
         }
         if (offset >= bufferToFill.numSamples) {
             callbacksInFlight_.fetch_sub(1, std::memory_order_release);
             return;
         }
-        const auto sampleCount = static_cast<int>(std::min<juce::int64>(
+        const auto sampleCount = static_cast<int>(std::min<std::int64_t>(
             remaining, bufferToFill.numSamples - offset));
         const auto* left = bufferToFill.buffer->getReadPointer(
             0, bufferToFill.startSample + offset);
@@ -2035,7 +2068,7 @@ std::shared_ptr<const std::vector<float>> soundPitchCurve(const AudioTrackContro
 // A sound's own volume and pan lanes over a block of it (`relative`: the
 // block's first frame from its region's start): the volume on every
 // channel, the pan as a balance of the first two.
-void applySoundLanes(juce::AudioBuffer<float>& buffer, const int channels, const int samples, const juce::int64 relative,
+void applySoundLanes(cydaw::audio::SampleBuffer<float>& buffer, const int channels, const int samples, const std::int64_t relative,
                      const double rate, const AudioTrackController::AudioClip& clip) noexcept
 {
     if (clip.soundLanes.empty() || samples <= 0 || rate <= 0.0)
@@ -2053,13 +2086,13 @@ void applySoundLanes(juce::AudioBuffer<float>& buffer, const int channels, const
         auto left = 1.0f;
         auto right = 1.0f;
         if (volumePoints != nullptr) {
-            const auto gain = juce::Decibels::decibelsToGain(
-                juce::jlimit(-60.0f, 12.0f, static_cast<float>(laneValueAt(*volumePoints, seconds, &volumeHint))), -60.0f);
+            const auto gain = cydaw::audio::Decibels::decibelsToGain(
+                cydaw::base::limit(-60.0f, 12.0f, static_cast<float>(laneValueAt(*volumePoints, seconds, &volumeHint))), -60.0f);
             left *= gain;
             right *= gain;
         }
         if (panPoints != nullptr) {
-            const auto balance = juce::jlimit(-1.0f, 1.0f, static_cast<float>(laneValueAt(*panPoints, seconds, &panHint)));
+            const auto balance = cydaw::base::limit(-1.0f, 1.0f, static_cast<float>(laneValueAt(*panPoints, seconds, &panHint)));
             if (balance > 0.0f)
                 left *= 1.0f - balance;
             else
@@ -2072,20 +2105,20 @@ void applySoundLanes(juce::AudioBuffer<float>& buffer, const int channels, const
 
 } // namespace
 
-class SegmentReaderSource final : public juce::PositionableAudioSource {
+class SegmentReaderSource final : public cydaw::audio::PositionableAudioSource {
 public:
-    explicit SegmentReaderSource(std::unique_ptr<juce::AudioFormatReader> reader)
+    explicit SegmentReaderSource(std::unique_ptr<cydaw::audio::AudioFormatReader> reader)
         : reader_(std::move(reader)),
           sourceLengthSamples_(reader_->lengthInSamples),
           readerSampleRate_(reader_->sampleRate),
-          fileChannels_(juce::jlimit(1, cydaw::engine::maximumTrackChannels, static_cast<int>(reader_->numChannels)))
+          fileChannels_(cydaw::base::limit(1, cydaw::engine::maximumTrackChannels, static_cast<int>(reader_->numChannels)))
     {
-        durationSamples_.store(std::max<juce::int64>(1, sourceLengthSamples_),
+        durationSamples_.store(std::max<std::int64_t>(1, sourceLengthSamples_),
                                std::memory_order_relaxed);
     }
 
-    void configure(const juce::int64 offset,
-                   const juce::int64 duration,
+    void configure(const std::int64_t offset,
+                   const std::int64_t duration,
                    const bool shouldLoop) noexcept
     {
         configureSeconds(
@@ -2108,16 +2141,16 @@ public:
         const auto sourceLengthSeconds = static_cast<double>(
             sourceLengthSamples_) / readerSampleRate_;
         const auto minimumSourceDuration = 1.0 / readerSampleRate_;
-        const auto safeOffset = juce::jlimit(
+        const auto safeOffset = cydaw::base::limit(
             0.0,
             std::max(0.0, sourceLengthSeconds - minimumSourceDuration),
             sourceOffsetSeconds);
-        const auto safeSourceDuration = juce::jlimit(
+        const auto safeSourceDuration = cydaw::base::limit(
             minimumSourceDuration,
             std::max(minimumSourceDuration,
                      sourceLengthSeconds - safeOffset),
             sourceDurationSeconds);
-        const auto safeTimelineDuration = juce::jlimit(
+        const auto safeTimelineDuration = cydaw::base::limit(
             0.001, 86'400.0, timelineDurationSeconds);
         sourceOffsetSeconds_.store(safeOffset,
                                    std::memory_order_release);
@@ -2127,12 +2160,12 @@ public:
                                        std::memory_order_release);
         stretchMode_.store(static_cast<int>(stretchMode),
                            std::memory_order_release);
-        pitchSemitones_.store(juce::jlimit(-48.0, 48.0, pitchSemitones), std::memory_order_release);
+        pitchSemitones_.store(cydaw::base::limit(-48.0, 48.0, pitchSemitones), std::memory_order_release);
         const auto outputSampleRate = std::max(
             1.0, outputSampleRate_.load(std::memory_order_relaxed));
         durationSamples_.store(
-            std::max<juce::int64>(
-                1, static_cast<juce::int64>(std::llround(
+            std::max<std::int64_t>(
+                1, static_cast<std::int64_t>(std::llround(
                        safeTimelineDuration * outputSampleRate))),
             std::memory_order_release);
         looping_.store(shouldLoop, std::memory_order_release);
@@ -2158,8 +2191,8 @@ public:
             0.001, timelineDurationSeconds_.load(
                        std::memory_order_acquire));
         durationSamples_.store(
-            std::max<juce::int64>(
-                1, static_cast<juce::int64>(std::llround(
+            std::max<std::int64_t>(
+                1, static_cast<std::int64_t>(std::llround(
                        timelineDuration * safeOutputSampleRate))),
             std::memory_order_release);
         rendered_.setSize(fileChannels_, std::max(4'096, samplesPerBlockExpected), false, false, true);
@@ -2171,7 +2204,7 @@ public:
         rendered_.setSize(0, 0);
     }
 
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& output) override
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output) override
     {
         output.clearActiveBufferRegion();
         if (output.buffer == nullptr || output.numSamples <= 0)
@@ -2212,7 +2245,7 @@ public:
                     break;
                 position %= duration;
             }
-            const auto count = static_cast<int>(std::min<juce::int64>(
+            const auto count = static_cast<int>(std::min<std::int64_t>(
                 output.numSamples - written, duration - position));
             if (count <= 0)
                 break;
@@ -2230,16 +2263,16 @@ public:
         samplesReadAhead_.fetch_add(output.numSamples, std::memory_order_release);
     }
 
-    void setNextReadPosition(const juce::int64 position) override
+    void setNextReadPosition(const std::int64_t position) override
     {
-        nextReadPosition_.store(std::max<juce::int64>(0, position),
+        nextReadPosition_.store(std::max<std::int64_t>(0, position),
                                 std::memory_order_release);
     }
-    [[nodiscard]] juce::int64 getNextReadPosition() const override
+    [[nodiscard]] std::int64_t getNextReadPosition() const override
     {
         return nextReadPosition_.load(std::memory_order_acquire);
     }
-    [[nodiscard]] juce::int64 getTotalLength() const override
+    [[nodiscard]] std::int64_t getTotalLength() const override
     {
         return durationSamples_.load(std::memory_order_acquire);
     }
@@ -2270,7 +2303,7 @@ private:
     };
 
     // One frame of the file's channels, in the output's.
-    static void writeFrame(const juce::AudioSourceChannelInfo& output, const int at,
+    static void writeFrame(const cydaw::audio::AudioSourceChannelInfo& output, const int at,
                            const std::array<float, cydaw::engine::maximumTrackChannels>& frame,
                            const int destinationChannels, const cydaw::engine::ChannelMatrix& matrix,
                            const bool direct) noexcept
@@ -2287,13 +2320,13 @@ private:
         }
     }
 
-    std::unique_ptr<juce::AudioFormatReader> reader_;
-    const juce::int64 sourceLengthSamples_ {};
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader_;
+    const std::int64_t sourceLengthSamples_ {};
     const double readerSampleRate_ {};
     const int fileChannels_ { 2 };
     std::atomic<double> outputSampleRate_ { 48'000.0 };
-    juce::AudioBuffer<float> sourceScratch_;
-    juce::AudioBuffer<float> rendered_;
+    cydaw::audio::SampleBuffer<float> sourceScratch_;
+    cydaw::audio::SampleBuffer<float> rendered_;
     FileSource fileSource_ { *this };
     cydaw::engine::TimeStretcher stretcher_;
     cydaw::engine::StretchSettings stretcherSettings_;
@@ -2307,21 +2340,21 @@ private:
     std::atomic<double> pitchSemitones_ {};
     // A sound's pitch lane, its semitones every 5 ms (soundPitchCurve).
     std::atomic<std::shared_ptr<const std::vector<float>>> pitchCurve_;
-    std::atomic<juce::int64> durationSamples_ { 1 };
-    std::atomic<juce::int64> nextReadPosition_ {};
-    std::atomic<juce::int64> samplesReadAhead_ {};
+    std::atomic<std::int64_t> durationSamples_ { 1 };
+    std::atomic<std::int64_t> nextReadPosition_ {};
+    std::atomic<std::int64_t> samplesReadAhead_ {};
     std::atomic<bool> looping_ {};
 };
 
 struct PreparedArrangementRegion {
     AudioTrackController::AudioClip clip;
-    std::unique_ptr<juce::AudioFormatReader> reader;
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader;
 };
 
-class EmptyAudioFormatReader final : public juce::AudioFormatReader {
+class EmptyAudioFormatReader final : public cydaw::audio::AudioFormatReader {
 public:
     EmptyAudioFormatReader()
-        : juce::AudioFormatReader(nullptr, "CyDAW empty audio track")
+        : cydaw::audio::AudioFormatReader(nullptr, "CyDAW empty audio track")
     {
         sampleRate = 48'000.0;
         bitsPerSample = 24;
@@ -2333,24 +2366,24 @@ public:
     bool readSamples(int* const* const destinationSamples,
                      const int destinationChannelCount,
                      const int destinationOffset,
-                     juce::int64,
+                     std::int64_t,
                      const int sampleCount) override
     {
         for (int channel = 0; channel < destinationChannelCount; ++channel)
             if (destinationSamples[channel] != nullptr)
-                juce::zeromem(destinationSamples[channel] + destinationOffset,
+                std::memset(destinationSamples[channel] + destinationOffset, 0,
                               static_cast<std::size_t>(sampleCount)
                                   * sizeof(int));
         return true;
     }
 };
 
-class ClipAudioSource final : public juce::PositionableAudioSource {
+class ClipAudioSource final : public cydaw::audio::PositionableAudioSource {
 public:
     // `channels`: its track's format, every deck's and every region's.
-    ClipAudioSource(std::unique_ptr<juce::AudioFormatReader> firstReader,
-                    std::unique_ptr<juce::AudioFormatReader> secondReader,
-                    juce::TimeSliceThread& readAheadThread,
+    ClipAudioSource(std::unique_ptr<cydaw::audio::AudioFormatReader> firstReader,
+                    std::unique_ptr<cydaw::audio::AudioFormatReader> secondReader,
+                    cydaw::audio::ReadAheadScheduler& readAheadThread,
                     const int channels = 2)
         : sourceLengthSamples_(firstReader->lengthInSamples),
           sampleRate_(firstReader->sampleRate),
@@ -2368,15 +2401,15 @@ public:
         configureArrangementDeck(1);
     }
 
-    [[nodiscard]] juce::Result setArrangementRegions(
+    [[nodiscard]] cydaw::base::Result setArrangementRegions(
         std::vector<PreparedArrangementRegion> regions);
-    [[nodiscard]] juce::Result setLauncherSceneSource(
+    [[nodiscard]] cydaw::base::Result setLauncherSceneSource(
         int sceneIndex,
-        std::unique_ptr<juce::AudioFormatReader> reader,
+        std::unique_ptr<cydaw::audio::AudioFormatReader> reader,
         double sourceOffsetSeconds,
         double durationSeconds,
         bool looping);
-    [[nodiscard]] juce::Result setLauncherSceneRegions(
+    [[nodiscard]] cydaw::base::Result setLauncherSceneRegions(
         int sceneIndex,
         std::vector<PreparedArrangementRegion> regions,
         double durationSeconds, double playStartSeconds,
@@ -2401,10 +2434,10 @@ public:
                       const double sourceOffsetSeconds,
                       const double durationSeconds) noexcept
     {
-        const auto offset = juce::jlimit<juce::int64>(
+        const auto offset = cydaw::base::limit<std::int64_t>(
             0, sourceLengthSamples_, secondsToSamples(sourceOffsetSeconds));
-        const auto available = std::max<juce::int64>(1, sourceLengthSamples_ - offset);
-        const auto duration = juce::jlimit<juce::int64>(
+        const auto available = std::max<std::int64_t>(1, sourceLengthSamples_ - offset);
+        const auto duration = cydaw::base::limit<std::int64_t>(
             1, available, secondsToSamples(durationSeconds));
         clipStartSamples_.store(secondsToSamples(startSeconds), std::memory_order_release);
         sourceOffsetSamples_.store(offset, std::memory_order_release);
@@ -2449,12 +2482,12 @@ public:
     {
         const auto contentLength = arrangementLengthSamples_.load(
             std::memory_order_acquire);
-        const auto sessionLength = std::max<juce::int64>(
+        const auto sessionLength = std::max<std::int64_t>(
             1, std::max(contentLength, secondsToSamples(sessionLengthSeconds)));
-        const auto loopStart = juce::jlimit<juce::int64>(
-            0, std::max<juce::int64>(0, sessionLength - 1),
+        const auto loopStart = cydaw::base::limit<std::int64_t>(
+            0, std::max<std::int64_t>(0, sessionLength - 1),
             secondsToSamples(loopStartSeconds));
-        const auto loopEnd = juce::jlimit<juce::int64>(
+        const auto loopEnd = cydaw::base::limit<std::int64_t>(
             loopStart + 1, sessionLength,
             secondsToSamples(loopEndSeconds));
         sessionLengthSamples_.store(sessionLength, std::memory_order_release);
@@ -2484,13 +2517,13 @@ public:
                               const double delaySeconds,
                               const double localStartSeconds = 0.0) noexcept
     {
-        const auto offset = juce::jlimit<juce::int64>(
+        const auto offset = cydaw::base::limit<std::int64_t>(
             0, sourceLengthSamples_, secondsToSamples(sourceOffsetSeconds));
-        const auto available = std::max<juce::int64>(1, sourceLengthSamples_ - offset);
+        const auto available = std::max<std::int64_t>(1, sourceLengthSamples_ - offset);
         const auto planDuration = launcherPlanDurationSamples(sceneIndex);
         const auto duration = planDuration > 0
                                   ? planDuration
-                                  : juce::jlimit<juce::int64>(
+                                  : cydaw::base::limit<std::int64_t>(
                                         1, available,
                                         secondsToSamples(std::max(
                                             1.0 / sampleRate_,
@@ -2546,12 +2579,12 @@ public:
     {
         if (!launcherActive_.load(std::memory_order_acquire))
             return 0.0f;
-        const auto duration = std::max<juce::int64>(
+        const auto duration = std::max<std::int64_t>(
             1, launcherDurationSamples_.load(std::memory_order_acquire));
         auto position = nextReadPosition_.load(std::memory_order_acquire);
         if (launcherLooping_.load(std::memory_order_acquire))
             position %= duration;
-        return juce::jlimit(
+        return cydaw::base::limit(
             0.0f, 1.0f,
             static_cast<float>(position) / static_cast<float>(duration));
     }
@@ -2601,7 +2634,7 @@ public:
         arrangementScratch_.setSize(0, 0);
     }
 
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& output) override
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output) override
     {
         output.clearActiveBufferRegion();
         if (output.buffer == nullptr || output.numSamples <= 0)
@@ -2618,8 +2651,8 @@ public:
             return;
         }
 
-        const auto prefixSamples = static_cast<int>(std::max<juce::int64>(
-            0, std::min<juce::int64>(scheduledDelaySamples_, output.numSamples)));
+        const auto prefixSamples = static_cast<int>(std::max<std::int64_t>(
+            0, std::min<std::int64_t>(scheduledDelaySamples_, output.numSamples)));
         renderCurrent(output, 0, prefixSamples);
         refreshPendingRequest();
         if (scheduledKind_ != requestNone && !activateScheduledDeck()) {
@@ -2630,9 +2663,9 @@ public:
         renderCurrent(output, prefixSamples, output.numSamples - prefixSamples);
     }
 
-    void setNextReadPosition(const juce::int64 position) override
+    void setNextReadPosition(const std::int64_t position) override
     {
-        const auto safePosition = std::max<juce::int64>(0, position);
+        const auto safePosition = std::max<std::int64_t>(0, position);
         nextReadPosition_.store(safePosition, std::memory_order_release);
         if (!prepared_.load(std::memory_order_acquire))
             return;
@@ -2640,12 +2673,12 @@ public:
         if (!launcherActive && arrangementPlan_ != nullptr)
             return;
         const auto clipStart = launcherActive
-                                   ? juce::int64 {}
+                                   ? std::int64_t {}
                                    : clipStartSamples_.load(std::memory_order_acquire);
         const auto clipDuration = launcherActive
                                       ? launcherDurationSamples_.load(std::memory_order_acquire)
                                       : clipDurationSamples_.load(std::memory_order_acquire);
-        const auto relative = juce::jlimit<juce::int64>(
+        const auto relative = cydaw::base::limit<std::int64_t>(
             0, clipDuration, safePosition - std::min(safePosition, clipStart));
         if (launcherActive
             && activeLauncherUsesPlan_.load(std::memory_order_acquire)) {
@@ -2655,11 +2688,11 @@ public:
         }
         decks_[activeDeck_.load(std::memory_order_acquire)]->setPosition(relative);
     }
-    [[nodiscard]] juce::int64 getNextReadPosition() const override
+    [[nodiscard]] std::int64_t getNextReadPosition() const override
     {
         return nextReadPosition_.load(std::memory_order_acquire);
     }
-    [[nodiscard]] juce::int64 getTotalLength() const override
+    [[nodiscard]] std::int64_t getTotalLength() const override
     {
         const auto currentLength = launcherActive_.load(std::memory_order_acquire)
                                        ? launcherDurationSamples_.load(std::memory_order_acquire)
@@ -2684,18 +2717,18 @@ public:
 
 private:
     struct Deck {
-        Deck(std::unique_ptr<juce::AudioFormatReader> reader,
-             juce::TimeSliceThread& thread,
+        Deck(std::unique_ptr<cydaw::audio::AudioFormatReader> reader,
+             cydaw::audio::ReadAheadScheduler& thread,
              const int channels,
              const int readAheadSamples = 131'072)
         {
             segment = std::make_unique<SegmentReaderSource>(std::move(reader));
-            buffer = std::make_unique<juce::BufferingAudioSource>(
+            buffer = std::make_unique<cydaw::audio::BufferingAudioSource>(
                 segment.get(), thread, false, readAheadSamples, channels, false);
         }
 
-        void configure(const juce::int64 offset,
-                       const juce::int64 duration,
+        void configure(const std::int64_t offset,
+                       const std::int64_t duration,
                        const bool looping,
                        const bool prepared,
                        const int blockSize,
@@ -2737,7 +2770,7 @@ private:
             buffer->prepareToPlay(blockSize, sampleRate);
         }
         void release() { buffer->releaseResources(); }
-        void setPosition(const juce::int64 position)
+        void setPosition(const std::int64_t position)
         {
             buffer->setNextReadPosition(position);
         }
@@ -2745,7 +2778,7 @@ private:
         {
             segment->setLooping(shouldLoop);
         }
-        [[nodiscard]] juce::int64 position() const
+        [[nodiscard]] std::int64_t position() const
         {
             return buffer->getNextReadPosition();
         }
@@ -2753,26 +2786,26 @@ private:
         {
             return segment->hasReadAhead(samples);
         }
-        void render(const juce::AudioSourceChannelInfo& output)
+        void render(const cydaw::audio::AudioSourceChannelInfo& output)
         {
             buffer->getNextAudioBlock(output);
         }
 
         std::unique_ptr<SegmentReaderSource> segment;
-        std::unique_ptr<juce::BufferingAudioSource> buffer;
+        std::unique_ptr<cydaw::audio::BufferingAudioSource> buffer;
     };
 
     struct ArrangementRegion {
         ArrangementRegion(AudioTrackController::AudioClip value,
-                          std::unique_ptr<juce::AudioFormatReader> reader,
-                          juce::TimeSliceThread& thread,
-                          const juce::int64 start,
+                          std::unique_ptr<cydaw::audio::AudioFormatReader> reader,
+                          cydaw::audio::ReadAheadScheduler& thread,
+                          const std::int64_t start,
                           const double sourceOffsetSeconds,
                           const double sourceDurationSeconds,
                           const double timelineDurationSeconds,
-                          const juce::int64 duration,
-                          const juce::int64 fadeIn,
-                          const juce::int64 fadeOut,
+                          const std::int64_t duration,
+                          const std::int64_t fadeIn,
+                          const std::int64_t fadeOut,
                           const bool prepared,
                           const int blockSize,
                           const double sampleRate,
@@ -2792,10 +2825,10 @@ private:
         }
 
         AudioTrackController::AudioClip clip;
-        std::atomic<juce::int64> startSamples {};
-        juce::int64 durationSamples { 1 };
-        juce::int64 fadeInSamples {};
-        juce::int64 fadeOutSamples {};
+        std::atomic<std::int64_t> startSamples {};
+        std::int64_t durationSamples { 1 };
+        std::int64_t fadeInSamples {};
+        std::int64_t fadeOutSamples {};
         Deck deck;
     };
 
@@ -2841,11 +2874,11 @@ private:
             prepared = false;
         }
 
-        juce::int64 durationSamples { 1 };
-        juce::int64 playStartSamples {};
-        juce::int64 playEndSamples { 1 };
-        juce::int64 loopStartSamples {};
-        juce::int64 loopEndSamples { 1 };
+        std::int64_t durationSamples { 1 };
+        std::int64_t playStartSamples {};
+        std::int64_t playEndSamples { 1 };
+        std::int64_t loopStartSamples {};
+        std::int64_t loopEndSamples { 1 };
         bool looping { true };
         bool prepared {};
         std::vector<std::unique_ptr<ArrangementRegion>> regions;
@@ -2856,9 +2889,9 @@ private:
     static constexpr int requestArrangement = 2;
     static constexpr int requestStop = 3;
 
-    [[nodiscard]] juce::int64 secondsToSamples(const double seconds) const noexcept
+    [[nodiscard]] std::int64_t secondsToSamples(const double seconds) const noexcept
     {
-        return static_cast<juce::int64>(std::llround(
+        return static_cast<std::int64_t>(std::llround(
             std::max(0.0, seconds) * sampleRate_));
     }
 
@@ -2874,21 +2907,21 @@ private:
     }
 
     [[nodiscard]] int launcherPlanState(int sceneIndex) noexcept;
-    [[nodiscard]] juce::int64 launcherPlanDurationSamples(
+    [[nodiscard]] std::int64_t launcherPlanDurationSamples(
         int sceneIndex) noexcept;
     void setLauncherPlanPosition(int sceneIndex,
-                                 juce::int64 position) noexcept;
-    void renderLauncherPlan(const juce::AudioSourceChannelInfo& output,
+                                 std::int64_t position) noexcept;
+    void renderLauncherPlan(const cydaw::audio::AudioSourceChannelInfo& output,
                             int outputOffset,
                             int sampleCount) noexcept;
 
     void publishDeckRequest(const int sceneIndex,
                             const bool launcher,
-                            const juce::int64 offset,
-                            const juce::int64 duration,
+                            const std::int64_t offset,
+                            const std::int64_t duration,
                             const bool shouldLoop,
-                            const juce::int64 delay,
-                            const juce::int64 start = 0) noexcept
+                            const std::int64_t delay,
+                            const std::int64_t start = 0) noexcept
     {
         const auto writingGeneration = pendingGeneration_.fetch_add(
             1, std::memory_order_acq_rel) + 1;
@@ -2972,15 +3005,15 @@ private:
             const auto& plan = launcherPlans_[static_cast<std::size_t>(
                 scheduledScene_)];
             if (plan != nullptr)
-                initialPosition = juce::jlimit<juce::int64>(
+                initialPosition = cydaw::base::limit<std::int64_t>(
                     plan->playStartSamples,
                     std::max(plan->playStartSamples,
                              plan->playEndSamples - 1),
                     initialPosition <= 0 ? plan->playStartSamples
                                          : initialPosition);
         } else {
-            initialPosition = juce::jlimit<juce::int64>(
-                0, std::max<juce::int64>(0,
+            initialPosition = cydaw::base::limit<std::int64_t>(
+                0, std::max<std::int64_t>(0,
                                          scheduledDurationSamples_ - 1),
                 initialPosition);
         }
@@ -3008,7 +3041,7 @@ private:
         return true;
     }
 
-    void renderArrangement(const juce::AudioSourceChannelInfo& output,
+    void renderArrangement(const cydaw::audio::AudioSourceChannelInfo& output,
                            const int outputOffset,
                            const int sampleCount)
     {
@@ -3033,10 +3066,10 @@ private:
         auto position = nextReadPosition_.load(std::memory_order_relaxed);
         auto destinationOffset = 0;
         const auto shouldLoop = looping_.load(std::memory_order_relaxed);
-        const auto loopStart = juce::jlimit<juce::int64>(
-            0, std::max<juce::int64>(0, totalLength - 1),
+        const auto loopStart = cydaw::base::limit<std::int64_t>(
+            0, std::max<std::int64_t>(0, totalLength - 1),
             loopStartSamples_.load(std::memory_order_relaxed));
-        const auto loopEnd = juce::jlimit<juce::int64>(
+        const auto loopEnd = cydaw::base::limit<std::int64_t>(
             loopStart + 1, totalLength,
             loopEndSamples_.load(std::memory_order_relaxed));
         const auto playbackEnd = shouldLoop ? loopEnd : totalLength;
@@ -3054,8 +3087,8 @@ private:
                            + (position - loopStart) % loopLength;
             }
             const auto remaining = sampleCount - destinationOffset;
-            const auto segmentSamples = static_cast<int>(std::min<juce::int64>(
-                { static_cast<juce::int64>(remaining),
+            const auto segmentSamples = static_cast<int>(std::min<std::int64_t>(
+                { static_cast<std::int64_t>(remaining),
                   playbackEnd - position,
                   arrangementScratch_.getNumSamples() }));
             if (segmentSamples <= 0)
@@ -3084,7 +3117,7 @@ private:
                         auto fadeGain = 1.0f;
                         if (region->fadeInSamples > 0
                             && regionPosition < region->fadeInSamples) {
-                            const auto denominator = std::max<juce::int64>(
+                            const auto denominator = std::max<std::int64_t>(
                                 1, region->fadeInSamples - 1);
                             fadeGain *= static_cast<float>(regionPosition)
                                         / static_cast<float>(denominator);
@@ -3093,20 +3126,20 @@ private:
                                                   - region->fadeOutSamples;
                         if (region->fadeOutSamples > 0
                             && regionPosition >= fadeOutStart) {
-                            const auto denominator = std::max<juce::int64>(
+                            const auto denominator = std::max<std::int64_t>(
                                 1, region->fadeOutSamples - 1);
                             fadeGain *= static_cast<float>(
                                             region->durationSamples - 1
                                             - regionPosition)
                                         / static_cast<float>(denominator);
                         }
-                        const auto safeGain = juce::jlimit(0.0f, 1.0f,
+                        const auto safeGain = cydaw::base::limit(0.0f, 1.0f,
                                                           fadeGain);
                         for (int channel = 0; channel < channelCount; ++channel)
                             arrangementScratch_.getWritePointer(channel)[sample] *= safeGain;
                     }
                 }
-                const auto eventGain = juce::Decibels::decibelsToGain(
+                const auto eventGain = cydaw::audio::Decibels::decibelsToGain(
                     region->clip.eventGainDb, -60.0f);
                 if (std::abs(eventGain - 1.0f) > 0.000001f)
                     for (int channel = 0; channel < channelCount; ++channel)
@@ -3118,7 +3151,7 @@ private:
                             = static_cast<double>(relativePosition + sample)
                               / sampleRate_;
                         const auto automationGain
-                            = juce::Decibels::decibelsToGain(
+                            = cydaw::audio::Decibels::decibelsToGain(
                                 automationValueAt(region->clip.automation,
                                                   localSeconds),
                                 -60.0f);
@@ -3143,7 +3176,7 @@ private:
         arrangementCallbacksInFlight_.fetch_sub(1, std::memory_order_release);
     }
 
-    void renderCurrent(const juce::AudioSourceChannelInfo& output,
+    void renderCurrent(const cydaw::audio::AudioSourceChannelInfo& output,
                        const int outputOffset,
                        const int sampleCount)
     {
@@ -3154,9 +3187,9 @@ private:
                 && !arrangementPlaybackEnabled_.load(
                     std::memory_order_acquire))) {
             auto position = nextReadPosition_.load(std::memory_order_relaxed);
-            const auto totalLength = std::max<juce::int64>(
+            const auto totalLength = std::max<std::int64_t>(
                 1, sessionLengthSamples_.load(std::memory_order_acquire));
-            position = std::min<juce::int64>(
+            position = std::min<std::int64_t>(
                 totalLength, position + sampleCount);
             nextReadPosition_.store(position, std::memory_order_relaxed);
             return;
@@ -3172,7 +3205,7 @@ private:
             return;
         }
         const auto clipStart = launcherActive
-                                   ? juce::int64 {}
+                                   ? std::int64_t {}
                                    : clipStartSamples_.load(std::memory_order_acquire);
         const auto clipDuration = launcherActive
                                       ? launcherDurationSamples_.load(std::memory_order_relaxed)
@@ -3181,7 +3214,7 @@ private:
                                     ? launcherLooping_.load(std::memory_order_relaxed)
                                     : looping_.load(std::memory_order_relaxed);
         const auto clipEnd = clipStart + clipDuration;
-        const auto totalLength = std::max<juce::int64>(1, clipEnd);
+        const auto totalLength = std::max<std::int64_t>(1, clipEnd);
         auto position = nextReadPosition_.load(std::memory_order_relaxed);
         auto destinationOffset = 0;
         auto& deck = *decks_[static_cast<std::size_t>(
@@ -3194,7 +3227,7 @@ private:
                 position = 0;
             }
             const auto remaining = sampleCount - destinationOffset;
-            const auto untilEnd = static_cast<int>(std::min<juce::int64>(
+            const auto untilEnd = static_cast<int>(std::min<std::int64_t>(
                 remaining, totalLength - position));
             const auto overlapStart = std::max(position, clipStart);
             const auto overlapEnd = std::min(position + untilEnd, clipEnd);
@@ -3216,53 +3249,53 @@ private:
     }
 
     std::array<std::unique_ptr<Deck>, 2> decks_;
-    const juce::int64 sourceLengthSamples_ {};
+    const std::int64_t sourceLengthSamples_ {};
     const double sampleRate_ {};
-    juce::TimeSliceThread& readAheadThread_;
+    cydaw::audio::ReadAheadScheduler& readAheadThread_;
     const int channels_ { 2 };
     std::unique_ptr<ArrangementPlan> arrangementPlan_;
     std::array<std::unique_ptr<LauncherPlan>,
                AudioTrackController::maximumLauncherScenes> launcherPlans_;
-    juce::AudioBuffer<float> arrangementScratch_;
+    cydaw::audio::SampleBuffer<float> arrangementScratch_;
     std::atomic<bool> arrangementPlanAvailable_ { true };
     std::atomic<int> arrangementCallbacksInFlight_ {};
     std::atomic<bool> launcherPlansAvailable_ { true };
     std::atomic<int> launcherCallbacksInFlight_ {};
-    std::atomic<juce::int64> arrangementLengthSamples_ {};
-    std::atomic<juce::int64> sessionLengthSamples_ { 1 };
-    std::atomic<juce::int64> loopStartSamples_ {};
-    std::atomic<juce::int64> loopEndSamples_ { 1 };
+    std::atomic<std::int64_t> arrangementLengthSamples_ {};
+    std::atomic<std::int64_t> sessionLengthSamples_ { 1 };
+    std::atomic<std::int64_t> loopStartSamples_ {};
+    std::atomic<std::int64_t> loopEndSamples_ { 1 };
     std::atomic<int> blockSize_ { 512 };
     std::atomic<double> outputSampleRate_ { 48'000.0 };
     std::atomic<bool> prepared_ {};
     std::atomic<int> activeDeck_ {};
-    std::atomic<juce::int64> nextReadPosition_ {};
-    std::atomic<juce::int64> clipStartSamples_ {};
-    std::atomic<juce::int64> sourceOffsetSamples_ {};
-    std::atomic<juce::int64> clipDurationSamples_ {};
+    std::atomic<std::int64_t> nextReadPosition_ {};
+    std::atomic<std::int64_t> clipStartSamples_ {};
+    std::atomic<std::int64_t> sourceOffsetSamples_ {};
+    std::atomic<std::int64_t> clipDurationSamples_ {};
     std::atomic<bool> looping_ {};
     std::atomic<bool> launcherActive_ {};
     std::atomic<bool> launcherStopped_ {};
     std::atomic<bool> arrangementPlaybackEnabled_ { true };
     std::atomic<bool> activeLauncherUsesPlan_ {};
-    std::atomic<juce::int64> launcherDurationSamples_ { 1 };
+    std::atomic<std::int64_t> launcherDurationSamples_ { 1 };
     std::atomic<bool> launcherLooping_ { true };
     std::atomic<int> activeScene_ { -1 };
     std::atomic<std::uint64_t> pendingGeneration_ {};
     std::atomic<int> pendingKind_ { requestNone };
     std::atomic<int> pendingDeck_ { 1 };
     std::atomic<int> pendingScene_ { -1 };
-    std::atomic<juce::int64> pendingDurationSamples_ { 1 };
-    std::atomic<juce::int64> pendingDelaySamples_ {};
-    std::atomic<juce::int64> pendingStartSamples_ {};
+    std::atomic<std::int64_t> pendingDurationSamples_ { 1 };
+    std::atomic<std::int64_t> pendingDelaySamples_ {};
+    std::atomic<std::int64_t> pendingStartSamples_ {};
     std::atomic<bool> pendingLooping_ { true };
     std::uint64_t scheduledGeneration_ {};
     int scheduledKind_ { requestNone };
     int scheduledDeck_ { 1 };
     int scheduledScene_ { -1 };
-    juce::int64 scheduledDurationSamples_ { 1 };
-    juce::int64 scheduledDelaySamples_ {};
-    juce::int64 scheduledStartSamples_ {};
+    std::int64_t scheduledDurationSamples_ { 1 };
+    std::int64_t scheduledDelaySamples_ {};
+    std::int64_t scheduledStartSamples_ {};
     bool scheduledLooping_ { true };
 };
 
@@ -3294,7 +3327,7 @@ int ClipAudioSource::launcherPlanState(const int sceneIndex) noexcept
     return state;
 }
 
-juce::int64 ClipAudioSource::launcherPlanDurationSamples(
+std::int64_t ClipAudioSource::launcherPlanDurationSamples(
     const int sceneIndex) noexcept
 {
     if (sceneIndex < 0
@@ -3302,7 +3335,7 @@ juce::int64 ClipAudioSource::launcherPlanDurationSamples(
         || !launcherPlansAvailable_.load(std::memory_order_acquire))
         return 0;
     launcherCallbacksInFlight_.fetch_add(1);
-    auto duration = juce::int64 {};
+    auto duration = std::int64_t {};
     if (launcherPlansAvailable_.load()) {
         const auto& plan = launcherPlans_[static_cast<std::size_t>(
             sceneIndex)];
@@ -3314,7 +3347,7 @@ juce::int64 ClipAudioSource::launcherPlanDurationSamples(
 }
 
 void ClipAudioSource::setLauncherPlanPosition(
-    const int sceneIndex, const juce::int64 position) noexcept
+    const int sceneIndex, const std::int64_t position) noexcept
 {
     if (sceneIndex < 0
         || sceneIndex >= AudioTrackController::maximumLauncherScenes
@@ -3324,12 +3357,12 @@ void ClipAudioSource::setLauncherPlanPosition(
     if (launcherPlansAvailable_.load()) {
         auto& plan = launcherPlans_[static_cast<std::size_t>(sceneIndex)];
         if (plan != nullptr) {
-            const auto safe = juce::jlimit<juce::int64>(
+            const auto safe = cydaw::base::limit<std::int64_t>(
                 0, plan->durationSamples, position);
             for (auto& region : plan->regions) {
                 const auto start = region->startSamples.load(
                     std::memory_order_relaxed);
-                region->deck.setPosition(juce::jlimit<juce::int64>(
+                region->deck.setPosition(cydaw::base::limit<std::int64_t>(
                     0, region->durationSamples, safe - start));
             }
         }
@@ -3338,7 +3371,7 @@ void ClipAudioSource::setLauncherPlanPosition(
 }
 
 void ClipAudioSource::renderLauncherPlan(
-    const juce::AudioSourceChannelInfo& output, const int outputOffset,
+    const cydaw::audio::AudioSourceChannelInfo& output, const int outputOffset,
     const int sampleCount) noexcept
 {
     if (sampleCount <= 0
@@ -3361,13 +3394,13 @@ void ClipAudioSource::renderLauncherPlan(
         return;
     }
 
-    const auto playStart = juce::jlimit<juce::int64>(
+    const auto playStart = cydaw::base::limit<std::int64_t>(
         0, plan->durationSamples - 1, plan->playStartSamples);
-    const auto playEnd = juce::jlimit<juce::int64>(
+    const auto playEnd = cydaw::base::limit<std::int64_t>(
         playStart + 1, plan->durationSamples, plan->playEndSamples);
-    const auto loopStart = juce::jlimit<juce::int64>(
+    const auto loopStart = cydaw::base::limit<std::int64_t>(
         playStart, playEnd - 1, plan->loopStartSamples);
-    const auto loopEnd = juce::jlimit<juce::int64>(
+    const auto loopEnd = cydaw::base::limit<std::int64_t>(
         loopStart + 1, playEnd, plan->loopEndSamples);
     auto position = nextReadPosition_.load(std::memory_order_relaxed);
     if (position < playStart)
@@ -3380,10 +3413,10 @@ void ClipAudioSource::renderLauncherPlan(
                 break;
             position = loopStart
                        + (position - loopStart)
-                             % std::max<juce::int64>(1,
+                             % std::max<std::int64_t>(1,
                                                      loopEnd - loopStart);
         }
-        const auto count = static_cast<int>(std::min<juce::int64>(
+        const auto count = static_cast<int>(std::min<std::int64_t>(
             sampleCount - written, playbackEnd - position));
         if (count <= 0)
             break;
@@ -3415,7 +3448,7 @@ void ClipAudioSource::renderLauncherPlan(
                     auto fadeGain = 1.0f;
                     if (region->fadeInSamples > 0
                         && regionPosition < region->fadeInSamples) {
-                        const auto denominator = std::max<juce::int64>(
+                        const auto denominator = std::max<std::int64_t>(
                             1, region->fadeInSamples - 1);
                         fadeGain *= static_cast<float>(regionPosition)
                                     / static_cast<float>(denominator);
@@ -3424,21 +3457,21 @@ void ClipAudioSource::renderLauncherPlan(
                                               - region->fadeOutSamples;
                     if (region->fadeOutSamples > 0
                         && regionPosition >= fadeOutStart) {
-                        const auto denominator = std::max<juce::int64>(
+                        const auto denominator = std::max<std::int64_t>(
                             1, region->fadeOutSamples - 1);
                         fadeGain *= static_cast<float>(
                                         region->durationSamples - 1
                                         - regionPosition)
                                     / static_cast<float>(denominator);
                     }
-                    const auto safeGain = juce::jlimit(
+                    const auto safeGain = cydaw::base::limit(
                         0.0f, 1.0f, fadeGain);
                     for (int channel = 0; channel < channels; ++channel)
                         arrangementScratch_.getWritePointer(channel)[sample]
                             *= safeGain;
                 }
             }
-            const auto eventGain = juce::Decibels::decibelsToGain(
+            const auto eventGain = cydaw::audio::Decibels::decibelsToGain(
                 region->clip.eventGainDb, -60.0f);
             if (std::abs(eventGain - 1.0f) > 0.000001f)
                 for (auto channel = 0; channel < channels; ++channel)
@@ -3450,7 +3483,7 @@ void ClipAudioSource::renderLauncherPlan(
                         = static_cast<double>(relative + sample)
                           / sampleRate_;
                     const auto automationGain
-                        = juce::Decibels::decibelsToGain(
+                        = cydaw::audio::Decibels::decibelsToGain(
                             automationValueAt(region->clip.automation,
                                               localSeconds),
                             -60.0f);
@@ -3480,9 +3513,9 @@ void ClipAudioSource::renderLauncherPlan(
     launcherCallbacksInFlight_.fetch_sub(1, std::memory_order_release);
 }
 
-juce::Result ClipAudioSource::setLauncherSceneSource(
+cydaw::base::Result ClipAudioSource::setLauncherSceneSource(
     const int sceneIndex,
-    std::unique_ptr<juce::AudioFormatReader> reader,
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader,
     const double sourceOffsetSeconds,
     const double durationSeconds,
     const bool shouldLoop)
@@ -3491,15 +3524,15 @@ juce::Result ClipAudioSource::setLauncherSceneSource(
         || sceneIndex >= AudioTrackController::maximumLauncherScenes
         || reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail("Cannot open a launcher clip source reader");
+        return cydaw::base::Result::fail("Cannot open a launcher clip source reader");
 
     const auto sourceLengthSeconds = static_cast<double>(
         reader->lengthInSamples) / reader->sampleRate;
     const auto minimumDuration = 1.0 / reader->sampleRate;
-    const auto offset = juce::jlimit(
+    const auto offset = cydaw::base::limit(
         0.0, std::max(0.0, sourceLengthSeconds - minimumDuration),
         sourceOffsetSeconds);
-    const auto duration = juce::jlimit(
+    const auto duration = cydaw::base::limit(
         minimumDuration,
         std::max(minimumDuration, sourceLengthSeconds - offset),
         durationSeconds);
@@ -3515,7 +3548,7 @@ juce::Result ClipAudioSource::setLauncherSceneSource(
         0.0, duration, shouldLoop);
 }
 
-juce::Result ClipAudioSource::setLauncherSceneRegions(
+cydaw::base::Result ClipAudioSource::setLauncherSceneRegions(
     const int sceneIndex,
     std::vector<PreparedArrangementRegion> regions,
     const double durationSeconds, const double playStartSeconds,
@@ -3524,7 +3557,7 @@ juce::Result ClipAudioSource::setLauncherSceneRegions(
 {
     if (sceneIndex < 0
         || sceneIndex >= AudioTrackController::maximumLauncherScenes)
-        return juce::Result::fail("Invalid launcher scene");
+        return cydaw::base::Result::fail("Invalid launcher scene");
 
     const auto replacingActiveScene
         = activeScene_.load(std::memory_order_acquire) == sceneIndex;
@@ -3532,19 +3565,19 @@ juce::Result ClipAudioSource::setLauncherSceneRegions(
         std::memory_order_acquire);
 
     auto next = std::make_unique<LauncherPlan>();
-    const auto duration = juce::jlimit(0.001, 86'400.0,
+    const auto duration = cydaw::base::limit(0.001, 86'400.0,
                                        durationSeconds);
-    next->durationSamples = std::max<juce::int64>(
+    next->durationSamples = std::max<std::int64_t>(
         1, secondsToSamples(duration));
-    next->playStartSamples = secondsToSamples(juce::jlimit(
+    next->playStartSamples = secondsToSamples(cydaw::base::limit(
         0.0, std::max(0.0, duration - 0.001), playStartSeconds));
-    next->playEndSamples = juce::jlimit<juce::int64>(
+    next->playEndSamples = cydaw::base::limit<std::int64_t>(
         next->playStartSamples + 1, next->durationSamples,
         secondsToSamples(playEndSeconds));
-    next->loopStartSamples = juce::jlimit<juce::int64>(
+    next->loopStartSamples = cydaw::base::limit<std::int64_t>(
         next->playStartSamples, next->playEndSamples - 1,
         secondsToSamples(loopStartSeconds));
-    next->loopEndSamples = juce::jlimit<juce::int64>(
+    next->loopEndSamples = cydaw::base::limit<std::int64_t>(
         next->loopStartSamples + 1, next->playEndSamples,
         secondsToSamples(loopEndSeconds));
     next->looping = shouldLoop;
@@ -3557,28 +3590,28 @@ juce::Result ClipAudioSource::setLauncherSceneRegions(
         if (preparedRegion.reader == nullptr
             || preparedRegion.reader->sampleRate <= 0.0
             || preparedRegion.reader->lengthInSamples <= 0)
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 "Cannot open a launcher event source reader");
         const auto sourceLength = static_cast<double>(
             preparedRegion.reader->lengthInSamples)
                                   / preparedRegion.reader->sampleRate;
         const auto minimum = 1.0 / preparedRegion.reader->sampleRate;
-        const auto offset = juce::jlimit(
+        const auto offset = cydaw::base::limit(
             0.0, std::max(0.0, sourceLength - minimum),
             preparedRegion.clip.sourceOffsetSeconds);
-        const auto sourceDuration = juce::jlimit(
+        const auto sourceDuration = cydaw::base::limit(
             minimum, std::max(minimum, sourceLength - offset),
             preparedRegion.clip.sourceDurationSeconds);
-        const auto timelineDuration = juce::jlimit(
+        const auto timelineDuration = cydaw::base::limit(
             0.001, 86'400.0, preparedRegion.clip.durationSeconds);
-        const auto timelineSamples = std::max<juce::int64>(
+        const auto timelineSamples = std::max<std::int64_t>(
             1, secondsToSamples(timelineDuration));
         const auto start = secondsToSamples(
             preparedRegion.clip.startSeconds);
-        const auto fadeIn = juce::jlimit<juce::int64>(
+        const auto fadeIn = cydaw::base::limit<std::int64_t>(
             0, timelineSamples,
             secondsToSamples(preparedRegion.clip.fadeInSeconds));
-        const auto fadeOut = juce::jlimit<juce::int64>(
+        const auto fadeOut = cydaw::base::limit<std::int64_t>(
             0, timelineSamples,
             secondsToSamples(preparedRegion.clip.fadeOutSeconds));
         next->regions.push_back(std::make_unique<ArrangementRegion>(
@@ -3596,7 +3629,7 @@ juce::Result ClipAudioSource::setLauncherSceneRegions(
     auto retired = std::move(slot);
     slot = std::move(next);
     if (replacingActiveScene) {
-        nextReadPosition_.store(juce::jlimit<juce::int64>(
+        nextReadPosition_.store(cydaw::base::limit<std::int64_t>(
                                     slot->playStartSamples,
                                     std::max(slot->playStartSamples,
                                              slot->playEndSamples - 1),
@@ -3611,7 +3644,7 @@ juce::Result ClipAudioSource::setLauncherSceneRegions(
         retired->release();
     retired.reset();
     launcherPlansAvailable_.store(true, std::memory_order_release);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 void ClipAudioSource::clearLauncherSceneSource(const int sceneIndex)
@@ -3630,47 +3663,47 @@ void ClipAudioSource::clearLauncherSceneSource(const int sceneIndex)
     launcherPlansAvailable_.store(true, std::memory_order_release);
 }
 
-juce::Result ClipAudioSource::setArrangementRegions(
+cydaw::base::Result ClipAudioSource::setArrangementRegions(
     std::vector<PreparedArrangementRegion> regions)
 {
     if (regions.size() > AudioTrackController::maximumAudioClipsPerTrack * 4)
-        return juce::Result::fail("The audio clip limit for this track was exceeded");
+        return cydaw::base::Result::fail("The audio clip limit for this track was exceeded");
 
     auto next = std::make_unique<ArrangementPlan>();
     next->regions.reserve(regions.size());
     const auto isPrepared = prepared_.load(std::memory_order_acquire);
     const auto blockSize = blockSize_.load(std::memory_order_acquire);
     const auto outputSampleRate = outputSampleRate_.load(std::memory_order_acquire);
-    auto totalLength = juce::int64 {};
+    auto totalLength = std::int64_t {};
     for (auto& preparedRegion : regions) {
         if (preparedRegion.reader == nullptr
             || preparedRegion.reader->sampleRate <= 0.0
             || preparedRegion.reader->lengthInSamples <= 0)
-            return juce::Result::fail("Cannot open an audio clip source reader");
+            return cydaw::base::Result::fail("Cannot open an audio clip source reader");
         const auto sourceLengthSeconds = static_cast<double>(
             preparedRegion.reader->lengthInSamples)
                                          / preparedRegion.reader->sampleRate;
         const auto minimumDuration = 1.0 / preparedRegion.reader->sampleRate;
-        const auto offsetSeconds = juce::jlimit(
+        const auto offsetSeconds = cydaw::base::limit(
             0.0, std::max(0.0, sourceLengthSeconds - minimumDuration),
             preparedRegion.clip.sourceOffsetSeconds);
-        const auto sourceDurationSeconds = juce::jlimit(
+        const auto sourceDurationSeconds = cydaw::base::limit(
             minimumDuration,
             std::max(minimumDuration, sourceLengthSeconds - offsetSeconds),
             preparedRegion.clip.sourceDurationSeconds > 0.0
                 ? preparedRegion.clip.sourceDurationSeconds
                 : preparedRegion.clip.durationSeconds);
-        const auto durationSeconds = juce::jlimit(
+        const auto durationSeconds = cydaw::base::limit(
             0.001, 86'400.0, preparedRegion.clip.durationSeconds);
-        const auto duration = std::max<juce::int64>(
+        const auto duration = std::max<std::int64_t>(
             1, secondsToSamples(durationSeconds));
-        const auto fadeInSeconds = juce::jlimit(
+        const auto fadeInSeconds = cydaw::base::limit(
             0.0, durationSeconds, preparedRegion.clip.fadeInSeconds);
-        const auto fadeOutSeconds = juce::jlimit(
+        const auto fadeOutSeconds = cydaw::base::limit(
             0.0, durationSeconds, preparedRegion.clip.fadeOutSeconds);
-        const auto fadeIn = juce::jlimit<juce::int64>(
+        const auto fadeIn = cydaw::base::limit<std::int64_t>(
             0, duration, secondsToSamples(fadeInSeconds));
-        const auto fadeOut = juce::jlimit<juce::int64>(
+        const auto fadeOut = cydaw::base::limit<std::int64_t>(
             0, duration, secondsToSamples(fadeOutSeconds));
         const auto start = secondsToSamples(preparedRegion.clip.startSeconds);
         preparedRegion.clip.startSeconds = static_cast<double>(start) / sampleRate_;
@@ -3716,7 +3749,7 @@ juce::Result ClipAudioSource::setArrangementRegions(
     if (retired != nullptr)
         retired->release();
     retired.reset();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool ClipAudioSource::moveArrangementRegion(const std::uint64_t regionId,
@@ -3727,7 +3760,7 @@ bool ClipAudioSource::moveArrangementRegion(const std::uint64_t regionId,
         return false;
     const auto start = secondsToSamples(startSeconds);
     auto moved = false;
-    auto totalLength = juce::int64 {};
+    auto totalLength = std::int64_t {};
     for (auto& region : arrangementPlan_->regions) {
         if (region->clip.id == regionId) {
             region->startSamples.store(start, std::memory_order_release);
@@ -3743,13 +3776,13 @@ bool ClipAudioSource::moveArrangementRegion(const std::uint64_t regionId,
     return moved;
 }
 
-class GraphSynthSound final : public juce::SynthesiserSound {
+class GraphSynthSound final : public cydaw::audio::VoiceSound {
 public:
     bool appliesToNote(int) override { return true; }
     bool appliesToChannel(int) override { return true; }
 };
 
-// A thin host: JUCE's voice bookkeeping around the engine's PolyVoice,
+// A thin host: native voice allocation around the engine's PolyVoice,
 // which is the same one the graph editor's preview plays.
 // What the instrument's control cables put on its voices this block. Written
 // and read on the audio thread only, before the voices render.
@@ -4020,7 +4053,7 @@ private:
 
 } // namespace
 
-class GraphSynthVoice final : public juce::SynthesiserVoice, public PlanVoice {
+class GraphSynthVoice final : public cydaw::audio::AllocatedVoice, public PlanVoice {
 public:
     GraphSynthVoice(const cydaw::realtime::RtPublisher<cydaw::engine::PolySynthGraphPlan>& graph,
                     const VoiceModulationState& modulation, const cydaw::engine::prism::Context* context = nullptr)
@@ -4043,14 +4076,14 @@ public:
         return graph != nullptr ? voice_.chokedBy(*graph) : 0;
     }
 
-    bool canPlaySound(juce::SynthesiserSound* sound) override
+    bool canPlaySound(cydaw::audio::VoiceSound* sound) override
     {
         return dynamic_cast<GraphSynthSound*>(sound) != nullptr;
     }
 
     void startNote(const int midiNoteNumber,
                    const float velocity,
-                   juce::SynthesiserSound*,
+                   cydaw::audio::VoiceSound*,
                    const int pitchWheel) override
     {
         // A note starts from the automated values too (what an envelope or
@@ -4080,7 +4113,7 @@ public:
 
     void setCurrentPlaybackSampleRate(const double rate) override
     {
-        juce::SynthesiserVoice::setCurrentPlaybackSampleRate(rate);
+        cydaw::audio::AllocatedVoice::setCurrentPlaybackSampleRate(rate);
         // Off the audio thread: sizes the string's delay line and builds the
         // wavetable bank before any note can ask for either; and the room a
         // panned note is rendered in.
@@ -4091,7 +4124,7 @@ public:
 
     void stopNote(float, const bool allowTailOff) override
     {
-        // Legato: JUCE stops a voice before starting it again; this one goes on.
+        // Legato preserves the sounding voice across a new start.
         if (legato)
             return;
         // Choked, or one note at a time: this one gives way, quickly.
@@ -4134,7 +4167,7 @@ public:
         }
     }
 
-    void renderNextBlock(juce::AudioBuffer<float>& output,
+    void renderNextBlock(cydaw::audio::SampleBuffer<float>& output,
                          int startSample,
                          const int numSamples) override
     {
@@ -4236,7 +4269,7 @@ private:
     float pan_ {};
     float panNow_ {};
     bool panFresh_ {};
-    juce::AudioBuffer<float> scratch_;
+    cydaw::audio::SampleBuffer<float> scratch_;
 };
 
 // A note's expression as the audio thread reads it.
@@ -4256,31 +4289,31 @@ struct AudioTrackController::MidiOutQueue {
     cydaw::realtime::SpscRing<Event, 1'024> ring;
     // The device it goes to (set by the outputs' thread's owner); none:
     // nothing is queued.
-    std::atomic<juce::MidiOutput*> device {};
+    std::atomic<cydaw::midi::Output*> device {};
 };
 
 // The tracks' MIDI outputs: each device opened once, a thread sending what
 // the tracks queued (a millisecond apart at most).
-class AudioTrackController::MidiOutputHub final : juce::Thread {
+class AudioTrackController::MidiOutputHub final : cydaw::base::Thread {
 public:
-    explicit MidiOutputHub(std::atomic<std::uint32_t>& sent) : juce::Thread("CyDAW MIDI out"), sent_(sent) { startThread(); }
+    explicit MidiOutputHub(std::atomic<std::uint32_t>& sent) : cydaw::base::Thread("CyDAW MIDI out"), sent_(sent) { startThread(); }
     ~MidiOutputHub() override
     {
         stopThread(2'000);
-        const juce::ScopedLock hold(lock_);
+        const cydaw::base::ScopedLock hold(lock_);
         for (auto& [queue, identifier] : queues_)
             queue->device.store(nullptr, std::memory_order_release);
     }
     // Every track's queue and the device it sends to (empty: none).
-    void setQueues(std::vector<std::pair<std::shared_ptr<MidiOutQueue>, juce::String>> queues)
+    void setQueues(std::vector<std::pair<std::shared_ptr<MidiOutQueue>, cydaw::base::Text>> queues)
     {
-        const juce::ScopedLock hold(lock_);
+        const cydaw::base::ScopedLock hold(lock_);
         for (auto& [queue, identifier] : queues) {
-            juce::MidiOutput* device {};
+            cydaw::midi::Output* device {};
             if (identifier.isNotEmpty()) {
                 auto& open = devices_[identifier];
                 if (open == nullptr)
-                    open = juce::MidiOutput::openDevice(identifier);
+                    open = cydaw::midi::Output::openDevice(identifier);
                 device = open.get();
             }
             queue->device.store(device, std::memory_order_release);
@@ -4299,14 +4332,14 @@ private:
     {
         while (!threadShouldExit()) {
             {
-                const juce::ScopedLock hold(lock_);
+                const cydaw::base::ScopedLock hold(lock_);
                 for (auto& [queue, identifier] : queues_) {
                     MidiOutQueue::Event event;
                     while (queue->ring.tryPop(event)) {
                         auto* device = queue->device.load(std::memory_order_acquire);
                         if (device == nullptr || event.size == 0)
                             continue;
-                        device->sendMessageNow(juce::MidiMessage(event.bytes.data(), event.size));
+                        device->sendMessageNow(cydaw::midi::Message(event.bytes.data(), event.size));
                         sent_.fetch_add(1, std::memory_order_relaxed);
                     }
                 }
@@ -4316,20 +4349,20 @@ private:
     }
 
     std::atomic<std::uint32_t>& sent_;
-    juce::CriticalSection lock_;
-    std::vector<std::pair<std::shared_ptr<MidiOutQueue>, juce::String>> queues_;
-    std::map<juce::String, std::unique_ptr<juce::MidiOutput>> devices_;
+    cydaw::base::CriticalSection lock_;
+    std::vector<std::pair<std::shared_ptr<MidiOutQueue>, cydaw::base::Text>> queues_;
+    std::map<cydaw::base::Text, std::unique_ptr<cydaw::midi::Output>> devices_;
 };
 
-struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, public RoutedInputReceiver {
-    void setRoutedInputs(const juce::AudioBuffer<float>* const* buses, const int numSamples) noexcept override
+struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioSource, public RoutedInputReceiver {
+    void setRoutedInputs(const cydaw::audio::SampleBuffer<float>* const* buses, const int numSamples) noexcept override
     {
         measureRoutedInputs(buses, numSamples);
         for (std::size_t bus = 0; bus < maximumBuses; ++bus)
             routedInputs[bus] = buses != nullptr ? buses[bus] : nullptr;
         routedSamples = numSamples;
     }
-    std::array<const juce::AudioBuffer<float>*, RoutedInputReceiver::maximumBuses> routedInputs {};
+    std::array<const cydaw::audio::SampleBuffer<float>*, RoutedInputReceiver::maximumBuses> routedInputs {};
     int routedSamples {};
     // Its voices held back by the latency of what is routed into it.
     AudioDelayLine voicesDelay;
@@ -4361,8 +4394,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     }
 
     MidiSynthEngine(AudioTrackController& controller,
-                    juce::MidiMessageCollector& sharedCollector,
-                    juce::MidiKeyboardState& sharedKeyboard)
+                    cydaw::midi::MessageCollector& sharedCollector,
+                    cydaw::midi::KeyboardState& sharedKeyboard)
         : owner(controller), collector(sharedCollector), keyboard(sharedKeyboard)
     {
         instrumentGraph.store(
@@ -4421,7 +4454,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             collector.reset(44'100.0);
     }
 
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& output) override
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output) override
     {
         output.clearActiveBufferRegion();
         if (output.buffer == nullptr || output.numSamples <= 0)
@@ -4458,9 +4491,11 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             // What the keyboard holds down, to let go of it alone later.
             for (const auto metadata : midi) {
                 const auto message = metadata.getMessage();
-                if (message.isNoteOn())
+                if (message.isNoteOn()) {
                     ++liveNoteOns;
-                const auto channel = static_cast<std::size_t>(juce::jlimit(1, 16, message.getChannel()) - 1);
+                    key_latency::collected(message.getNoteNumber(), metadata.samplePosition);
+                }
+                const auto channel = static_cast<std::size_t>(cydaw::base::limit(1, 16, message.getChannel()) - 1);
                 if (message.isNoteOn())
                     liveHeld[channel].set(static_cast<std::size_t>(message.getNoteNumber()));
                 else if (message.isNoteOff())
@@ -4499,7 +4534,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
 
         if (needsAllNotesOff.exchange(false, std::memory_order_acq_rel)) {
             for (int channel = 1; channel <= 16; ++channel)
-                midi.addEvent(juce::MidiMessage::allNotesOff(channel), 0);
+                midi.addEvent(cydaw::midi::Message::allNotesOff(channel), 0);
             for (auto& held : liveHeld)
                 held.reset();
             liveSustain.reset();
@@ -4508,9 +4543,9 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             for (std::size_t channel = 0; channel < liveHeld.size(); ++channel) {
                 for (std::size_t note = 0; note < 128; ++note)
                     if (liveHeld[channel].test(note))
-                        midi.addEvent(juce::MidiMessage::noteOff(static_cast<int>(channel) + 1, static_cast<int>(note)), 0);
+                        midi.addEvent(cydaw::midi::Message::noteOff(static_cast<int>(channel) + 1, static_cast<int>(note)), 0);
                 if (liveSustain.test(channel))
-                    midi.addEvent(juce::MidiMessage::controllerEvent(static_cast<int>(channel) + 1, 64, 0), 0);
+                    midi.addEvent(cydaw::midi::Message::controllerEvent(static_cast<int>(channel) + 1, 64, 0), 0);
                 liveHeld[channel].reset();
             }
             liveSustain.reset();
@@ -4524,10 +4559,10 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             const auto sessionEnd = std::max(
                 sequenceEnd,
                 transportLengthSeconds.load(std::memory_order_acquire));
-            const auto loopStart = juce::jlimit(
+            const auto loopStart = cydaw::base::limit(
                 0.0, std::max(0.0, sessionEnd - 0.000001),
                 loopStartSeconds.load(std::memory_order_relaxed));
-            const auto loopEnd = juce::jlimit(
+            const auto loopEnd = cydaw::base::limit(
                 loopStart + 0.000001, std::max(loopStart + 0.000001,
                                                sessionEnd),
                 loopEndSeconds.load(std::memory_order_relaxed));
@@ -4543,18 +4578,18 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             // then 43, 14 bits over -48..+12 dB).
             const auto bendAt = [](const ScheduledNote& note, const double time) {
                 const auto position = (time - note.startSeconds) / std::max(1.0e-6, note.endSeconds - note.startSeconds);
-                return juce::jlimit(0, 16'383, static_cast<int>(std::lround(8'192.0 + curveAt(note.curves->pitch, position) / 24.0 * 8'192.0)));
+                return cydaw::base::limit(0, 16'383, static_cast<int>(std::lround(8'192.0 + curveAt(note.curves->pitch, position) / 24.0 * 8'192.0)));
             };
             const auto gainAt = [](const ScheduledNote& note, const double time) {
                 const auto position = (time - note.startSeconds) / std::max(1.0e-6, note.endSeconds - note.startSeconds);
-                return juce::jlimit(0, 16'383, static_cast<int>(std::lround((curveAt(note.curves->gain, position) + 48.0) / 60.0 * 16'383.0)));
+                return cydaw::base::limit(0, 16'383, static_cast<int>(std::lround((curveAt(note.curves->gain, position) + 48.0) / 60.0 * 16'383.0)));
             };
             const auto sendBend = [&midi](const ScheduledNote& note, const int value, const int at) {
-                midi.addEvent(juce::MidiMessage::pitchWheel(note.channel, value), at);
+                midi.addEvent(cydaw::midi::Message::pitchWheel(note.channel, value), at);
             };
             const auto sendGain = [&midi](const ScheduledNote& note, const int value, const int at) {
-                midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 43, value & 127), at);
-                midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 11, value >> 7), at);
+                midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 43, value & 127), at);
+                midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 11, value >> 7), at);
             };
             // Its timbre (CC 74), pressure (the channel's) and pan (CC 10),
             // 0..127: what the curve says, its rest when it has none.
@@ -4562,7 +4597,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                                    const double rest, const double low, const double high) {
                 const auto position = (time - note.startSeconds) / std::max(1.0e-6, note.endSeconds - note.startSeconds);
                 const auto value = points.empty() ? rest : curveAt(points, position);
-                return juce::jlimit(0, 127, static_cast<int>(std::lround((value - low) / (high - low) * 127.0)));
+                return cydaw::base::limit(0, 127, static_cast<int>(std::lround((value - low) / (high - low) * 127.0)));
             };
             const auto timbreAt = [&partAt](const ScheduledNote& note, const double time) {
                 return partAt(note.curves->timbre, note, time, 0.5, 0.0, 1.0);
@@ -4578,11 +4613,11 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             const auto addExpression = [&](const ScheduledNote& note, const double time, const int at, const bool beforeNote) {
                 if (beforeNote) {
                     sendBend(note, bendAt(note, time), at);
-                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 74, timbreAt(note, time)), at);
+                    midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 74, timbreAt(note, time)), at);
                 } else {
                     sendGain(note, gainAt(note, time), at);
-                    midi.addEvent(juce::MidiMessage::channelPressureChange(note.channel, pressureAt(note, time)), at);
-                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 10, panAt(note, time)), at);
+                    midi.addEvent(cydaw::midi::Message::channelPressureChange(note.channel, pressureAt(note, time)), at);
+                    midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 10, panAt(note, time)), at);
                 }
             };
             // A note with a chance plays this time or not: rolled as it comes.
@@ -4600,7 +4635,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 const auto end = start + static_cast<double>(count) / rate;
                 if (shouldChase) {
                     for (int channel = 1; channel <= 16; ++channel)
-                        midi.addEvent(juce::MidiMessage::allNotesOff(channel), offset);
+                        midi.addEvent(cydaw::midi::Message::allNotesOff(channel), offset);
                     for (const auto& note : *notes)
                         if (note.startSeconds < start && note.endSeconds > start) {
                             roll(note);
@@ -4608,7 +4643,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                                 continue;
                             if (note.curves != nullptr)
                                 addExpression(note, start, offset, true);
-                            midi.addEvent(juce::MidiMessage::noteOn(note.channel, note.noteNumber, note.velocity), offset);
+                            midi.addEvent(cydaw::midi::Message::noteOn(note.channel, note.noteNumber, note.velocity), offset);
                             if (note.curves != nullptr)
                                 addExpression(note, start, offset, false);
                         }
@@ -4620,13 +4655,13 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                     if (note.silenced)
                         continue;
                     if (note.startSeconds >= start && note.startSeconds < end) {
-                        const auto eventOffset = offset + juce::jlimit(
+                        const auto eventOffset = offset + cydaw::base::limit(
                             0, count - 1, static_cast<int>(std::llround((note.startSeconds - start) * rate)));
                         // The bend before the note (the voice starts on it),
                         // the gain once it is there.
                         if (note.curves != nullptr)
                             addExpression(note, note.startSeconds, eventOffset, true);
-                        midi.addEvent(juce::MidiMessage::noteOn(note.channel, note.noteNumber, note.velocity), eventOffset);
+                        midi.addEvent(cydaw::midi::Message::noteOn(note.channel, note.noteNumber, note.velocity), eventOffset);
                         if (note.curves != nullptr)
                             addExpression(note, note.startSeconds, eventOffset, false);
                     }
@@ -4638,7 +4673,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                             if (time <= note.startSeconds || time >= note.endSeconds)
                                 continue;
                             const auto before = std::max(note.startSeconds, time - tick);
-                            const auto at = offset + juce::jlimit(0, count - 1, static_cast<int>(std::llround((time - start) * rate)));
+                            const auto at = offset + cydaw::base::limit(0, count - 1, static_cast<int>(std::llround((time - start) * rate)));
                             if (!note.curves->pitch.empty())
                                 if (const auto value = bendAt(note, time); value != bendAt(note, before))
                                     sendBend(note, value, at);
@@ -4647,19 +4682,19 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                                     sendGain(note, value, at);
                             if (!note.curves->timbre.empty())
                                 if (const auto value = timbreAt(note, time); value != timbreAt(note, before))
-                                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 74, value), at);
+                                    midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 74, value), at);
                             if (!note.curves->pressure.empty())
                                 if (const auto value = pressureAt(note, time); value != pressureAt(note, before))
-                                    midi.addEvent(juce::MidiMessage::channelPressureChange(note.channel, value), at);
+                                    midi.addEvent(cydaw::midi::Message::channelPressureChange(note.channel, value), at);
                             if (!note.curves->pan.empty())
                                 if (const auto value = panAt(note, time); value != panAt(note, before))
-                                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 10, value), at);
+                                    midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 10, value), at);
                         }
                     }
                     if (note.endSeconds >= start && note.endSeconds < end) {
-                        const auto eventOffset = offset + juce::jlimit(
+                        const auto eventOffset = offset + cydaw::base::limit(
                             0, count - 1, static_cast<int>(std::llround((note.endSeconds - start) * rate)));
-                        midi.addEvent(juce::MidiMessage::noteOff(note.channel, note.noteNumber), eventOffset);
+                        midi.addEvent(cydaw::midi::Message::noteOff(note.channel, note.noteNumber), eventOffset);
                     }
                 }
             };
@@ -4675,14 +4710,14 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 if (!shouldLoop && position >= sessionEnd) {
                     playing.store(false, std::memory_order_release);
                     for (int channel = 1; channel <= 16; ++channel)
-                        midi.addEvent(juce::MidiMessage::allNotesOff(channel),
+                        midi.addEvent(cydaw::midi::Message::allNotesOff(channel),
                                       destinationOffset);
                     break;
                 }
 
                 auto segment = remaining;
                 const auto playbackEnd = shouldLoop ? loopEnd : sessionEnd;
-                const auto samplesToEnd = juce::jmax(
+                const auto samplesToEnd = cydaw::base::maximum(
                     1, static_cast<int>(std::ceil(
                            (playbackEnd - position) * rate)));
                 segment = std::min(segment, samplesToEnd);
@@ -4694,7 +4729,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
 
                 if (shouldLoop && position >= loopEnd && remaining > 0) {
                     for (int channel = 1; channel <= 16; ++channel)
-                        midi.addEvent(juce::MidiMessage::allNotesOff(channel), destinationOffset);
+                        midi.addEvent(cydaw::midi::Message::allNotesOff(channel), destinationOffset);
                     position = loopStart;
                     chase = true;
                 }
@@ -4774,14 +4809,14 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
 
     // Everything the graph places after the instrument. Compiled here, on the
     // message thread; the audio thread only ever reads the published plan.
-    juce::Result setEffectGraph(const cydaw::engine::NativeDspGraph& graph)
+    cydaw::base::Result setEffectGraph(const cydaw::engine::NativeDspGraph& graph)
     {
         effects.prepare(sampleRateHz.load(std::memory_order_acquire),
                         blockSize.load(std::memory_order_acquire), 2);
         return effects.setGraph(graph);
     }
 
-    juce::Result updateEffectParameters(
+    cydaw::base::Result updateEffectParameters(
         const cydaw::engine::NativeDspGraph& graph)
     {
         return effects.updateParameters(graph);
@@ -4803,11 +4838,11 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                            const double loopEnd) noexcept
     {
         const auto safeLength = std::max(0.000001, sessionLength);
-        const auto safeStart = juce::jlimit(
+        const auto safeStart = cydaw::base::limit(
             0.0, std::max(0.0, safeLength - 0.000001), loopStart);
         transportLengthSeconds.store(safeLength, std::memory_order_release);
         loopStartSeconds.store(safeStart, std::memory_order_release);
-        loopEndSeconds.store(juce::jlimit(
+        loopEndSeconds.store(cydaw::base::limit(
                                  safeStart + 0.000001, safeLength, loopEnd),
                              std::memory_order_release);
     }
@@ -4848,13 +4883,13 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         graph.voiceCount = 16;
         // A sound model and a sampler play at their recording's level: up to
         // unity.
-        graph.oscillatorLevel = juce::jlimit(
+        graph.oscillatorLevel = cydaw::base::limit(
             0.0f, cydaw::engine::playsRecordingLevel(graph.waveform) ? 1.0f : 0.5f, graph.oscillatorLevel);
-        graph.attackSeconds = juce::jlimit(0.0001f, 5.0f, graph.attackSeconds);
-        graph.decaySeconds = juce::jlimit(0.0001f, 5.0f, graph.decaySeconds);
-        graph.sustainLevel = juce::jlimit(0.0f, 1.0f, graph.sustainLevel);
-        graph.releaseSeconds = juce::jlimit(0.0001f, 10.0f, graph.releaseSeconds);
-        graph.filterCutoffHz = juce::jlimit(20.0f, 20'000.0f,
+        graph.attackSeconds = cydaw::base::limit(0.0001f, 5.0f, graph.attackSeconds);
+        graph.decaySeconds = cydaw::base::limit(0.0001f, 5.0f, graph.decaySeconds);
+        graph.sustainLevel = cydaw::base::limit(0.0f, 1.0f, graph.sustainLevel);
+        graph.releaseSeconds = cydaw::base::limit(0.0001f, 10.0f, graph.releaseSeconds);
+        graph.filterCutoffHz = cydaw::base::limit(20.0f, 20'000.0f,
                                             graph.filterCutoffHz);
         instrumentGraph.store(
             std::make_shared<const cydaw::engine::PolySynthGraphPlan>(graph));
@@ -4915,7 +4950,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
 
     // The voices, rendered from `plan`: in pieces of 32 frames while its
     // values glide toward it (a knob turned), whole otherwise.
-    void renderVoices(const cydaw::engine::PolySynthGraphPlan* plan, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi,
+    void renderVoices(const cydaw::engine::PolySynthGraphPlan* plan, cydaw::audio::SampleBuffer<float>& buffer, const cydaw::midi::EventBuffer& midi,
                       const int start, const int count) noexcept
     {
         if (plan == nullptr || !glide.begin(*plan)) {
@@ -4935,7 +4970,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
 
     // The block's notes and controllers into what the modulators read: the
     // keys held, the last note struck, the wheels, every controller.
-    void followNotes(const juce::MidiBuffer& midi) noexcept
+    void followNotes(const cydaw::midi::EventBuffer& midi) noexcept
     {
         for (const auto metadata : midi) {
             const auto message = metadata.getMessage();
@@ -5050,8 +5085,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         VoiceModulationState modulation;
         PlanSynthesiser synthesiser;
         NativeDspRuntime effects;
-        juce::AudioBuffer<float> buffer;
-        juce::MidiBuffer notes;
+        cydaw::audio::SampleBuffer<float> buffer;
+        cydaw::midi::EventBuffer notes;
         std::atomic<int> note { -1 };   // the key that plays it; -1: none
         std::atomic<int> playAs { -1 }; // the note it plays; -1: the key's own
         std::atomic<float> gain { 1.0f };
@@ -5100,7 +5135,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
 
     // The pads' sound, added into the block (before the track's effects):
     // as the track's instrument card has them hear its notes (`trackPlan`).
-    void renderPads(const cydaw::engine::PolySynthGraphPlan* trackPlan, const juce::MidiBuffer& midi, const juce::AudioSourceChannelInfo& output,
+    void renderPads(const cydaw::engine::PolySynthGraphPlan* trackPlan, const cydaw::midi::EventBuffer& midi, const cydaw::audio::AudioSourceChannelInfo& output,
                     const double timelineSeconds) noexcept
     {
         namespace container = cydaw::engine::instrument_container;
@@ -5249,7 +5284,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 if (type == 0x90 && data[2] > 0 && group > 0)
                     for (std::size_t other = 0; other < count; ++other)
                         if (other != index && playing[other]->choke.load(std::memory_order_relaxed) == group)
-                            playing[other]->notes.addEvent(juce::MidiMessage::allNotesOff((data[0] & 0x0F) + 1), metadata.samplePosition);
+                            playing[other]->notes.addEvent(cydaw::midi::Message::allNotesOff((data[0] & 0x0F) + 1), metadata.samplePosition);
             }
         }
         const auto rate = std::max(1.0, synthesiser.getSampleRate());
@@ -5287,10 +5322,10 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     std::atomic<double> sampleRateHz { 48'000.0 };
     PlanSynthesiser synthesiser;
     AudioTrackController& owner;
-    juce::MidiMessageCollector& collector;
-    juce::MidiBuffer blockMidi_;
-    juce::MidiBuffer incomingMidi_;
-    juce::MidiKeyboardState& keyboard;
+    cydaw::midi::MessageCollector& collector;
+    cydaw::midi::EventBuffer blockMidi_;
+    cydaw::midi::EventBuffer incomingMidi_;
+    cydaw::midi::KeyboardState& keyboard;
     cydaw::realtime::RtPublisher<std::vector<ScheduledNote>> sequence;
     std::atomic<double> sequenceLengthSeconds {};
     std::atomic<double> transportLengthSeconds { 0.000001 };
@@ -5309,7 +5344,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     std::bitset<16> liveSustain {};
     std::atomic<bool> needsLiveNotesOff {};
     // The MIDI keyboards' collector as well as its own (the simulator's).
-    std::atomic<juce::MidiMessageCollector*> hardware {};
+    std::atomic<cydaw::midi::MessageCollector*> hardware {};
     // The notes its clips played (a counter, for the lights).
     std::atomic<std::uint32_t> clipNotes {};
     // Its notes on their way to its MIDI output.
@@ -5319,9 +5354,9 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
 struct AudioTrackController::MidiPlaybackTrack final {
     MidiPlaybackTrack(AudioTrackController& controller,
                       const std::uint64_t trackId,
-                      juce::String trackName,
-                      juce::MidiMessageCollector& collector,
-                      juce::MidiKeyboardState& keyboard)
+                      cydaw::base::Text trackName,
+                      cydaw::midi::MessageCollector& collector,
+                      cydaw::midi::KeyboardState& keyboard)
         : id(trackId), name(std::move(trackName)),
           synth(controller, collector, keyboard),
           gainPanSource(synth, synth.positionSeconds),
@@ -5330,10 +5365,10 @@ struct AudioTrackController::MidiPlaybackTrack final {
     }
 
     std::uint64_t id {};
-    juce::String name;
+    cydaw::base::Text name;
     // What it hears while it is the live track, and where its notes also go.
-    std::vector<juce::String> midiInputs { AudioTrackController::allMidiInputs };
-    juce::String midiOutput;
+    std::vector<cydaw::base::Text> midiInputs { AudioTrackController::allMidiInputs };
+    cydaw::base::Text midiOutput;
     float gainDb {};
     float pan {};
     bool muted {};
@@ -5360,9 +5395,9 @@ struct AudioTrackController::MidiPlaybackTrack final {
 // by block; an instrument plays a looped pattern and the on-screen keyboard
 // through the same synthesiser the MIDI tracks use. The result goes into the
 // master's mixer with the tracks, which the workshop leaves stopped.
-struct AudioTrackController::Simulation final : public juce::AudioSource {
+struct AudioTrackController::Simulation final : public cydaw::audio::AudioSource {
     struct Sample {
-        juce::AudioBuffer<float> audio;
+        cydaw::audio::SampleBuffer<float> audio;
         double sampleRate { 44'100.0 };
     };
 
@@ -5384,7 +5419,7 @@ struct AudioTrackController::Simulation final : public juce::AudioSource {
 
     void releaseResources() override { synth.releaseResources(); }
 
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& output) override
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output) override
     {
         output.clearActiveBufferRegion();
         if (!active.load(std::memory_order_acquire) || output.buffer == nullptr || output.numSamples <= 0)
@@ -5406,7 +5441,7 @@ struct AudioTrackController::Simulation final : public juce::AudioSource {
         if (instrument.load(std::memory_order_acquire)) {
             // Its other inputs after its voices.
             const auto* other = sideInput(buffer, start, count, at, running, true);
-            const std::array<const juce::AudioBuffer<float>*, RoutedInputReceiver::maximumBuses> buses { nullptr, other, other, other };
+            const std::array<const cydaw::audio::SampleBuffer<float>*, RoutedInputReceiver::maximumBuses> buses { nullptr, other, other, other };
             synth.setRoutedInputs(buses.data(), count);
             synth.getNextAudioBlock(output);
             synth.setRoutedInputs(nullptr, 0);
@@ -5414,7 +5449,7 @@ struct AudioTrackController::Simulation final : public juce::AudioSource {
             if (running)
                 generate(buffer, start, count, at);
             const auto* other = sideInput(buffer, start, count, at, running, false);
-            const std::array<const juce::AudioBuffer<float>*, NativeDspRuntime::maximumExtraInputs> buses { other, other, other };
+            const std::array<const cydaw::audio::SampleBuffer<float>*, NativeDspRuntime::maximumExtraInputs> buses { other, other, other };
             effect.setExtraInputs(buses.data(), buses.size());
             (void) effect.process(buffer, start, count, at);
             if (monoOutput.load(std::memory_order_relaxed) && buffer.getNumChannels() > 1)
@@ -5446,7 +5481,7 @@ struct AudioTrackController::Simulation final : public juce::AudioSource {
     static double noteHz(const int note) noexcept { return 440.0 * std::pow(2.0, (note - 69) / 12.0); }
 
     // What the device's other inputs hear this block, from 0, or null.
-    const juce::AudioBuffer<float>* sideInput(const juce::AudioBuffer<float>& buffer, const int start, const int count,
+    const cydaw::audio::SampleBuffer<float>* sideInput(const cydaw::audio::SampleBuffer<float>& buffer, const int start, const int count,
                                               const double at, const bool running, const bool forInstrument) noexcept
     {
         const auto kind = static_cast<SimulationSideSource>(sideSource.load(std::memory_order_relaxed));
@@ -5487,7 +5522,7 @@ struct AudioTrackController::Simulation final : public juce::AudioSource {
         return &side;
     }
 
-    void generate(juce::AudioBuffer<float>& buffer, const int start, const int count, const double at) noexcept
+    void generate(cydaw::audio::SampleBuffer<float>& buffer, const int start, const int count, const double at) noexcept
     {
         const auto kind = static_cast<SimulationSource>(source.load(std::memory_order_relaxed));
         const auto level = sourceGain.load(std::memory_order_relaxed);
@@ -5629,8 +5664,8 @@ struct AudioTrackController::Simulation final : public juce::AudioSource {
         }
     }
 
-    juce::MidiMessageCollector collector;
-    juce::MidiKeyboardState keyboard;
+    cydaw::midi::MessageCollector collector;
+    cydaw::midi::KeyboardState keyboard;
     MidiSynthEngine synth;
     NativeDspRuntime effect;
     cydaw::realtime::RtPublisher<Sample> samples;
@@ -5666,7 +5701,7 @@ struct AudioTrackController::Simulation final : public juce::AudioSource {
     float click {};
     double samplePosition {};
     // The other inputs' sound, and their kick.
-    juce::AudioBuffer<float> side;
+    cydaw::audio::SampleBuffer<float> side;
     double sidePhase {};
     float sideKick {};
     float sideKickPitch {};
@@ -5707,7 +5742,7 @@ double AudioTrackController::simulationSeconds() const noexcept
     return simulation_->seconds.load(std::memory_order_relaxed);
 }
 
-juce::Result AudioTrackController::setSimulationEffect(const cydaw::engine::NativeDspGraph& graph, const bool monoOutput)
+cydaw::base::Result AudioTrackController::setSimulationEffect(const cydaw::engine::NativeDspGraph& graph, const bool monoOutput)
 {
     simulation_->effect.prepare(simulation_->sampleRateHz.load(std::memory_order_acquire),
                                 simulation_->blockSize.load(std::memory_order_acquire), 2);
@@ -5718,7 +5753,7 @@ juce::Result AudioTrackController::setSimulationEffect(const cydaw::engine::Nati
     return result;
 }
 
-juce::Result AudioTrackController::setSimulationInstrument(const cydaw::engine::PolySynthGraphPlan& plan,
+cydaw::base::Result AudioTrackController::setSimulationInstrument(const cydaw::engine::PolySynthGraphPlan& plan,
                                                            const cydaw::engine::NativeDspGraph& chain,
                                                            std::vector<cydaw::engine::PolyVoiceModulation> modulations)
 {
@@ -5726,13 +5761,13 @@ juce::Result AudioTrackController::setSimulationInstrument(const cydaw::engine::
     synth.setInstrumentGraph(plan);
     synth.voiceModulations.store(
         std::make_shared<const std::vector<cydaw::engine::PolyVoiceModulation>>(std::move(modulations)));
-    const auto result = synth.updateEffectParameters(chain).wasOk() ? juce::Result::ok() : synth.setEffectGraph(chain);
+    const auto result = synth.updateEffectParameters(chain).wasOk() ? cydaw::base::Result::ok() : synth.setEffectGraph(chain);
     simulation_->instrument.store(true, std::memory_order_release);
     applySimulationMidi();
     return result;
 }
 
-juce::Result AudioTrackController::updateSimulationParameters(const cydaw::engine::NativeDspGraph& graph)
+cydaw::base::Result AudioTrackController::updateSimulationParameters(const cydaw::engine::NativeDspGraph& graph)
 {
     return simulation_->instrument.load(std::memory_order_acquire) ? simulation_->synth.updateEffectParameters(graph)
                                                                    : simulation_->effect.updateParameters(graph);
@@ -5746,26 +5781,26 @@ void AudioTrackController::setSimulationSideSource(const SimulationSideSource so
 void AudioTrackController::setSimulationSource(const SimulationSource source, const float levelDb, const float toneHz) noexcept
 {
     simulation_->source.store(static_cast<int>(source), std::memory_order_relaxed);
-    simulation_->sourceGain.store(juce::Decibels::decibelsToGain(juce::jlimit(-60.0f, 6.0f, levelDb), -60.0f),
+    simulation_->sourceGain.store(cydaw::audio::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 6.0f, levelDb), -60.0f),
                                   std::memory_order_relaxed);
-    simulation_->toneHz.store(juce::jlimit(20.0f, 20'000.0f, toneHz), std::memory_order_relaxed);
+    simulation_->toneHz.store(cydaw::base::limit(20.0f, 20'000.0f, toneHz), std::memory_order_relaxed);
 }
 
-juce::Result AudioTrackController::setSimulationSample(const juce::File& file)
+cydaw::base::Result AudioTrackController::setSimulationSample(const cydaw::base::File& file)
 {
-    std::unique_ptr<juce::AudioFormatReader> reader(formatManager_.createReaderFor(file));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formatManager_.createReaderFor(file));
     if (reader == nullptr)
-        return juce::Result::fail("unreadable audio file: " + file.getFileName());
-    const auto length = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples,
-                                                               static_cast<juce::int64>(reader->sampleRate * 300.0)));
+        return cydaw::base::Result::fail("unreadable audio file: " + file.getFileName());
+    const auto length = static_cast<int>(std::min<std::int64_t>(reader->lengthInSamples,
+                                                               static_cast<std::int64_t>(reader->sampleRate * 300.0)));
     if (length < 2)
-        return juce::Result::fail("empty audio file: " + file.getFileName());
+        return cydaw::base::Result::fail("empty audio file: " + file.getFileName());
     auto sample = std::make_shared<Simulation::Sample>();
     sample->sampleRate = reader->sampleRate > 0.0 ? reader->sampleRate : 44'100.0;
     sample->audio.setSize(static_cast<int>(std::clamp<unsigned int>(reader->numChannels, 1u, 2u)), length);
     reader->read(&sample->audio, 0, length, 0, true, true);
     simulation_->samples.store(std::move(sample));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 void AudioTrackController::setSimulationPattern(std::vector<SimulationNote> notes, const double lengthBeats)
@@ -5781,9 +5816,9 @@ void AudioTrackController::publishSimulationPattern()
     const auto beat = 60.0 / std::max(1.0, tempoBpm_);
     auto scheduled = std::make_shared<std::vector<MidiSynthEngine::ScheduledNote>>();
     for (const auto& note : simulationPattern_)
-        scheduled->push_back({ juce::jlimit(0, 127, note.noteNumber), note.startBeats * beat,
+        scheduled->push_back({ cydaw::base::limit(0, 127, note.noteNumber), note.startBeats * beat,
                                (note.startBeats + std::max(0.01, note.lengthBeats)) * beat,
-                               juce::jlimit(0.01f, 1.0f, note.velocity) });
+                               cydaw::base::limit(0.01f, 1.0f, note.velocity) });
     const auto length = simulationPatternBeats_ * beat;
     auto& synth = simulation_->synth;
     synth.setSequence(std::move(scheduled), length);
@@ -5837,20 +5872,20 @@ void AudioTrackController::refreshMidiInputs() noexcept
     if (!takes)
         for (const auto& track : midiTracks_)
             if (track->id == target) {
-                route->all = std::find(track->midiInputs.begin(), track->midiInputs.end(), juce::String(allMidiInputs)) != track->midiInputs.end();
+                route->all = std::find(track->midiInputs.begin(), track->midiInputs.end(), cydaw::base::Text(allMidiInputs)) != track->midiInputs.end();
                 route->keyboard = route->all
-                                  || std::find(track->midiInputs.begin(), track->midiInputs.end(), juce::String(computerKeyboardInput))
+                                  || std::find(track->midiInputs.begin(), track->midiInputs.end(), cydaw::base::Text(computerKeyboardInput))
                                          != track->midiInputs.end();
                 for (const auto& input : track->midiInputs)
                     if (input != allMidiInputs && input != computerKeyboardInput)
                         route->devices.push_back(input);
             }
     std::shared_ptr<const LiveMidiRoute> shared = std::move(route);
-    const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+    const cydaw::base::SpinLock::ScopedLockType hold(midiGateLock_);
     liveRoute_.swap(shared);
 }
 
-void AudioTrackController::countMidiSource(const juce::String& identifier) noexcept
+void AudioTrackController::countMidiSource(const cydaw::base::Text& identifier) noexcept
 {
     midiInCount_.fetch_add(1, std::memory_order_relaxed);
     const auto key = static_cast<std::uint64_t>(identifier.hashCode64()) | 1u;
@@ -5870,7 +5905,7 @@ void AudioTrackController::countMidiSource(const juce::String& identifier) noexc
     }
 }
 
-std::uint32_t AudioTrackController::midiInputActivity(const juce::String& identifier) const noexcept
+std::uint32_t AudioTrackController::midiInputActivity(const cydaw::base::Text& identifier) const noexcept
 {
     const auto key = static_cast<std::uint64_t>(identifier.hashCode64()) | 1u;
     for (const auto& slot : midiSources_)
@@ -5907,12 +5942,12 @@ bool AudioTrackController::midiTrackHearsInputs(const std::uint64_t trackId) con
     return !simulationTakesMidi() && trackId != 0 && midiInputTrackId() == trackId;
 }
 
-void AudioTrackController::setMidiTrackInputs(const std::uint64_t trackId, std::vector<juce::String> inputs)
+void AudioTrackController::setMidiTrackInputs(const std::uint64_t trackId, std::vector<cydaw::base::Text> inputs)
 {
     // Every input holds the computer's keyboard: it is not listed twice.
-    if (std::find(inputs.begin(), inputs.end(), juce::String(allMidiInputs)) != inputs.end())
-        std::erase(inputs, juce::String(computerKeyboardInput));
-    std::vector<juce::String> unique;
+    if (std::find(inputs.begin(), inputs.end(), cydaw::base::Text(allMidiInputs)) != inputs.end())
+        std::erase(inputs, cydaw::base::Text(computerKeyboardInput));
+    std::vector<cydaw::base::Text> unique;
     for (auto& input : inputs)
         if (std::find(unique.begin(), unique.end(), input) == unique.end())
             unique.push_back(std::move(input));
@@ -5923,7 +5958,7 @@ void AudioTrackController::setMidiTrackInputs(const std::uint64_t trackId, std::
     refreshMidiInputs();
 }
 
-std::vector<juce::String> AudioTrackController::midiTrackInputs(const std::uint64_t trackId) const
+std::vector<cydaw::base::Text> AudioTrackController::midiTrackInputs(const std::uint64_t trackId) const
 {
     for (const auto& track : midiTracks_)
         if (track->id == trackId)
@@ -5931,7 +5966,7 @@ std::vector<juce::String> AudioTrackController::midiTrackInputs(const std::uint6
     return {};
 }
 
-void AudioTrackController::setMidiTrackOutput(const std::uint64_t trackId, const juce::String& identifier)
+void AudioTrackController::setMidiTrackOutput(const std::uint64_t trackId, const cydaw::base::Text& identifier)
 {
     for (auto& track : midiTracks_)
         if (track->id == trackId)
@@ -5939,7 +5974,7 @@ void AudioTrackController::setMidiTrackOutput(const std::uint64_t trackId, const
     publishMidiOutputs();
 }
 
-juce::String AudioTrackController::midiTrackOutput(const std::uint64_t trackId) const
+cydaw::base::Text AudioTrackController::midiTrackOutput(const std::uint64_t trackId) const
 {
     for (const auto& track : midiTracks_)
         if (track->id == trackId)
@@ -5949,7 +5984,7 @@ juce::String AudioTrackController::midiTrackOutput(const std::uint64_t trackId) 
 
 void AudioTrackController::publishMidiOutputs()
 {
-    std::vector<std::pair<std::shared_ptr<MidiOutQueue>, juce::String>> queues;
+    std::vector<std::pair<std::shared_ptr<MidiOutQueue>, cydaw::base::Text>> queues;
     for (const auto& track : midiTracks_)
         if (track->midiOutput.isNotEmpty())
             queues.emplace_back(track->synth.outQueue, track->midiOutput);
@@ -5960,13 +5995,21 @@ void AudioTrackController::publishMidiOutputs()
     midiOutputs_->setQueues(std::move(queues));
 }
 
+void AudioTrackController::controllerMidiMessage(const cydaw::midi::Message& message)
+{
+    if(message.isNoteOn())key_latency::queued(message.getNoteNumber());
+    midiInCount_.fetch_add(1,std::memory_order_relaxed);
+    midiCollector_.addMessageToQueue(message);
+}
+
 void AudioTrackController::computerKeyboardNote(const int note, const float velocity, const bool on)
 {
+    if (on) key_latency::queued(note);
     keyboardCount_.fetch_add(1, std::memory_order_relaxed);
     midiInCount_.fetch_add(1, std::memory_order_relaxed);
     std::shared_ptr<const LiveMidiRoute> route;
     {
-        const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+        const cydaw::base::SpinLock::ScopedLockType hold(midiGateLock_);
         route = liveRoute_;
     }
     // A key let go always reaches it (it may have been pressed before the
@@ -5974,9 +6017,9 @@ void AudioTrackController::computerKeyboardNote(const int note, const float velo
     if (on && route != nullptr && !route->keyboard)
         return;
     if (on)
-        midiKeyboardState_.noteOn(1, juce::jlimit(0, 127, note), juce::jlimit(0.0f, 1.0f, velocity));
+        midiKeyboardState_.noteOn(1, cydaw::base::limit(0, 127, note), cydaw::base::limit(0.0f, 1.0f, velocity));
     else
-        midiKeyboardState_.noteOff(1, juce::jlimit(0, 127, note), 0.0f);
+        midiKeyboardState_.noteOff(1, cydaw::base::limit(0, 127, note), 0.0f);
 }
 
 std::array<float, 4> AudioTrackController::midiTrackInputLevels(const std::uint64_t trackId) const noexcept
@@ -5992,18 +6035,18 @@ std::array<float, 4> AudioTrackController::midiTrackInputLevels(const std::uint6
 void AudioTrackController::setMidiInputGate(MidiInputGate gate)
 {
     auto shared = gate ? std::make_shared<const MidiInputGate>(std::move(gate)) : nullptr;
-    const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+    const cydaw::base::SpinLock::ScopedLockType hold(midiGateLock_);
     midiGate_.swap(shared);
 }
 
-void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
+void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(cydaw::midi::Input* source, const cydaw::midi::Message& message)
 {
     std::shared_ptr<const MidiInputGate> gate;
     {
-        const juce::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
+        const cydaw::base::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
         gate = owner_.midiGate_;
     }
-    const auto identifier = source != nullptr ? source->getIdentifier() : juce::String();
+    const auto identifier = source != nullptr ? cydaw::base::Text(source->getIdentifier()) : cydaw::base::Text();
     // Counted as it arrives (a controller's message too), for the lights.
     owner_.countMidiSource(identifier);
     if (gate != nullptr && *gate && !(*gate)(identifier, message))
@@ -6011,12 +6054,12 @@ void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(juce::MidiI
     // The live track hears it when it listens to that keyboard.
     std::shared_ptr<const LiveMidiRoute> route;
     {
-        const juce::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
+        const cydaw::base::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
         route = owner_.liveRoute_;
     }
     if (route != nullptr && !route->all && std::find(route->devices.begin(), route->devices.end(), identifier) == route->devices.end())
         return;
-    owner_.midiCollector_.handleIncomingMidiMessage(source, message);
+    owner_.midiCollector_.addMessageToQueue(message);
 }
 
 void AudioTrackController::setArmFollowsMidiInput(const bool follows) noexcept
@@ -6027,17 +6070,17 @@ void AudioTrackController::setArmFollowsMidiInput(const bool follows) noexcept
 
 void AudioTrackController::simulationNoteOn(const int noteNumber, const float velocity)
 {
-    simulation_->keyboard.noteOn(1, juce::jlimit(0, 127, noteNumber), juce::jlimit(0.01f, 1.0f, velocity));
+    simulation_->keyboard.noteOn(1, cydaw::base::limit(0, 127, noteNumber), cydaw::base::limit(0.01f, 1.0f, velocity));
 }
 
 void AudioTrackController::simulationNoteOff(const int noteNumber)
 {
-    simulation_->keyboard.noteOff(1, juce::jlimit(0, 127, noteNumber), 0.0f);
+    simulation_->keyboard.noteOff(1, cydaw::base::limit(0, 127, noteNumber), 0.0f);
 }
 
 void AudioTrackController::setSimulationOutputGainDb(const float gainDb) noexcept
 {
-    simulation_->outputGain.store(juce::Decibels::decibelsToGain(juce::jlimit(-60.0f, 12.0f, gainDb), -60.0f),
+    simulation_->outputGain.store(cydaw::audio::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 12.0f, gainDb), -60.0f),
                                   std::memory_order_relaxed);
 }
 
@@ -6066,7 +6109,7 @@ std::vector<std::pair<std::uint64_t, float>> AudioTrackController::simulationCon
                                                                    : simulation_->effect.controlValues();
 }
 
-juce::Result AudioTrackController::selfTestNoteExpression()
+cydaw::base::Result AudioTrackController::selfTestNoteExpression()
 {
     AudioTrackController controller;
     controller.clearMidiTracks();
@@ -6076,7 +6119,7 @@ juce::Result AudioTrackController::selfTestNoteExpression()
             (void) controller.removeMidiClip(trackId, clip.id);
     auto* track = controller.findMidiTrack(trackId);
     if (track == nullptr)
-        return juce::Result::fail("no MIDI track");
+        return cydaw::base::Result::fail("no MIDI track");
     auto graph = track->synth.instrumentPlan();
     graph.enabled = true;
     graph.waveform = cydaw::engine::PolyOscillatorWaveform::sine;
@@ -6090,7 +6133,7 @@ juce::Result AudioTrackController::selfTestNoteExpression()
 
     // The energy of a frequency in a mono run of samples.
     const auto energyAt = [](const std::vector<float>& samples, const double frequency) {
-        const auto omega = 2.0 * juce::MathConstants<double>::pi * frequency / 48'000.0;
+        const auto omega = 2.0 * cydaw::base::MathConstants<double>::pi * frequency / 48'000.0;
         const auto coefficient = 2.0 * std::cos(omega);
         double previous {};
         double before {};
@@ -6112,7 +6155,7 @@ juce::Result AudioTrackController::selfTestNoteExpression()
         (void) controller.setMidiNoteExpression(trackId, clipId, noteId, pitch, gain);
         std::vector<float> samples;
         if (controller.startMidiClipPreview(trackId, clipId, 0)) {
-            juce::AudioBuffer<float> block(2, 512);
+            cydaw::audio::SampleBuffer<float> block(2, 512);
             for (int index = 0; index < 60; ++index) {
                 block.clear();
                 track->synth.getNextAudioBlock({ &block, 0, block.getNumSamples() });
@@ -6130,21 +6173,21 @@ juce::Result AudioTrackController::selfTestNoteExpression()
     const auto quiet = render({}, { { 0.0f, -12.0f }, { 1.0f, -12.0f } }, false);
     track->synth.releaseResources();
     if (plain.empty() || octave.empty() || quiet.empty())
-        return juce::Result::fail("the clip did not play");
+        return cydaw::base::Result::fail("the clip did not play");
     const auto plainA4 = energyAt(plain, 440.0);
     if (plainA4 < 1.0e-3)
-        return juce::Result::fail("a plain A4 is silent");
+        return cydaw::base::Result::fail("a plain A4 is silent");
     // Bent an octave up: A5, and the A3 beside it untouched (its own channel).
     const auto bentA5 = energyAt(octave, 880.0);
     const auto bentA4 = energyAt(octave, 440.0);
     const auto keptA3 = energyAt(octave, 220.0);
     if (bentA5 < plainA4 * 0.5 || bentA4 > plainA4 * 0.1 || keptA3 < plainA4 * 0.5)
-        return juce::Result::fail("pitch curve: A5 " + juce::String(bentA5 / plainA4, 3) + ", A4 " + juce::String(bentA4 / plainA4, 3)
-                                  + ", A3 " + juce::String(keptA3 / plainA4, 3) + " of a plain note");
+        return cydaw::base::Result::fail("pitch curve: A5 " + cydaw::base::Text(bentA5 / plainA4, 3) + ", A4 " + cydaw::base::Text(bentA4 / plainA4, 3)
+                                  + ", A3 " + cydaw::base::Text(keptA3 / plainA4, 3) + " of a plain note");
     // -12 dB: a quarter of the level.
     const auto ratio = energyAt(quiet, 440.0) / plainA4;
     if (std::abs(ratio - 0.251) > 0.04)
-        return juce::Result::fail("gain curve: " + juce::String(ratio, 3) + " of a plain note, not 0.25");
+        return cydaw::base::Result::fail("gain curve: " + cydaw::base::Text(ratio, 3) + " of a plain note, not 0.25");
     // A copy keeps the curves; the order of points is kept, values bounded.
     const auto clipId = controller.addMidiClip(trackId, "Copies", 0.0, 4.0, false, 0xff4fd3ae);
     const auto noteId = controller.addMidiNote(trackId, clipId, 60, 0.0, 1.0, 0.8f);
@@ -6156,34 +6199,34 @@ juce::Result AudioTrackController::selfTestNoteExpression()
                 if (note.id == noteId)
                     stored = note;
     if (stored.pitch.size() != 2 || stored.pitch[0].position != 0.2f || stored.pitch[0].value != 24.0f || stored.gain.size() != 1)
-        return juce::Result::fail("expression points were not tidied");
+        return cydaw::base::Result::fail("expression points were not tidied");
     const auto copyId = controller.copyMidiNote(trackId, clipId, stored, 2.0);
     for (const auto& clip : controller.midiTracks().front().clips)
         for (const auto& note : clip.notes)
             if (note.id == copyId && (note.pitch != stored.pitch || note.gain != stored.gain))
-                return juce::Result::fail("a copied note lost its expression");
+                return cydaw::base::Result::fail("a copied note lost its expression");
     // A bent way, as a glide arrives: quick first, on the key at its end,
     // never past it; the bend kept on the note, bounded.
     const std::vector<NoteExpressionPoint> glide { { 0.0f, 0.0f, 0.55f }, { 1.0f, 12.0f } };
     const auto halfway = NoteExpressionPoint::valueAt(glide, 0.5f);
     if (halfway < 9.0f || halfway > 11.0f || std::abs(NoteExpressionPoint::valueAt(glide, 1.0f) - 12.0f) > 1.0e-4f)
-        return juce::Result::fail("a bent glide is at " + juce::String(halfway, 2) + " halfway, not about 10");
+        return cydaw::base::Result::fail("a bent glide is at " + cydaw::base::Text(halfway, 2) + " halfway, not about 10");
     auto previous = 0.0f;
     for (auto step = 0; step <= 100; ++step) {
         const auto value = NoteExpressionPoint::valueAt(glide, static_cast<float>(step) / 100.0f);
         if (value < previous - 1.0e-5f || value > 12.0f + 1.0e-5f)
-            return juce::Result::fail("a bent glide goes back or past its key");
+            return cydaw::base::Result::fail("a bent glide goes back or past its key");
         previous = value;
     }
     (void) controller.setMidiNoteExpression(trackId, clipId, noteId, { { 0.0f, 0.0f, 3.0f }, { 1.0f, 5.0f } }, {});
     for (const auto& clip : controller.midiTracks().front().clips)
         for (const auto& note : clip.notes)
             if (note.id == noteId && (note.pitch.size() != 2 || note.pitch[0].bend != 1.0f))
-                return juce::Result::fail("a note's bend was not kept within -1..1");
-    return juce::Result::ok();
+                return cydaw::base::Result::fail("a note's bend was not kept within -1..1");
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::selfTestLegatoVoicing()
+cydaw::base::Result AudioTrackController::selfTestLegatoVoicing()
 {
     AudioTrackController controller;
     controller.clearMidiTracks();
@@ -6193,12 +6236,12 @@ juce::Result AudioTrackController::selfTestLegatoVoicing()
             (void) controller.removeMidiClip(trackId, clip.id);
     auto* track = controller.findMidiTrack(trackId);
     if (track == nullptr)
-        return juce::Result::fail("no MIDI track");
+        return cydaw::base::Result::fail("no MIDI track");
     constexpr auto rate = 48'000.0;
     const auto energyAt = [](const std::vector<float>& samples, const double frequency, const double from, const double to) {
         const auto first = static_cast<std::size_t>(from * rate);
         const auto last = std::min(samples.size(), static_cast<std::size_t>(to * rate));
-        const auto omega = 2.0 * juce::MathConstants<double>::pi * frequency / rate;
+        const auto omega = 2.0 * cydaw::base::MathConstants<double>::pi * frequency / rate;
         const auto coefficient = 2.0 * std::cos(omega);
         double previous {};
         double before {};
@@ -6230,7 +6273,7 @@ juce::Result AudioTrackController::selfTestLegatoVoicing()
         (void) controller.addMidiNote(trackId, clipId, 67, 1.0, 3.0, 0.8f);
         std::vector<float> samples;
         if (controller.startMidiClipPreview(trackId, clipId, 0)) {
-            juce::AudioBuffer<float> block(2, 512);
+            cydaw::audio::SampleBuffer<float> block(2, 512);
             for (int index = 0; index < 150; ++index) {
                 block.clear();
                 track->synth.getNextAudioBlock({ &block, 0, block.getNumSamples() });
@@ -6247,27 +6290,27 @@ juce::Result AudioTrackController::selfTestLegatoVoicing()
     const auto poly = render(0, 0.0f);
     const auto legato = render(2, 0.25f);
     if (poly.size() < static_cast<std::size_t>(1.5 * rate) || legato.size() < static_cast<std::size_t>(1.5 * rate))
-        return juce::Result::fail("the clip did not play");
+        return cydaw::base::Result::fail("the clip did not play");
     // Poly: a chord while they overlap.
     const auto polyC = energyAt(poly, c4, 0.9, 1.4);
     const auto polyG = energyAt(poly, g4, 0.9, 1.4);
     if (polyC < 1.0e-3 || polyG < 1.0e-3)
-        return juce::Result::fail("poly: the two notes do not sound together");
+        return cydaw::base::Result::fail("poly: the two notes do not sound together");
     // Legato: the first gave way, the second sounds alone…
     const auto legatoC = energyAt(legato, c4, 0.9, 1.4);
     const auto legatoG = energyAt(legato, g4, 0.9, 1.4);
     if (legatoC > polyC * 0.05 || legatoG < polyG * 0.7)
-        return juce::Result::fail("legato: C4 " + juce::String(legatoC / polyC, 3) + ", G4 " + juce::String(legatoG / polyG, 3)
+        return cydaw::base::Result::fail("legato: C4 " + cydaw::base::Text(legatoC / polyC, 3) + ", G4 " + cydaw::base::Text(legatoG / polyG, 3)
                                   + " of poly while the notes overlap");
     // …having slid up to it: not there yet at its start.
     const auto sliding = energyAt(legato, g4, 0.5, 0.6);
     const auto arrived = energyAt(legato, g4, 1.0, 1.1);
     if (sliding > arrived * 0.5)
-        return juce::Result::fail("legato: no glide (G4 at the start " + juce::String(sliding / arrived, 3) + " of later)");
-    return juce::Result::ok();
+        return cydaw::base::Result::fail("legato: no glide (G4 at the start " + cydaw::base::Text(sliding / arrived, 3) + " of later)");
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::selfTestPolySynthGraph()
+cydaw::base::Result AudioTrackController::selfTestPolySynthGraph()
 {
     constexpr auto sampleRate = 48'000.0;
     constexpr auto sampleCount = 4'800;
@@ -6276,18 +6319,18 @@ juce::Result AudioTrackController::selfTestPolySynthGraph()
         cydaw::realtime::RtPublisher<cydaw::engine::PolySynthGraphPlan> graph;
         graph.store(
             std::make_shared<const cydaw::engine::PolySynthGraphPlan>(plan));
-        juce::Synthesiser synthesiser;
+        PlanSynthesiser synthesiser;
         const VoiceModulationState unmodulated;
         for (int voice = 0; voice < 16; ++voice)
             synthesiser.addVoice(new GraphSynthVoice(graph, unmodulated));
         synthesiser.addSound(new GraphSynthSound());
         synthesiser.setCurrentPlaybackSampleRate(sampleRate);
-        juce::MidiBuffer midi;
+        cydaw::midi::EventBuffer midi;
         for (const auto note : notes) {
-            midi.addEvent(juce::MidiMessage::noteOn(1, note, 0.75f), 0);
-            midi.addEvent(juce::MidiMessage::noteOff(1, note), sampleCount / 2);
+            midi.addEvent(cydaw::midi::Message::noteOn(1, note, 0.75f), 0);
+            midi.addEvent(cydaw::midi::Message::noteOff(1, note), sampleCount / 2);
         }
-        juce::AudioBuffer<float> output(2, sampleCount);
+        cydaw::audio::SampleBuffer<float> output(2, sampleCount);
         output.clear();
         synthesiser.renderNextBlock(output, midi, 0, sampleCount);
         return output;
@@ -6322,7 +6365,7 @@ juce::Result AudioTrackController::selfTestPolySynthGraph()
     if (sineRms <= 0.01f || chordRms <= sineRms
         || waveformDifference <= 0.01
         || releaseStart <= 0.0001f || releaseEnd >= releaseStart * 0.1f)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "Poly synth graph did not render waveform, polyphony and ADSR release correctly.");
 
     // Every mode the waveform enum offers has to make a sound here, not only
@@ -6337,9 +6380,9 @@ juce::Result AudioTrackController::selfTestPolySynthGraph()
             mode);
         const auto rendered = render(plan, { 60 });
         if (rendered.getRMSLevel(0, 480, 3'600) <= 0.001f)
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 "Poly synth voice rendered silence for waveform "
-                + juce::String(mode));
+                + cydaw::base::Text(mode));
     }
 
     // Prisme's voicing: its voice limit, mono, legato (one voice however many
@@ -6368,13 +6411,13 @@ juce::Result AudioTrackController::selfTestPolySynthGraph()
                 return current != nullptr ? PlanSynthesiser::voicingOf(*current) : PlanSynthesiser::Voicing {};
             };
             synthesiser.setCurrentPlaybackSampleRate(sampleRate);
-            juce::MidiBuffer midi;
+            cydaw::midi::EventBuffer midi;
             auto at = 0;
             for (const auto note : notes) {
-                midi.addEvent(juce::MidiMessage::noteOn(1, note, 0.8f), at);
+                midi.addEvent(cydaw::midi::Message::noteOn(1, note, 0.8f), at);
                 at += 480;
             }
-            juce::AudioBuffer<float> output(2, sampleCount);
+            cydaw::audio::SampleBuffer<float> output(2, sampleCount);
             output.clear();
             synthesiser.renderNextBlock(output, midi, 0, sampleCount);
             auto active = 0;
@@ -6387,16 +6430,16 @@ juce::Result AudioTrackController::selfTestPolySynthGraph()
             return active;
         };
         if (voicesAfter({ 60, 64, 67, 72 }, 0, 16, 0.0f, nullptr) != 4)
-            return juce::Result::fail("Prisme in poly did not play four held notes");
+            return cydaw::base::Result::fail("Prisme in poly did not play four held notes");
         if (const auto limited = voicesAfter({ 60, 64, 67, 72 }, 0, 2, 0.0f, nullptr); limited != 2)
-            return juce::Result::fail("Prisme's voice limit did not hold (" + juce::String(limited) + " voices)");
+            return cydaw::base::Result::fail("Prisme's voice limit did not hold (" + cydaw::base::Text(limited) + " voices)");
         if (voicesAfter({ 60, 64, 67 }, 1, 16, 0.0f, nullptr) != 1)
-            return juce::Result::fail("Prisme in mono played more than one voice");
+            return cydaw::base::Result::fail("Prisme in mono played more than one voice");
         auto pitch = 0.0;
         if (voicesAfter({ 48, 60 }, 2, 16, 1.0f, &pitch) != 1 || !(pitch > 48.0 && pitch < 60.0))
-            return juce::Result::fail("Prisme in legato did not slide on one voice (" + juce::String(pitch) + ")");
+            return cydaw::base::Result::fail("Prisme in legato did not slide on one voice (" + cydaw::base::Text(pitch) + ")");
     }
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 struct AudioTrackController::PlaybackTrack final {
@@ -6407,10 +6450,10 @@ struct AudioTrackController::PlaybackTrack final {
     // A rebuild deferred by an arrangement batch, owed at its end.
     bool arrangementPlanPending {};
 
-    PlaybackTrack(std::unique_ptr<juce::AudioFormatReader> firstReader,
-                  std::unique_ptr<juce::AudioFormatReader> secondReader,
-                  juce::File sourceFile,
-                  juce::TimeSliceThread& readAheadThread,
+    PlaybackTrack(std::unique_ptr<cydaw::audio::AudioFormatReader> firstReader,
+                  std::unique_ptr<cydaw::audio::AudioFormatReader> secondReader,
+                  cydaw::base::File sourceFile,
+                  cydaw::audio::ReadAheadScheduler& readAheadThread,
                   const int channels = 2)
         : gainPanSource(transportSource), latencySource(gainPanSource), file(std::move(sourceFile)),
           channelCount(cydaw::engine::clampTrackChannels(channels))
@@ -6429,10 +6472,10 @@ struct AudioTrackController::PlaybackTrack final {
         transportSource.setSource(nullptr);
     }
 
-    void replaceSource(std::unique_ptr<juce::AudioFormatReader> firstReader,
-                       std::unique_ptr<juce::AudioFormatReader> secondReader,
-                       juce::File sourceFile,
-                       juce::TimeSliceThread& readAheadThread)
+    void replaceSource(std::unique_ptr<cydaw::audio::AudioFormatReader> firstReader,
+                       std::unique_ptr<cydaw::audio::AudioFormatReader> secondReader,
+                       cydaw::base::File sourceFile,
+                       cydaw::audio::ReadAheadScheduler& readAheadThread)
     {
         const auto wasPlaying = transportSource.isPlaying();
         const auto position = transportSource.getCurrentPosition();
@@ -6448,18 +6491,18 @@ struct AudioTrackController::PlaybackTrack final {
         clipSource->setClipRange(clipStart, sourceOffset, clipDuration);
         transportSource.setSource(clipSource.get(), 0, nullptr,
                                   clipSource->sampleRate(), cydaw::engine::maximumTrackChannels);
-        transportSource.setPosition(juce::jlimit(
+        transportSource.setPosition(cydaw::base::limit(
             0.0, clipSource->arrangementLengthSeconds(), position));
         if (wasPlaying)
             transportSource.start();
         file = std::move(sourceFile);
     }
 
-    juce::AudioTransportSource transportSource;
+    cydaw::audio::AudioTransportSource transportSource;
     GainPanAudioSource gainPanSource;
     LatencyCompensatingAudioSource latencySource;
     std::unique_ptr<ClipAudioSource> clipSource;
-    juce::File file;
+    cydaw::base::File file;
     // Its format: 1 mono to 8 (7.1).
     int channelCount { 2 };
     cydaw::engine::NativeDspGraph nativeDspGraph;
@@ -6481,8 +6524,8 @@ struct AudioTrackController::PlaybackTrack final {
     std::uint64_t nextPluginAutomationId { 1 };
     std::vector<AudioClip> audioClips;
     std::vector<LauncherClip> launcherClips;
-    std::vector<juce::File> audioEditUndoSources;
-    std::vector<juce::File> audioEditRedoSources;
+    std::vector<cydaw::base::File> audioEditUndoSources;
+    std::vector<cydaw::base::File> audioEditRedoSources;
     std::vector<ClipAudioEditState> clipAudioEditUndoStates;
     std::vector<ClipAudioEditState> clipAudioEditRedoStates;
     std::vector<std::vector<AudioClip>> arrangementEditUndoStates;
@@ -6496,7 +6539,7 @@ bool LoopAuditionSource::clock(std::int64_t& frames, const std::function<void()>
     for (int tries = 0; tries < 200; ++tries) {
         const auto before = sequence_.load(std::memory_order_acquire);
         if ((before & 1u) != 0u) {
-            juce::Thread::sleep(1);
+            cydaw::base::Thread::sleep(1);
             continue;
         }
         frames = frames_.load(std::memory_order_acquire);
@@ -6507,7 +6550,7 @@ bool LoopAuditionSource::clock(std::int64_t& frames, const std::function<void()>
     return false;
 }
 
-void LoopAuditionSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& info)
+void LoopAuditionSource::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& info)
 {
     const auto blockStart = frames_.load(std::memory_order_relaxed);
     {
@@ -6534,7 +6577,7 @@ void LoopAuditionSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& i
                     phase_ = ((loop->startFrame % frames) + frames) % frames;
                 }
             }
-            const auto gain = juce::Decibels::decibelsToGain(gainDb_.load(std::memory_order_relaxed));
+            const auto gain = cydaw::audio::Decibels::decibelsToGain(gainDb_.load(std::memory_order_relaxed));
             const auto& rendered = *loop->channels;
             const auto channels = static_cast<int>(rendered.size());
             for (int channel = 0; channel < info.buffer->getNumChannels(); ++channel) {
@@ -6558,8 +6601,8 @@ void LoopAuditionSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& i
 
 AudioTrackController::AudioTrackController()
 {
-    formatManager_.registerBasicFormats();
-    readAheadThread_.startThread(juce::Thread::Priority::normal);
+    cydaw::integration::registerCyAudioCoreReaders(formatManager_);
+    readAheadThread_.startThread(cydaw::base::Thread::Priority::normal);
     (void) addMidiTrack("Instrument 1");
     simulation_ = std::make_unique<Simulation>(*this);
     mixerSource_.addInputSource(simulation_.get(), false);
@@ -6610,8 +6653,8 @@ AudioTrackController::~AudioTrackController()
     readAheadThread_.stopThread(3'000);
 }
 
-juce::String AudioTrackController::initialiseAudio(
-    const juce::XmlElement* const savedState)
+cydaw::base::Text AudioTrackController::initialiseAudio(
+    const cydaw::base::XmlElement* const savedState)
 {
     auto error = deviceManager_.initialise(
         savedState == nullptr ? 2 : 0, 2, savedState, true);
@@ -6626,16 +6669,16 @@ juce::String AudioTrackController::initialiseAudio(
     return error;
 }
 
-juce::Result AudioTrackController::addAudioTrack(
-    const juce::File& file, std::size_t* const newTrackIndex,
+cydaw::base::Result AudioTrackController::addAudioTrack(
+    const cydaw::base::File& file, std::size_t* const newTrackIndex,
     const double initialClipStartSeconds)
 {
-    auto firstReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto firstReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(file));
-    auto secondReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto secondReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(file));
     if (firstReader == nullptr || secondReader == nullptr)
-        return juce::Result::fail(tr("error.openAudio", "file", file.getFileName()));
+        return cydaw::base::Result::fail(tr("error.openAudio", "file", file.getFileName()));
 
     // A stereo track, unless the file has more channels (a quad or 5.1
     // recording keeps them); a mono file spreads on it.
@@ -6678,10 +6721,10 @@ juce::Result AudioTrackController::addAudioTrack(
     refreshLatencyCompensation();
     if (newTrackIndex != nullptr)
         *newTrackIndex = tracks_.size() - 1;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-void AudioTrackController::setModeTrackSource(const std::size_t index, juce::AudioSource* source)
+void AudioTrackController::setModeTrackSource(const std::size_t index, cydaw::audio::AudioSource* source)
 {
     if (auto* track = findTrack(index)) {
         track->gainPanSource.setExternalTimeline(&modeEndPosition_);
@@ -6698,12 +6741,12 @@ void AudioTrackController::setModeGainAutomation(const bool midi, const std::uin
     else if(auto* track=findTrack(static_cast<std::size_t>(id)))track->gainPanSource.setAutomation(std::move(published));
 }
 
-juce::Result AudioTrackController::addEmptyAudioTrack(
+cydaw::base::Result AudioTrackController::addEmptyAudioTrack(
     std::size_t* const newTrackIndex)
 {
     auto track = std::make_unique<PlaybackTrack>(
         std::make_unique<EmptyAudioFormatReader>(),
-        std::make_unique<EmptyAudioFormatReader>(), juce::File {},
+        std::make_unique<EmptyAudioFormatReader>(), cydaw::base::File {},
         readAheadThread_);
     track->inputBusId = virtualBusRouter_.defaultInputBusId();
     const auto arrangementResult = rebuildArrangementPlan(*track);
@@ -6724,57 +6767,56 @@ juce::Result AudioTrackController::addEmptyAudioTrack(
     refreshLatencyCompensation();
     if (newTrackIndex != nullptr)
         *newTrackIndex = tracks_.size() - 1;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::startSamplePreview(
-    const juce::File& file, const double startSeconds, const SamplePreviewTempo& tempo)
+cydaw::base::Result AudioTrackController::startSamplePreview(
+    const cydaw::base::File& file, const double startSeconds, const SamplePreviewTempo& tempo)
 {
     if (tempo.sourceBpm > 0.0)
         if (startTempoPreview(file, startSeconds, tempo).wasOk())
-            return juce::Result::ok();
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+            return cydaw::base::Result::ok();
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(file));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             tr("error.openAudio", "file", file.getFileName()));
 
     const auto sourceSampleRate = reader->sampleRate;
     const auto sourceLengthSeconds = static_cast<double>(reader->lengthInSamples)
                                      / sourceSampleRate;
-    auto source = std::make_unique<juce::AudioFormatReaderSource>(
-        reader.release(), true);
+    auto source = std::make_unique<SegmentReaderSource>(std::move(reader));
     stopSamplePreview();
     samplePreviewReader_ = std::move(source);
     samplePreviewTransport_.setSource(samplePreviewReader_.get(), 32'768,
                                       &readAheadThread_, sourceSampleRate);
-    samplePreviewTransport_.setGain(juce::Decibels::decibelsToGain(
+    samplePreviewTransport_.setGain(cydaw::audio::Decibels::decibelsToGain(
         samplePreviewGainDb_.load(std::memory_order_relaxed)));
-    samplePreviewTransport_.setPosition(juce::jlimit(
-        0.0, juce::jmax(0.0, sourceLengthSeconds - 0.001), startSeconds));
+    samplePreviewTransport_.setPosition(cydaw::base::limit(
+        0.0, cydaw::base::maximum(0.0, sourceLengthSeconds - 0.001), startSeconds));
     samplePreviewTransport_.start();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::startTempoPreview(const juce::File& file, const double startSeconds,
+cydaw::base::Result AudioTrackController::startTempoPreview(const cydaw::base::File& file, const double startSeconds,
                                                      const SamplePreviewTempo& tempo)
 {
-    std::unique_ptr<juce::AudioFormatReader> reader(formatManager_.createReaderFor(file));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formatManager_.createReaderFor(file));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
-        return juce::Result::fail(tr("error.openAudio", "file", file.getFileName()));
+        return cydaw::base::Result::fail(tr("error.openAudio", "file", file.getFileName()));
     // A loop of whole beats: the file's length in beats, rounded.
     const auto seconds = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
     const auto beats = static_cast<int>(std::lround(seconds * tempo.sourceBpm / 60.0));
     if (beats < 1 || seconds > 32.0)
-        return juce::Result::fail("not a loop");
+        return cydaw::base::Result::fail("not a loop");
     const auto loopSeconds = static_cast<double>(beats) * 60.0 / tempo.sourceBpm;
-    const auto frames = std::min<juce::int64>(reader->lengthInSamples,
-                                              static_cast<juce::int64>(std::ceil(loopSeconds * reader->sampleRate)));
+    const auto frames = std::min<std::int64_t>(reader->lengthInSamples,
+                                              static_cast<std::int64_t>(std::ceil(loopSeconds * reader->sampleRate)));
     const auto channels = std::clamp(static_cast<int>(reader->numChannels), 1, 2);
-    juce::AudioBuffer<float> decoded(channels, static_cast<int>(frames));
+    cydaw::audio::SampleBuffer<float> decoded(channels, static_cast<int>(frames));
     if (!reader->read(&decoded, 0, static_cast<int>(frames), 0, true, channels > 1))
-        return juce::Result::fail(tr("error.openAudio", "file", file.getFileName()));
+        return cydaw::base::Result::fail(tr("error.openAudio", "file", file.getFileName()));
     std::vector<std::vector<float>> source(static_cast<std::size_t>(channels));
     for (int channel = 0; channel < channels; ++channel)
         source[static_cast<std::size_t>(channel)].assign(decoded.getReadPointer(channel),
@@ -6785,7 +6827,7 @@ juce::Result AudioTrackController::startTempoPreview(const juce::File& file, con
         source, reader->sampleRate, tempo.sourceBpm, beats, tempoBpm_, rate,
         static_cast<cydaw::engine::StretchAlgorithm>(std::clamp(tempo.algorithm, 0, 3))));
     if (rendered->empty() || rendered->front().empty())
-        return juce::Result::fail("could not stretch " + file.getFileName());
+        return cydaw::base::Result::fail("could not stretch " + file.getFileName());
     loop->frames = static_cast<std::int64_t>(rendered->front().size());
     loop->channels = std::move(rendered);
     loop->beats = beats;
@@ -6817,16 +6859,16 @@ juce::Result AudioTrackController::startTempoPreview(const juce::File& file, con
     tempoPreview_.sourceSeconds = loopSeconds;
     tempoPreview_.loop = loop;
     loopAudition_.play(std::move(loop));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 void AudioTrackController::followTempoPreview()
 {
     const auto current = tempoPreview_.loop;
-    if (tempoPreview_.file == juce::File() || current == nullptr || !isPlaying() || !loopAudition_.playing())
+    if (tempoPreview_.file == cydaw::base::File() || current == nullptr || !isPlaying() || !loopAudition_.playing())
         return;
     // Five times a second is enough.
-    const auto now = juce::Time::getMillisecondCounter();
+    const auto now = cydaw::base::Time::getMillisecondCounter();
     if (now - tempoPreview_.checked < 200)
         return;
     tempoPreview_.checked = now;
@@ -6861,7 +6903,7 @@ void AudioTrackController::followTempoPreview()
 
 int AudioTrackController::samplePreviewLoopBeats() const noexcept
 {
-    return tempoPreview_.file != juce::File() ? tempoPreview_.beats : 0;
+    return tempoPreview_.file != cydaw::base::File() ? tempoPreview_.beats : 0;
 }
 
 void AudioTrackController::stopSamplePreview()
@@ -6870,28 +6912,28 @@ void AudioTrackController::stopSamplePreview()
     samplePreviewTransport_.setSource(nullptr);
     samplePreviewReader_.reset();
     loopAudition_.stop();
-    tempoPreview_.file = juce::File();
+    tempoPreview_.file = cydaw::base::File();
     tempoPreview_.loop.reset();
 }
 
 bool AudioTrackController::isSamplePreviewing() const noexcept
 {
-    return samplePreviewTransport_.isPlaying() || tempoPreview_.file != juce::File();
+    return samplePreviewTransport_.isPlaying() || tempoPreview_.file != cydaw::base::File();
 }
 
 double AudioTrackController::samplePreviewPositionSeconds() const noexcept
 {
-    if (tempoPreview_.file != juce::File())
+    if (tempoPreview_.file != cydaw::base::File())
         return loopAudition_.fraction() * tempoPreview_.sourceSeconds;
     return samplePreviewTransport_.getCurrentPosition();
 }
 
 void AudioTrackController::setSamplePreviewGainDb(const float gainDb) noexcept
 {
-    const auto value = juce::jlimit(-48.0f, 6.0f, gainDb);
+    const auto value = cydaw::base::limit(-48.0f, 6.0f, gainDb);
     samplePreviewGainDb_.store(value, std::memory_order_relaxed);
     samplePreviewTransport_.setGain(
-        juce::Decibels::decibelsToGain(value));
+        cydaw::audio::Decibels::decibelsToGain(value));
 }
 
 float AudioTrackController::samplePreviewGainDb() const noexcept
@@ -6899,19 +6941,19 @@ float AudioTrackController::samplePreviewGainDb() const noexcept
     return samplePreviewGainDb_.load(std::memory_order_relaxed);
 }
 
-juce::Result AudioTrackController::startAudioClipPreview(
+cydaw::base::Result AudioTrackController::startAudioClipPreview(
     const std::size_t trackIndex, const std::uint64_t clipId,
     const double localStartSeconds)
 {
     const auto clipValue = audioClip(trackIndex, clipId);
     if (!clipValue.has_value())
-        return juce::Result::fail("Clip not found");
+        return cydaw::base::Result::fail("Clip not found");
 
     stopSamplePreview();
     stopAudioClipPreview();
     auto preview = std::make_unique<PlaybackTrack>(
         std::make_unique<EmptyAudioFormatReader>(),
-        std::make_unique<EmptyAudioFormatReader>(), juce::File {},
+        std::make_unique<EmptyAudioFormatReader>(), cydaw::base::File {},
         readAheadThread_);
     auto clip = *clipValue;
     normaliseAudioClipTimeline(clip);
@@ -6926,23 +6968,23 @@ juce::Result AudioTrackController::startAudioClipPreview(
         bounds.playEndSeconds, bounds.loopStartSeconds,
         bounds.loopEndSeconds);
     preview->clipSource->setLooping(bounds.looping);
-    preview->transportSource.setPosition(juce::jlimit(
+    preview->transportSource.setPosition(cydaw::base::limit(
         bounds.playStartSeconds, bounds.playEndSeconds,
         localStartSeconds));
     auditionMixer_.addInputSource(&preview->latencySource, false);
     clipPreviewTrack_ = std::move(preview);
     clipPreviewTrack_->transportSource.start();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::refreshAudioClipPreview(
+cydaw::base::Result AudioTrackController::refreshAudioClipPreview(
     const std::size_t trackIndex, const std::uint64_t clipId)
 {
     if (clipPreviewTrack_ == nullptr)
-        return juce::Result::fail("Clip preview is not active");
+        return cydaw::base::Result::fail("Clip preview is not active");
     const auto clipValue = audioClip(trackIndex, clipId);
     if (!clipValue.has_value())
-        return juce::Result::fail("Clip not found");
+        return cydaw::base::Result::fail("Clip not found");
 
     auto clip = *clipValue;
     normaliseAudioClipTimeline(clip);
@@ -6968,11 +7010,11 @@ juce::Result AudioTrackController::refreshAudioClipPreview(
         bounds.playEndSeconds, bounds.loopStartSeconds,
         bounds.loopEndSeconds);
     clipPreviewTrack_->clipSource->setLooping(bounds.looping);
-    clipPreviewTrack_->transportSource.setPosition(juce::jlimit(
+    clipPreviewTrack_->transportSource.setPosition(cydaw::base::limit(
         bounds.playStartSeconds, bounds.playEndSeconds, position));
     if (wasPlaying)
         clipPreviewTrack_->transportSource.start();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 void AudioTrackController::stopAudioClipPreview()
@@ -6997,19 +7039,19 @@ double AudioTrackController::audioClipPreviewPositionSeconds() const noexcept
                : 0.0;
 }
 
-juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
+cydaw::base::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
 {
     if (arrangementBatchDepth_ > 0) {
         track.arrangementPlanPending = true;
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
     std::vector<PreparedArrangementRegion> prepared;
     std::size_t renderClipCount {};
     for (const auto& clip : track.audioClips) {
         if (clip.events.empty()) {
             if (!clip.usesEventTimeline
-                && (clip.sourceFile != juce::File {}
-                    || track.file != juce::File {}))
+                && (clip.sourceFile != cydaw::base::File {}
+                    || track.file != cydaw::base::File {}))
                 ++renderClipCount;
         } else {
             renderClipCount += clip.events.size();
@@ -7024,8 +7066,8 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
     for (auto& container : track.audioClips) {
         if (container.events.empty()) {
             if (!container.usesEventTimeline
-                && (container.sourceFile != juce::File {}
-                    || track.file != juce::File {}))
+                && (container.sourceFile != cydaw::base::File {}
+                    || track.file != cydaw::base::File {}))
                 clipsToRender.push_back(&container);
             continue;
         }
@@ -7065,7 +7107,7 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
 
     for (auto* clipPointer : clipsToRender) {
         auto& clip = *clipPointer;
-        if (clip.sourceFile == juce::File {})
+        if (clip.sourceFile == cydaw::base::File {})
             clip.sourceFile = track.file;
         if (clip.takes.empty())
             clip.takes.push_back({
@@ -7078,33 +7120,33 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
         clip.activeTakeIndex = std::min(
             clip.activeTakeIndex, clip.takes.size() - 1);
         auto& activeTake = clip.takes[clip.activeTakeIndex];
-        if (activeTake.sourceFile == juce::File {})
+        if (activeTake.sourceFile == cydaw::base::File {})
             activeTake.sourceFile = clip.sourceFile;
         clip.sourceFile = activeTake.sourceFile;
-        auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
             formatManager_.createReaderFor(clip.sourceFile));
         if (reader == nullptr || reader->sampleRate <= 0.0
             || reader->lengthInSamples <= 0)
-            return juce::Result::fail(tr("error.openAudio", "file",
+            return cydaw::base::Result::fail(tr("error.openAudio", "file",
                                          clip.sourceFile.getFileName()));
         const auto sourceLength = static_cast<double>(reader->lengthInSamples)
                                   / reader->sampleRate;
         const auto minimumDuration = 1.0 / reader->sampleRate;
         clip.startSeconds = std::max(0.0, clip.startSeconds);
-        clip.sourceOffsetSeconds = juce::jlimit(
+        clip.sourceOffsetSeconds = cydaw::base::limit(
             0.0, std::max(0.0, sourceLength - minimumDuration),
             clip.sourceOffsetSeconds);
-        clip.sourceDurationSeconds = juce::jlimit(
+        clip.sourceDurationSeconds = cydaw::base::limit(
             minimumDuration,
             std::max(minimumDuration, sourceLength - clip.sourceOffsetSeconds),
             clip.sourceDurationSeconds > 0.0
                 ? clip.sourceDurationSeconds
                 : clip.durationSeconds);
-        clip.durationSeconds = juce::jlimit(
+        clip.durationSeconds = cydaw::base::limit(
             0.001, 86'400.0, clip.durationSeconds);
-        clip.fadeInSeconds = juce::jlimit(
+        clip.fadeInSeconds = cydaw::base::limit(
             0.0, clip.durationSeconds, clip.fadeInSeconds);
-        clip.fadeOutSeconds = juce::jlimit(
+        clip.fadeOutSeconds = cydaw::base::limit(
             0.0, clip.durationSeconds, clip.fadeOutSeconds);
         if (clip.name.isEmpty())
             clip.name = clip.sourceFile.getFileNameWithoutExtension();
@@ -7159,8 +7201,8 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
         } else {
             constexpr double crossfade = 0.01;
             for (const auto& part : clip.comp) {
-                const auto from = juce::jlimit(0.0, clip.durationSeconds, part.startSeconds);
-                const auto to = juce::jlimit(from, clip.durationSeconds, part.endSeconds);
+                const auto from = cydaw::base::limit(0.0, clip.durationSeconds, part.startSeconds);
+                const auto to = cydaw::base::limit(from, clip.durationSeconds, part.endSeconds);
                 if (to - from < 0.0005)
                     continue;
                 const auto atStart = from <= 1.0e-6;
@@ -7174,7 +7216,7 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
         }
         for (const auto& passage : passages) {
             const auto& take = clip.takes[passage.take];
-            const auto file = take.sourceFile != juce::File {} ? take.sourceFile : clip.sourceFile;
+            const auto file = take.sourceFile != cydaw::base::File {} ? take.sourceFile : clip.sourceFile;
             for (std::size_t segmentIndex = 1; segmentIndex < warpPoints.size(); ++segmentIndex) {
                 const auto& first = warpPoints[segmentIndex - 1];
                 const auto& last = warpPoints[segmentIndex];
@@ -7204,9 +7246,9 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
                 segment.fadeOutSeconds = to >= passage.to - 1.0e-9 ? passage.fadeOut : 0.0;
                 shiftAutomation(segment.automation, -from);
                 shiftLanes(segment.soundLanes, -from);
-                auto segmentReader = std::unique_ptr<juce::AudioFormatReader>(formatManager_.createReaderFor(file));
+                auto segmentReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(formatManager_.createReaderFor(file));
                 if (segmentReader == nullptr)
-                    return juce::Result::fail(tr("error.openAudio", "file", file.getFileName()));
+                    return cydaw::base::Result::fail(tr("error.openAudio", "file", file.getFileName()));
                 prepared.push_back({ std::move(segment), std::move(segmentReader) });
             }
         }
@@ -7218,28 +7260,28 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
     return result;
 }
 
-juce::Result AudioTrackController::rebuildLauncherPlans(PlaybackTrack& track)
+cydaw::base::Result AudioTrackController::rebuildLauncherPlans(PlaybackTrack& track)
 {
     for (int sceneIndex = 0; sceneIndex < maximumLauncherScenes; ++sceneIndex)
         track.clipSource->clearLauncherSceneSource(sceneIndex);
     for (auto& clip : track.launcherClips) {
-        if (clip.sourceFile == juce::File {})
+        if (clip.sourceFile == cydaw::base::File {})
             clip.sourceFile = track.file;
         normaliseLauncherClipTimeline(clip);
         std::vector<AudioEvent> events = clip.events;
         if (!clip.usesEventTimeline && events.empty()
-            && clip.sourceFile != juce::File {})
+            && clip.sourceFile != cydaw::base::File {})
             events.push_back({
                 0, clip.name, 0.0, clip.sourceOffsetSeconds,
                 clip.durationSeconds, clip.durationSeconds, clip.colour,
                 clip.sourceFile, 0.0 });
         std::vector<PreparedArrangementRegion> prepared;
         for (const auto& event : events) {
-            auto reader = std::unique_ptr<juce::AudioFormatReader>(
+            auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
                 formatManager_.createReaderFor(event.sourceFile));
             if (reader == nullptr || reader->sampleRate <= 0.0
                 || reader->lengthInSamples <= 0)
-                return juce::Result::fail(tr(
+                return cydaw::base::Result::fail(tr(
                     "error.openAudio", "file",
                     event.sourceFile.getFileName()));
             AudioClip render;
@@ -7304,7 +7346,7 @@ juce::Result AudioTrackController::rebuildLauncherPlans(PlaybackTrack& track)
                 auto segmentReader = index == 1
                                          ? std::move(reader)
                                          : std::unique_ptr<
-                                               juce::AudioFormatReader>(
+                                               cydaw::audio::AudioFormatReader>(
                                                formatManager_.createReaderFor(
                                                    event.sourceFile));
                 prepared.push_back({ std::move(segment),
@@ -7318,7 +7360,7 @@ juce::Result AudioTrackController::rebuildLauncherPlans(PlaybackTrack& track)
         if (result.failed())
             return result;
     }
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 void AudioTrackController::recordArrangementEdit(
@@ -7416,7 +7458,7 @@ bool AudioTrackController::restoreArrangementEditState(
     const auto trackLength = track.clipSource->arrangementLengthSeconds();
     const auto sessionLength = transportLength();
     track.transportSource.setPosition(
-        juce::jlimit(0.0, sessionLength, currentPosition));
+        cydaw::base::limit(0.0, sessionLength, currentPosition));
     if (wasPlaying && currentPosition < sessionLength)
         track.transportSource.start();
     for (auto& point : track.automation)
@@ -7429,41 +7471,41 @@ bool AudioTrackController::restoreArrangementEditState(
     return true;
 }
 
-juce::Result AudioTrackController::selfTestDoubleDeckLauncher(
-    const juce::File& sourceFile,
-    const juce::File& alternateSourceFile)
+cydaw::base::Result AudioTrackController::selfTestDoubleDeckLauncher(
+    const cydaw::base::File& sourceFile,
+    const cydaw::base::File& alternateSourceFile)
 {
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    auto firstReader = std::unique_ptr<juce::AudioFormatReader>(
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    auto firstReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(sourceFile));
-    auto secondReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto secondReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(sourceFile));
-    auto expectedReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto expectedReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(sourceFile));
     const auto alternate = alternateSourceFile.existsAsFile()
                                ? alternateSourceFile
                                : sourceFile;
-    auto launcherReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto launcherReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(alternate));
-    auto launcherExpected = std::unique_ptr<juce::AudioFormatReader>(
+    auto launcherExpected = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(alternate));
     if (firstReader == nullptr || secondReader == nullptr || expectedReader == nullptr
         || launcherReader == nullptr || launcherExpected == nullptr
         || firstReader->sampleRate <= 0.0 || firstReader->lengthInSamples <= 0)
-        return juce::Result::fail("Cannot open double-deck self-test audio");
+        return cydaw::base::Result::fail("Cannot open double-deck self-test audio");
 
     const auto sampleRate = firstReader->sampleRate;
-    const auto firstOffsetSamples = juce::jlimit<juce::int64>(
+    const auto firstOffsetSamples = cydaw::base::limit<std::int64_t>(
         0, firstReader->lengthInSamples - 1,
-        static_cast<juce::int64>(std::llround(sampleRate * 0.101)));
-    const auto secondOffsetSamples = juce::jlimit<juce::int64>(
+        static_cast<std::int64_t>(std::llround(sampleRate * 0.101)));
+    const auto secondOffsetSamples = cydaw::base::limit<std::int64_t>(
         0, firstReader->lengthInSamples - 1,
-        static_cast<juce::int64>(std::llround(sampleRate * 0.207)));
+        static_cast<std::int64_t>(std::llround(sampleRate * 0.207)));
     constexpr int blockSize = 64;
-    juce::TimeSliceThread readAheadThread("CyDAW double-deck self-test");
-    readAheadThread.startThread(juce::Thread::Priority::normal);
-    auto result = juce::Result::ok();
+    cydaw::audio::ReadAheadScheduler readAheadThread("CyDAW double-deck self-test");
+    readAheadThread.startThread(cydaw::base::Thread::Priority::normal);
+    auto result = cydaw::base::Result::ok();
     {
         ClipAudioSource source(std::move(firstReader), std::move(secondReader),
                                readAheadThread);
@@ -7473,13 +7515,13 @@ juce::Result AudioTrackController::selfTestDoubleDeckLauncher(
             0.05, true, 16.0 / sampleRate);
         for (int attempt = 0;
              attempt < 500 && !source.pendingDeckHasReadAhead(); ++attempt)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         if (!source.pendingDeckHasReadAhead()) {
-            result = juce::Result::fail("Standby deck did not prefetch");
+            result = cydaw::base::Result::fail("Standby deck did not prefetch");
         } else {
-            juce::AudioBuffer<float> rendered(2, blockSize);
+            cydaw::audio::SampleBuffer<float> rendered(2, blockSize);
             source.getNextAudioBlock({ &rendered, 0, blockSize });
-            juce::AudioBuffer<float> expected(2, 2);
+            cydaw::audio::SampleBuffer<float> expected(2, 2);
             expected.clear();
             (void) expectedReader->read(&expected, 0, 1, 5,
                                         true, true);
@@ -7490,7 +7532,7 @@ juce::Result AudioTrackController::selfTestDoubleDeckLauncher(
                        > 0.000001f
                 || std::abs(rendered.getSample(0, 16) - expected.getSample(0, 1))
                        > 0.000001f) {
-                result = juce::Result::fail(
+                result = cydaw::base::Result::fail(
                     "First deck did not activate at the requested sample");
             } else {
                 source.scheduleLauncherClip(
@@ -7498,7 +7540,7 @@ juce::Result AudioTrackController::selfTestDoubleDeckLauncher(
                     0.05, true, 0.0);
                 for (int attempt = 0;
                      attempt < 500 && !source.pendingDeckHasReadAhead(); ++attempt)
-                    juce::Thread::sleep(2);
+                    cydaw::base::Thread::sleep(2);
                 rendered.clear();
                 source.getNextAudioBlock({ &rendered, 0, blockSize });
                 expected.clear();
@@ -7507,26 +7549,26 @@ juce::Result AudioTrackController::selfTestDoubleDeckLauncher(
                 if (source.activeLauncherScene() != 5
                     || std::abs(rendered.getSample(0, 0)
                                 - expected.getSample(0, 0)) > 0.000001f)
-                    result = juce::Result::fail(
+                    result = cydaw::base::Result::fail(
                         "Second deck did not replace the active deck exactly");
             }
         }
         if (result.wasOk()) {
             const auto alternateOffset = 0.113;
-            const auto alternateOffsetSamples = juce::jlimit<juce::int64>(
+            const auto alternateOffsetSamples = cydaw::base::limit<std::int64_t>(
                 0, launcherExpected->lengthInSamples - 1,
-                static_cast<juce::int64>(std::llround(
+                static_cast<std::int64_t>(std::llround(
                     launcherExpected->sampleRate * alternateOffset)));
             const auto planResult = source.setLauncherSceneSource(
                 7, std::move(launcherReader), alternateOffset, 0.05, true);
             source.scheduleLauncherClip(7, 0.0, 0.05, true, 0.0);
             for (int attempt = 0;
                  attempt < 500 && !source.pendingDeckHasReadAhead(); ++attempt)
-                juce::Thread::sleep(2);
-            juce::AudioBuffer<float> rendered(2, blockSize);
+                cydaw::base::Thread::sleep(2);
+            cydaw::audio::SampleBuffer<float> rendered(2, blockSize);
             rendered.clear();
             source.getNextAudioBlock({ &rendered, 0, blockSize });
-            juce::AudioBuffer<float> expected(2, 1);
+            cydaw::audio::SampleBuffer<float> expected(2, 1);
             expected.clear();
             (void) launcherExpected->read(
                 &expected, 0, 1, alternateOffsetSamples, true, true);
@@ -7534,13 +7576,13 @@ juce::Result AudioTrackController::selfTestDoubleDeckLauncher(
                 || source.activeLauncherScene() != 7
                 || std::abs(rendered.getSample(0, 0)
                             - expected.getSample(0, 0)) > 0.001f)
-                result = juce::Result::fail(
+                result = cydaw::base::Result::fail(
                     "An independent launcher source did not prefetch or render: "
                     + planResult.getErrorMessage()
-                    + " scene=" + juce::String(source.activeLauncherScene())
-                    + " rendered=" + juce::String(
+                    + " scene=" + cydaw::base::Text(source.activeLauncherScene())
+                    + " rendered=" + cydaw::base::Text(
                           rendered.getSample(0, 0), 6)
-                    + " expected=" + juce::String(
+                    + " expected=" + cydaw::base::Text(
                           expected.getSample(0, 0), 6));
         }
         source.releaseResources();
@@ -7549,27 +7591,27 @@ juce::Result AudioTrackController::selfTestDoubleDeckLauncher(
     return result;
 }
 
-juce::Result AudioTrackController::selfTestLauncherTimeline(
-    const juce::File& eventSourceFile)
+cydaw::base::Result AudioTrackController::selfTestLauncherTimeline(
+    const cydaw::base::File& eventSourceFile)
 {
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    auto eventReader = std::unique_ptr<juce::AudioFormatReader>(
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    auto eventReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(eventSourceFile));
-    auto expectedReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto expectedReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(eventSourceFile));
     if (eventReader == nullptr || expectedReader == nullptr
         || eventReader->sampleRate <= 0.0
         || eventReader->lengthInSamples <= 0)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "Cannot open launcher timeline self-test audio");
 
     constexpr int blockSize = 64;
     constexpr double timelineDuration = 0.25;
-    juce::TimeSliceThread readAheadThread(
+    cydaw::audio::ReadAheadScheduler readAheadThread(
         "CyDAW launcher timeline self-test");
-    readAheadThread.startThread(juce::Thread::Priority::normal);
-    auto result = juce::Result::ok();
+    readAheadThread.startThread(cydaw::base::Thread::Priority::normal);
+    auto result = cydaw::base::Result::ok();
     {
         ClipAudioSource source(
             std::make_unique<EmptyAudioFormatReader>(),
@@ -7594,16 +7636,16 @@ juce::Result AudioTrackController::selfTestLauncherTimeline(
              result.wasOk() && attempt < 500
              && !source.pendingDeckHasReadAhead(); ++attempt) {
             source.scheduleLauncherClip(6, 0.0, 0.05, false, 0.0);
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         }
         if (result.wasOk()) {
             source.scheduleLauncherClip(6, 0.0, 0.05, false, 0.0);
             for (int attempt = 0;
                  attempt < 500 && !source.pendingDeckHasReadAhead(); ++attempt)
-                juce::Thread::sleep(2);
+                cydaw::base::Thread::sleep(2);
             const auto eventSamples = static_cast<int>(std::llround(
                 event.durationSeconds * source.sampleRate()));
-            juce::AudioBuffer<float> rendered(2, eventSamples);
+            cydaw::audio::SampleBuffer<float> rendered(2, eventSamples);
             rendered.clear();
             for (int offset = 0; offset < eventSamples;
                  offset += blockSize) {
@@ -7611,14 +7653,14 @@ juce::Result AudioTrackController::selfTestLauncherTimeline(
                     &rendered, offset,
                     std::min(blockSize, eventSamples - offset) });
             }
-            const auto expectedLength = static_cast<juce::int64>(
+            const auto expectedLength = static_cast<std::int64_t>(
                 std::llround(timelineDuration * source.sampleRate()));
             if (source.activeLauncherScene() != 6
                 || source.getTotalLength() < expectedLength - 1)
-                result = juce::Result::fail(
+                result = cydaw::base::Result::fail(
                     "An empty audio track truncated its launcher timeline");
             if (result.wasOk()) {
-                juce::AudioBuffer<float> expected(2, eventSamples);
+                cydaw::audio::SampleBuffer<float> expected(2, eventSamples);
                 expected.clear();
                 (void) expectedReader->read(
                     &expected, 0, eventSamples, 0, true, true);
@@ -7638,7 +7680,7 @@ juce::Result AudioTrackController::selfTestLauncherTimeline(
                     || std::abs(rendered.getSample(0, late)
                                 - expected.getSample(0, late) * lateGain)
                            > 0.002f)
-                    result = juce::Result::fail(
+                    result = cydaw::base::Result::fail(
                         "Launcher timeline ignored its audio event fades");
             }
         }
@@ -7648,27 +7690,27 @@ juce::Result AudioTrackController::selfTestLauncherTimeline(
     return result;
 }
 
-juce::Result AudioTrackController::selfTestMulticlipArrangement(
-    const juce::File& sourceFile,
-    const juce::File& alternateSourceFile)
+cydaw::base::Result AudioTrackController::selfTestMulticlipArrangement(
+    const cydaw::base::File& sourceFile,
+    const cydaw::base::File& alternateSourceFile)
 {
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    auto launcherReaderA = std::unique_ptr<juce::AudioFormatReader>(
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    auto launcherReaderA = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(sourceFile));
-    auto launcherReaderB = std::unique_ptr<juce::AudioFormatReader>(
+    auto launcherReaderB = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(sourceFile));
-    auto expectedReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto expectedReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(sourceFile));
     if (launcherReaderA == nullptr || launcherReaderB == nullptr
         || expectedReader == nullptr || expectedReader->sampleRate <= 0.0)
-        return juce::Result::fail("Cannot open multiclip self-test audio");
+        return cydaw::base::Result::fail("Cannot open multiclip self-test audio");
 
     constexpr int blockSize = 64;
     const auto sampleRate = expectedReader->sampleRate;
-    juce::TimeSliceThread readAheadThread("CyDAW multiclip self-test");
-    readAheadThread.startThread(juce::Thread::Priority::normal);
-    auto result = juce::Result::ok();
+    cydaw::audio::ReadAheadScheduler readAheadThread("CyDAW multiclip self-test");
+    readAheadThread.startThread(cydaw::base::Thread::Priority::normal);
+    auto result = cydaw::base::Result::ok();
     {
         ClipAudioSource source(std::move(launcherReaderA),
                                std::move(launcherReaderB), readAheadThread);
@@ -7678,9 +7720,9 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                                    const double offset,
                                    const double duration) {
             regions.push_back({
-                { id, "Region " + juce::String(static_cast<int>(id)),
+                { id, "Region " + cydaw::base::Text(static_cast<int>(id)),
                   start, offset, duration, duration, 0xffff9b2f },
-                std::unique_ptr<juce::AudioFormatReader>(
+                std::unique_ptr<cydaw::audio::AudioFormatReader>(
                     formats.createReaderFor(sourceFile)) });
         };
         addRegion(1, 0.0, 0.10, 0.05);
@@ -7691,13 +7733,13 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
         for (int attempt = 0;
              result.wasOk() && attempt < 500
              && !source.arrangementHasReadAhead(); ++attempt)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         if (result.wasOk() && !source.arrangementHasReadAhead())
-            result = juce::Result::fail(
+            result = cydaw::base::Result::fail(
                 "Arrangement regions did not prefetch");
 
         constexpr int renderedSamples = 7'000;
-        juce::AudioBuffer<float> rendered(2, renderedSamples);
+        cydaw::audio::SampleBuffer<float> rendered(2, renderedSamples);
         rendered.clear();
         if (result.wasOk()) {
             source.setNextReadPosition(0);
@@ -7706,8 +7748,8 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                 source.getNextAudioBlock({ &rendered, offset, count });
             }
 
-            const auto readExpected = [&](const juce::int64 sample) {
-                juce::AudioBuffer<float> value(2, 1);
+            const auto readExpected = [&](const std::int64_t sample) {
+                cydaw::audio::SampleBuffer<float> value(2, 1);
                 value.clear();
                 (void) expectedReader->read(&value, 0, 1, sample,
                                             true, true);
@@ -7733,7 +7775,7 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                             - overlapExpected) > 0.00002f
                 || std::abs(source.arrangementLengthSeconds() - 0.13)
                        > 1.0 / sampleRate) {
-                result = juce::Result::fail(
+                result = cydaw::base::Result::fail(
                     "Multiclip regions, gaps or overlaps rendered incorrectly");
             }
         }
@@ -7742,7 +7784,7 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
             if (!source.moveArrangementRegion(2, 0.06)
                 || std::abs(source.arrangementLengthSeconds() - 0.12)
                        > 1.0 / sampleRate)
-                result = juce::Result::fail(
+                result = cydaw::base::Result::fail(
                     "Moving a region did not update the arrangement atomically");
         }
 
@@ -7755,18 +7797,18 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                 { 4, "Faded region", 0.0, sourceOffset, regionDuration,
                   regionDuration, 0xffff9b2f, sourceFile, 0.0,
                   fadeDuration, fadeDuration },
-                std::unique_ptr<juce::AudioFormatReader>(
+                std::unique_ptr<cydaw::audio::AudioFormatReader>(
                     formats.createReaderFor(sourceFile)) });
             result = source.setArrangementRegions(std::move(fadedRegions));
             for (int attempt = 0;
                  result.wasOk() && attempt < 500
                  && !source.arrangementHasReadAhead(); ++attempt)
-                juce::Thread::sleep(2);
+                cydaw::base::Thread::sleep(2);
             const auto durationSamples = static_cast<int>(std::llround(
                 regionDuration * sampleRate));
             const auto fadeSamples = static_cast<int>(std::llround(
                 fadeDuration * sampleRate));
-            juce::AudioBuffer<float> faded(2, durationSamples);
+            cydaw::audio::SampleBuffer<float> faded(2, durationSamples);
             faded.clear();
             if (result.wasOk()) {
                 source.setNextReadPosition(0);
@@ -7776,9 +7818,9 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                                                 durationSamples - offset);
                     source.getNextAudioBlock({ &faded, offset, count });
                 }
-                const auto sourceStart = static_cast<juce::int64>(
+                const auto sourceStart = static_cast<std::int64_t>(
                     std::llround(sourceOffset * sampleRate));
-                juce::AudioBuffer<float> expected(2, durationSamples);
+                cydaw::audio::SampleBuffer<float> expected(2, durationSamples);
                 expected.clear();
                 (void) expectedReader->read(&expected, 0, durationSamples,
                                             sourceStart, true, true);
@@ -7794,7 +7836,7 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                            > 0.00002f
                     || std::abs(faded.getSample(0, durationSamples - 1))
                            > 0.000001f)
-                    result = juce::Result::fail(
+                    result = cydaw::base::Result::fail(
                         "Arrangement region fades were not sample-accurate");
             }
         }
@@ -7808,7 +7850,7 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
             loopRegions.push_back({
                 { 5, "Loop region", 0.0, regionOffset, regionDuration,
                   regionDuration, 0xffff9b2f, sourceFile, 0.0 },
-                std::unique_ptr<juce::AudioFormatReader>(
+                std::unique_ptr<cydaw::audio::AudioFormatReader>(
                     formats.createReaderFor(sourceFile)) });
             result = source.setArrangementRegions(std::move(loopRegions));
             source.setTransportRange(0.080, loopStart, loopEnd);
@@ -7816,13 +7858,13 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
             for (int attempt = 0;
                  result.wasOk() && attempt < 500
                  && !source.arrangementHasReadAhead(); ++attempt)
-                juce::Thread::sleep(2);
+                cydaw::base::Thread::sleep(2);
             constexpr int loopRenderSamples = 6;
-            juce::AudioBuffer<float> looped(2, loopRenderSamples);
+            cydaw::audio::SampleBuffer<float> looped(2, loopRenderSamples);
             looped.clear();
-            const auto loopStartSample = static_cast<juce::int64>(
+            const auto loopStartSample = static_cast<std::int64_t>(
                 std::llround(loopStart * sampleRate));
-            const auto loopEndSample = static_cast<juce::int64>(
+            const auto loopEndSample = static_cast<std::int64_t>(
                 std::llround(loopEnd * sampleRate));
             if (result.wasOk()) {
                 source.setNextReadPosition(loopEndSample - 2);
@@ -7832,16 +7874,16 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                     const auto timelineSample = sample < 2
                                                     ? loopEndSample - 2 + sample
                                                     : loopStartSample + sample - 2;
-                    juce::AudioBuffer<float> expected(2, 1);
+                    cydaw::audio::SampleBuffer<float> expected(2, 1);
                     expected.clear();
-                    const auto sourceSample = static_cast<juce::int64>(
+                    const auto sourceSample = static_cast<std::int64_t>(
                         std::llround(regionOffset * sampleRate))
                                               + timelineSample;
                     (void) expectedReader->read(&expected, 0, 1,
                                                 sourceSample, true, true);
                     if (std::abs(looped.getSample(0, sample)
                                  - expected.getSample(0, 0)) > 0.00001f) {
-                        result = juce::Result::fail(
+                        result = cydaw::base::Result::fail(
                             "Arrangement loop range did not wrap sample-accurately");
                         break;
                     }
@@ -7849,7 +7891,7 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                 if (result.wasOk()
                     && source.getNextReadPosition()
                            != loopStartSample + loopRenderSamples - 2)
-                    result = juce::Result::fail(
+                    result = cydaw::base::Result::fail(
                         "Arrangement loop range published the wrong playhead position");
             }
             source.setLooping(false);
@@ -7857,13 +7899,13 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
         }
 
         if (result.wasOk() && alternateSourceFile.existsAsFile()) {
-            auto alternateExpected = std::unique_ptr<juce::AudioFormatReader>(
+            auto alternateExpected = std::unique_ptr<cydaw::audio::AudioFormatReader>(
                 formats.createReaderFor(alternateSourceFile));
-            auto alternateReader = std::unique_ptr<juce::AudioFormatReader>(
+            auto alternateReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
                 formats.createReaderFor(alternateSourceFile));
             if (alternateExpected == nullptr || alternateReader == nullptr
                 || alternateExpected->sampleRate <= 0.0) {
-                result = juce::Result::fail(
+                result = cydaw::base::Result::fail(
                     "Cannot open alternate multiclip source");
             } else {
                 const auto alternateRate = alternateExpected->sampleRate;
@@ -7877,14 +7919,14 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                 for (int attempt = 0;
                      result.wasOk() && attempt < 500
                      && !source.arrangementHasReadAhead(); ++attempt)
-                    juce::Thread::sleep(2);
-                juce::AudioBuffer<float> converted(2, blockSize);
+                    cydaw::base::Thread::sleep(2);
+                cydaw::audio::SampleBuffer<float> converted(2, blockSize);
                 converted.clear();
                 if (result.wasOk()) {
                     source.setNextReadPosition(0);
                     source.getNextAudioBlock(
                         { &converted, 0, converted.getNumSamples() });
-                    juce::AudioBuffer<float> expected(2, blockSize + 4);
+                    cydaw::audio::SampleBuffer<float> expected(2, blockSize + 4);
                     expected.clear();
                     (void) alternateExpected->read(
                         &expected, 0, expected.getNumSamples(), 0, true, true);
@@ -7909,7 +7951,7 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
                                                          * fraction;
                         if (std::abs(converted.getSample(0, outputSample)
                                      - expectedValue) > 0.001f) {
-                            result = juce::Result::fail(
+                            result = cydaw::base::Result::fail(
                                 "Alternate sample-rate region was not resampled correctly");
                             break;
                         }
@@ -7968,7 +8010,7 @@ bool AudioTrackController::setMidiClipStartBeats(const std::uint64_t trackId,
 
 bool AudioTrackController::setMidiClipPresentation(const std::uint64_t trackId,
                                                    const std::uint64_t clipId,
-                                                   juce::String name,
+                                                   cydaw::base::Text name,
                                                    const std::uint32_t colour)
 {
     auto* track = findMidiTrack(trackId);
@@ -8032,7 +8074,7 @@ AudioTrackController::TrackInfo AudioTrackController::trackInfo(const std::size_
     for (std::size_t pluginIndex = 0; pluginIndex < track->gainPanSource.pluginCount(); ++pluginIndex)
         if (const auto* host = track->gainPanSource.pluginHost(pluginIndex))
             result.plugins.push_back({ host->pluginFile(), host->pluginName(), host->isRunning(),
-                                       host->missedBlockCount(), host->latencySamples() });
+                                       host->missedBlockCount(), host->latencySamples(), host->sleepInfo() });
     return result;
 }
 
@@ -8050,10 +8092,10 @@ const std::vector<AudioTrackController::AudioClip>* AudioTrackController::audioC
     return track != nullptr ? &track->audioClips : nullptr;
 }
 
-juce::File AudioTrackController::trackFile(const std::size_t index) const
+cydaw::base::File AudioTrackController::trackFile(const std::size_t index) const
 {
     const auto* track = findTrack(index);
-    return track != nullptr ? track->file : juce::File {};
+    return track != nullptr ? track->file : cydaw::base::File {};
 }
 
 std::vector<AudioTrackController::MidiTrackSummary> AudioTrackController::midiTrackSummaries() const
@@ -8087,7 +8129,7 @@ AudioTrackController::trackPlugins(const std::size_t index) const
         if (const auto* host = track->gainPanSource.pluginHost(pluginIndex))
             plugins.push_back({ host->pluginFile(), host->pluginName(),
                                 host->isRunning(), host->missedBlockCount(),
-                                host->latencySamples() });
+                                host->latencySamples(), host->sleepInfo() });
     return plugins;
 }
 
@@ -8180,7 +8222,7 @@ std::array<float, 2> AudioTrackController::virtualBusMeterLevels(
     return virtualBusRouter_.meterLevels(busId);
 }
 
-juce::Result AudioTrackController::setVirtualBusGraph(
+cydaw::base::Result AudioTrackController::setVirtualBusGraph(
     const std::uint64_t busId,
     const cydaw::engine::NativeDspGraph& graph)
 {
@@ -8193,7 +8235,7 @@ juce::Result AudioTrackController::setVirtualBusGraph(
     return result;
 }
 
-juce::Result AudioTrackController::updateVirtualBusGraphParameters(
+cydaw::base::Result AudioTrackController::updateVirtualBusGraphParameters(
     const std::uint64_t busId,
     const cydaw::engine::NativeDspGraph& graph)
 {
@@ -8212,14 +8254,14 @@ AudioTrackController::virtualBusControlValues(const std::uint64_t busId) const
     return virtualBusRouter_.controlValues(busId);
 }
 
-juce::StringArray AudioTrackController::physicalInputChannelNames() const
+cydaw::base::TextList AudioTrackController::physicalInputChannelNames() const
 {
     if (auto* device = deviceManager_.getCurrentAudioDevice())
         return device->getInputChannelNames();
     return {};
 }
 
-juce::StringArray AudioTrackController::physicalOutputChannelNames() const
+cydaw::base::TextList AudioTrackController::physicalOutputChannelNames() const
 {
     if (auto* device = deviceManager_.getCurrentAudioDevice())
         return device->getOutputChannelNames();
@@ -8233,8 +8275,8 @@ AudioTrackController::DeviceChannels AudioTrackController::deviceChannels() cons
     if (device == nullptr)
         return channels;
     // A bus counts the channels open, in order: those are the names it sees.
-    const auto names = [](const juce::StringArray& all, const juce::BigInteger& active) {
-        juce::StringArray open;
+    const auto names = [](const cydaw::base::TextList& all, const cydaw::audio::ChannelSet& active) {
+        cydaw::base::TextList open;
         for (auto index = 0; index < all.size(); ++index)
             if (active[index])
                 open.add(all[index]);
@@ -8249,14 +8291,14 @@ AudioTrackController::DeviceChannels AudioTrackController::deviceChannels() cons
     return channels;
 }
 
-juce::Result AudioTrackController::setDeviceChannelCounts(const int inputs, const int outputs)
+cydaw::base::Result AudioTrackController::setDeviceChannelCounts(const int inputs, const int outputs)
 {
     auto* device = deviceManager_.getCurrentAudioDevice();
     if (device == nullptr)
-        return juce::Result::fail(tr("error.recordInput"));
+        return cydaw::base::Result::fail(tr("error.recordInput"));
     auto setup = deviceManager_.getAudioDeviceSetup();
-    const auto inputCount = juce::jlimit(0, device->getInputChannelNames().size(), inputs);
-    const auto outputCount = juce::jlimit(1, std::max(1, device->getOutputChannelNames().size()), outputs);
+    const auto inputCount = cydaw::base::limit(0, device->getInputChannelNames().size(), inputs);
+    const auto outputCount = cydaw::base::limit(1, std::max(1, device->getOutputChannelNames().size()), outputs);
     setup.useDefaultInputChannels = false;
     setup.useDefaultOutputChannels = false;
     setup.inputChannels.clear();
@@ -8265,8 +8307,8 @@ juce::Result AudioTrackController::setDeviceChannelCounts(const int inputs, cons
         setup.inputChannels.setRange(0, inputCount, true);
     setup.outputChannels.setRange(0, outputCount, true);
     if (const auto error = deviceManager_.setAudioDeviceSetup(setup, true); error.isNotEmpty())
-        return juce::Result::fail(error);
-    return juce::Result::ok();
+        return cydaw::base::Result::fail(error);
+    return cydaw::base::Result::ok();
 }
 
 int AudioTrackController::trackChannelCount(const std::size_t index) const noexcept
@@ -8275,16 +8317,16 @@ int AudioTrackController::trackChannelCount(const std::size_t index) const noexc
     return track != nullptr ? track->channelCount : 2;
 }
 
-juce::Result AudioTrackController::setTrackChannelCount(const std::size_t index, const int channels)
+cydaw::base::Result AudioTrackController::setTrackChannelCount(const std::size_t index, const int channels)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     const auto count = cydaw::engine::clampTrackChannels(channels);
     if (track->channelCount == count)
-        return juce::Result::ok();
-    std::unique_ptr<juce::AudioFormatReader> first;
-    std::unique_ptr<juce::AudioFormatReader> second;
+        return cydaw::base::Result::ok();
+    std::unique_ptr<cydaw::audio::AudioFormatReader> first;
+    std::unique_ptr<cydaw::audio::AudioFormatReader> second;
     if (track->file.existsAsFile()) {
         first.reset(formatManager_.createReaderFor(track->file));
         second.reset(formatManager_.createReaderFor(track->file));
@@ -8354,8 +8396,8 @@ void AudioTrackController::setTrackMixer(const std::size_t index,
                                          const bool muted)
 {
     if (auto* track = findTrack(index)) {
-        track->gainDb = juce::jlimit(-60.0f, 12.0f, gainDb);
-        track->pan = juce::jlimit(-1.0f, 1.0f, pan);
+        track->gainDb = cydaw::base::limit(-60.0f, 12.0f, gainDb);
+        track->pan = cydaw::base::limit(-1.0f, 1.0f, pan);
         track->muted = muted;
         track->gainPanSource.setPan(track->pan);
         refreshTrackGains();
@@ -8364,9 +8406,9 @@ void AudioTrackController::setTrackMixer(const std::size_t index,
 
 void AudioTrackController::setMasterGain(const float gainDb) noexcept
 {
-    const auto value = juce::jlimit(-60.0f, 12.0f, gainDb);
+    const auto value = cydaw::base::limit(-60.0f, 12.0f, gainDb);
     masterGainDb_.store(value, std::memory_order_release);
-    masterOutput_.setGain(masterMuted_.load(std::memory_order_acquire) ? 0.0f : juce::Decibels::decibelsToGain(value));
+    masterOutput_.setGain(masterMuted_.load(std::memory_order_acquire) ? 0.0f : cydaw::audio::Decibels::decibelsToGain(value));
 }
 
 void AudioTrackController::setMasterMuted(const bool muted) noexcept
@@ -8380,12 +8422,12 @@ bool AudioTrackController::isMasterMuted() const noexcept
     return masterMuted_.load(std::memory_order_acquire);
 }
 
-juce::Result AudioTrackController::setMasterNativeDspGraph(const cydaw::engine::NativeDspGraph& graph)
+cydaw::base::Result AudioTrackController::setMasterNativeDspGraph(const cydaw::engine::NativeDspGraph& graph)
 {
     return masterOutput_.setChainGraph(graph);
 }
 
-juce::Result AudioTrackController::updateMasterNativeDspParameters(const cydaw::engine::NativeDspGraph& graph)
+cydaw::base::Result AudioTrackController::updateMasterNativeDspParameters(const cydaw::engine::NativeDspGraph& graph)
 {
     return masterOutput_.updateChainParameters(graph);
 }
@@ -8559,7 +8601,7 @@ AudioTrackController::audioClipEvents(
         return {};
     if (clip->usesEventTimeline || !clip->events.empty())
         return clip->events;
-    if (clip->sourceFile == juce::File {})
+    if (clip->sourceFile == cydaw::base::File {})
         return {};
     return { AudioEvent {
         clip->id, clip->name, 0.0, clip->sourceOffsetSeconds,
@@ -8574,9 +8616,9 @@ std::uint64_t AudioTrackController::addAudioClip(
     const double startSeconds,
     const double sourceOffsetSeconds,
     const double durationSeconds,
-    juce::String name,
+    cydaw::base::Text name,
     const std::uint32_t colour,
-    juce::File sourceFile,
+    cydaw::base::File sourceFile,
     const double fadeInSeconds,
     const double fadeOutSeconds)
 {
@@ -8586,9 +8628,9 @@ std::uint64_t AudioTrackController::addAudioClip(
         return 0;
     auto previous = track->audioClips;
     const auto id = nextAudioClipId_++;
-    const auto emptyContainer = sourceFile == juce::File {}
-                                && track->file == juce::File {};
-    if (sourceFile == juce::File {})
+    const auto emptyContainer = sourceFile == cydaw::base::File {}
+                                && track->file == cydaw::base::File {};
+    if (sourceFile == cydaw::base::File {})
         sourceFile = track->file;
     track->audioClips.push_back({ id, std::move(name), startSeconds,
                                   sourceOffsetSeconds, durationSeconds,
@@ -8608,19 +8650,19 @@ std::uint64_t AudioTrackController::addAudioClip(
     return id;
 }
 
-juce::Result AudioTrackController::addAudioClipFromFile(
+cydaw::base::Result AudioTrackController::addAudioClipFromFile(
     const std::size_t index,
-    const juce::File& sourceFile,
+    const cydaw::base::File& sourceFile,
     const double startSeconds,
     std::uint64_t* const newClipId)
 {
     if (findTrack(index) == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(sourceFile));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail(tr("error.openAudio", "file",
+        return cydaw::base::Result::fail(tr("error.openAudio", "file",
                                      sourceFile.getFileName()));
     const auto duration = static_cast<double>(reader->lengthInSamples)
                           / reader->sampleRate;
@@ -8628,37 +8670,37 @@ juce::Result AudioTrackController::addAudioClipFromFile(
         index, startSeconds, 0.0, duration,
         sourceFile.getFileNameWithoutExtension(), 0xff53d0c2, sourceFile);
     if (id == 0)
-        return juce::Result::fail("Could not add the audio region to this track");
+        return cydaw::base::Result::fail("Could not add the audio region to this track");
     if (newClipId != nullptr)
         *newClipId = id;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::addAudioTake(
+cydaw::base::Result AudioTrackController::addAudioTake(
     const std::size_t index,
     const std::uint64_t clipId,
-    const juce::File& sourceFile,
+    const cydaw::base::File& sourceFile,
     const bool activate,
     const bool fitClipToTake)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.recordedTakeTrack"));
+        return cydaw::base::Result::fail(tr("error.recordedTakeTrack"));
     const auto found = std::find_if(
         track->audioClips.begin(), track->audioClips.end(),
         [clipId](const auto& clip) { return clip.id == clipId; });
     if (found == track->audioClips.end())
-        return juce::Result::fail(tr("error.audioTakeClip"));
+        return cydaw::base::Result::fail(tr("error.audioTakeClip"));
     if (found->takes.size() >= maximumAudioTakesPerClip)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             tr("error.audioTakeLimit", "count",
-               juce::String(static_cast<int>(maximumAudioTakesPerClip))));
+               cydaw::base::Text(static_cast<int>(maximumAudioTakesPerClip))));
 
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(sourceFile));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             tr("error.openAudio", "file", sourceFile.getFileName()));
     const auto sourceLength = static_cast<double>(reader->lengthInSamples)
                               / reader->sampleRate;
@@ -8668,7 +8710,7 @@ juce::Result AudioTrackController::addAudioTake(
     auto takeName = sourceFile.getFileNameWithoutExtension();
     if (takeName.isEmpty())
         takeName = tr("audioTake.defaultName", "count",
-                      juce::String(static_cast<int>(found->takes.size() + 1)));
+                      cydaw::base::Text(static_cast<int>(found->takes.size() + 1)));
     found->takes.push_back({ takeName, sourceFile, sourceLength });
     if (activate) {
         found->activeTakeIndex = found->takes.size() - 1;
@@ -8686,10 +8728,10 @@ juce::Result AudioTrackController::addAudioTake(
         return result;
     }
     recordArrangementEdit(*track, std::move(previous));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::replaceAudioTakes(
+cydaw::base::Result AudioTrackController::replaceAudioTakes(
     const std::size_t index,
     const std::uint64_t clipId,
     std::vector<AudioTake> takes,
@@ -8697,22 +8739,22 @@ juce::Result AudioTrackController::replaceAudioTakes(
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.recordedTakeTrack"));
+        return cydaw::base::Result::fail(tr("error.recordedTakeTrack"));
     const auto found = std::find_if(
         track->audioClips.begin(), track->audioClips.end(),
         [clipId](const auto& clip) { return clip.id == clipId; });
     if (found == track->audioClips.end())
-        return juce::Result::fail(tr("error.audioTakeClip"));
+        return cydaw::base::Result::fail(tr("error.audioTakeClip"));
     if (takes.empty() || takes.size() > maximumAudioTakesPerClip
         || activeTakeIndex >= takes.size())
-        return juce::Result::fail(tr("error.audioTakeState"));
+        return cydaw::base::Result::fail(tr("error.audioTakeState"));
 
     for (auto& take : takes) {
-        auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
             formatManager_.createReaderFor(take.sourceFile));
         if (reader == nullptr || reader->sampleRate <= 0.0
             || reader->lengthInSamples <= 0)
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 tr("error.openAudio", "file",
                    take.sourceFile.getFileName()));
         take.sourceLengthSeconds = static_cast<double>(reader->lengthInSamples)
@@ -8734,7 +8776,7 @@ juce::Result AudioTrackController::replaceAudioTakes(
         return result;
     }
     recordArrangementEdit(*track, std::move(previous));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool AudioTrackController::setActiveAudioTake(
@@ -8802,9 +8844,9 @@ bool AudioTrackController::removeAudioTake(
     return true;
 }
 
-juce::Result AudioTrackController::selfTestAudioTakeRendering(
-    const juce::File& firstTake,
-    const juce::File& secondTake)
+cydaw::base::Result AudioTrackController::selfTestAudioTakeRendering(
+    const cydaw::base::File& firstTake,
+    const cydaw::base::File& secondTake)
 {
     AudioTrackController session;
     std::size_t trackIndex {};
@@ -8813,7 +8855,7 @@ juce::Result AudioTrackController::selfTestAudioTakeRendering(
         return result;
     const auto clips = session.audioClips(trackIndex);
     if (clips.size() != 1)
-        return juce::Result::fail("Audio take self-test did not create a clip");
+        return cydaw::base::Result::fail("Audio take self-test did not create a clip");
     const auto clipId = clips.front().id;
     if (const auto result = session.addAudioTake(
             trackIndex, clipId, secondTake, true, true);
@@ -8821,7 +8863,7 @@ juce::Result AudioTrackController::selfTestAudioTakeRendering(
         return result;
     auto* track = session.findTrack(trackIndex);
     if (track == nullptr || track->clipSource == nullptr)
-        return juce::Result::fail("Audio take self-test track is unavailable");
+        return cydaw::base::Result::fail("Audio take self-test track is unavailable");
 
     constexpr double outputSampleRate = 48'000.0;
     constexpr int blockSize = 256;
@@ -8831,14 +8873,14 @@ juce::Result AudioTrackController::selfTestAudioTakeRendering(
         for (int attempt = 0;
              attempt < 1'000
              && !track->clipSource->arrangementHasReadAhead(); ++attempt)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         return track->clipSource->arrangementHasReadAhead();
     };
     const auto renderCorrelation = [track, &waitForReadAhead](
                                        const double frequency) {
         if (!waitForReadAhead())
             return 0.0;
-        juce::AudioBuffer<float> rendered(2, renderedSamples);
+        cydaw::audio::SampleBuffer<float> rendered(2, renderedSamples);
         rendered.clear();
         track->clipSource->setNextReadPosition(0);
         for (int offset = 0; offset < renderedSamples; offset += blockSize) {
@@ -8849,7 +8891,7 @@ juce::Result AudioTrackController::selfTestAudioTakeRendering(
         for (int sample = 0; sample < renderedSamples; ++sample)
             correlation += static_cast<double>(rendered.getSample(0, sample))
                            * std::sin(
-                               juce::MathConstants<double>::twoPi
+                               cydaw::base::MathConstants<double>::twoPi
                                * frequency * static_cast<double>(sample)
                                / outputSampleRate);
         return std::abs(correlation);
@@ -8859,72 +8901,72 @@ juce::Result AudioTrackController::selfTestAudioTakeRendering(
     const auto secondAt220 = renderCorrelation(220.0);
     if (!(secondAt440 > secondAt220 * 3.0)) {
         track->clipSource->releaseResources();
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "The active alternate take was not rendered");
     }
     if (!session.setActiveAudioTake(trackIndex, clipId, 0)) {
         track->clipSource->releaseResources();
-        return juce::Result::fail("The original take could not be activated");
+        return cydaw::base::Result::fail("The original take could not be activated");
     }
     const auto firstAt220 = renderCorrelation(220.0);
     const auto firstAt440 = renderCorrelation(440.0);
     track->clipSource->releaseResources();
     if (!(firstAt220 > firstAt440 * 3.0))
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "Switching back did not update the rendered take");
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::selfTestStretchRendering(
-    const juce::File& sourceFile)
+cydaw::base::Result AudioTrackController::selfTestStretchRendering(
+    const cydaw::base::File& sourceFile)
 {
     constexpr double outputSampleRate = 48'000.0;
     constexpr int sampleCount = 8'192;
     const auto renderMode = [&](const StretchMode mode,
-                                juce::AudioBuffer<float>& destination) {
-        juce::AudioFormatManager formats;
-        formats.registerBasicFormats();
-        auto reader = std::unique_ptr<juce::AudioFormatReader>(
+                                cydaw::audio::SampleBuffer<float>& destination) {
+        cydaw::audio::AudioFormatManager formats;
+        cydaw::integration::registerCyAudioCoreReaders(formats);
+        auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
             formats.createReaderFor(sourceFile));
         if (reader == nullptr)
             return false;
         SegmentReaderSource source(std::move(reader));
         source.configureSeconds(0.0, 1.0, 2.0, false, mode);
         source.prepareToPlay(sampleCount, outputSampleRate);
-        source.setNextReadPosition(static_cast<juce::int64>(
+        source.setNextReadPosition(static_cast<std::int64_t>(
             outputSampleRate * 0.35));
         destination.setSize(2, sampleCount);
         destination.clear();
-        juce::AudioSourceChannelInfo output(&destination, 0, sampleCount);
+        cydaw::audio::AudioSourceChannelInfo output(&destination, 0, sampleCount);
         source.getNextAudioBlock(output);
         source.releaseResources();
         return destination.getMagnitude(0, 0, sampleCount) > 0.001f;
     };
-    const auto correlation = [](const juce::AudioBuffer<float>& buffer,
+    const auto correlation = [](const cydaw::audio::SampleBuffer<float>& buffer,
                                 const double frequency) {
         auto result = 0.0;
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
             result += static_cast<double>(buffer.getSample(0, sample))
-                      * std::sin(juce::MathConstants<double>::twoPi
+                      * std::sin(cydaw::base::MathConstants<double>::twoPi
                                  * frequency * static_cast<double>(sample)
                                  / outputSampleRate);
         return std::abs(result);
     };
 
-    juce::AudioBuffer<float> repitch;
-    juce::AudioBuffer<float> tonal;
-    juce::AudioBuffer<float> beats;
-    juce::AudioBuffer<float> texture;
+    cydaw::audio::SampleBuffer<float> repitch;
+    cydaw::audio::SampleBuffer<float> tonal;
+    cydaw::audio::SampleBuffer<float> beats;
+    cydaw::audio::SampleBuffer<float> texture;
     if (!renderMode(StretchMode::repitch, repitch)
         || !renderMode(StretchMode::tonal, tonal)
         || !renderMode(StretchMode::beats, beats)
         || !renderMode(StretchMode::texture, texture))
-        return juce::Result::fail("A stretch mode rendered silence");
+        return cydaw::base::Result::fail("A stretch mode rendered silence");
     if (!(correlation(repitch, 110.0) > correlation(repitch, 220.0) * 2.0))
-        return juce::Result::fail("Repitch did not follow the playback rate");
+        return cydaw::base::Result::fail("Repitch did not follow the playback rate");
     if (!(correlation(tonal, 220.0) > correlation(tonal, 110.0) * 1.4))
-        return juce::Result::fail("Tonal stretch did not preserve pitch");
-    return juce::Result::ok();
+        return cydaw::base::Result::fail("Tonal stretch did not preserve pitch");
+    return cydaw::base::Result::ok();
 }
 
 bool AudioTrackController::updateAudioClip(
@@ -8951,7 +8993,7 @@ bool AudioTrackController::updateAudioClip(
     if (wasPlaying)
         track->transportSource.stop();
     if (!found->events.empty()) {
-        const auto safeDuration = juce::jlimit(0.001, 86'400.0,
+        const auto safeDuration = cydaw::base::limit(0.001, 86'400.0,
                                               durationSeconds);
         const auto startDelta = startSeconds - found->startSeconds;
         const auto isWholeClipStretch
@@ -9072,7 +9114,7 @@ bool AudioTrackController::updateAudioClip(
     const auto trackLength = track->clipSource->arrangementLengthSeconds();
     const auto sessionLength = transportLength();
     track->transportSource.setPosition(
-        juce::jlimit(0.0, sessionLength, currentPosition));
+        cydaw::base::limit(0.0, sessionLength, currentPosition));
     if (wasPlaying && currentPosition < sessionLength)
         track->transportSource.start();
     for (auto& point : track->automation)
@@ -9114,7 +9156,7 @@ bool AudioTrackController::setAudioClipStretchSettings(
     if (found == track->audioClips.end())
         return false;
     const auto safeTempo = sourceTempoBpm > 0.0
-                               ? juce::jlimit(30.0, 400.0, sourceTempoBpm)
+                               ? cydaw::base::limit(30.0, 400.0, sourceTempoBpm)
                                : 0.0;
     if (std::abs(found->sourceTempoBpm - safeTempo) < 0.0000001
         && found->stretchMode == mode)
@@ -9156,7 +9198,7 @@ std::uint64_t AudioTrackController::addAudioClipStretchMarker(
                                + found->sourceDurationSeconds - 0.001;
     if (sourceMaximum <= sourceMinimum)
         return 0;
-    const auto safeSource = juce::jlimit(sourceMinimum, sourceMaximum,
+    const auto safeSource = cydaw::base::limit(sourceMinimum, sourceMaximum,
                                          sourceSeconds);
     const auto globalRate = found->durationSeconds
                             / std::max(0.001,
@@ -9165,7 +9207,7 @@ std::uint64_t AudioTrackController::addAudioClipStretchMarker(
                             ? timelineSeconds
                             : (safeSource - found->sourceOffsetSeconds)
                                   * globalRate;
-    safeTimeline = juce::jlimit(0.001,
+    safeTimeline = cydaw::base::limit(0.001,
                                 found->durationSeconds - 0.001,
                                 safeTimeline);
 
@@ -9233,7 +9275,7 @@ bool AudioTrackController::updateAudioClipStretchMarker(
     if (maximum <= minimum)
         return false;
     auto previous = track->audioClips;
-    marker->timelineSeconds = juce::jlimit(minimum, maximum,
+    marker->timelineSeconds = cydaw::base::limit(minimum, maximum,
                                           timelineSeconds);
     const auto wasPlaying = track->transportSource.isPlaying();
     if (wasPlaying)
@@ -9286,24 +9328,24 @@ bool AudioTrackController::removeAudioClipStretchMarker(
     return true;
 }
 
-juce::Result AudioTrackController::addAudioClipEventFromFile(
+cydaw::base::Result AudioTrackController::addAudioClipEventFromFile(
     const std::size_t index, const std::uint64_t clipId,
-    const juce::File& sourceFile, const double localStartSeconds,
+    const cydaw::base::File& sourceFile, const double localStartSeconds,
     std::uint64_t* const newEventId)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     auto clip = std::find_if(
         track->audioClips.begin(), track->audioClips.end(),
         [clipId](const auto& value) { return value.id == clipId; });
     if (clip == track->audioClips.end())
-        return juce::Result::fail("Clip not found");
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        return cydaw::base::Result::fail("Clip not found");
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(sourceFile));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             tr("error.openAudio", "file", sourceFile.getFileName()));
     const auto sourceLength = static_cast<double>(reader->lengthInSamples)
                               / reader->sampleRate;
@@ -9338,27 +9380,27 @@ juce::Result AudioTrackController::addAudioClipEventFromFile(
     recordArrangementEdit(*track, std::move(previous));
     if (newEventId != nullptr)
         *newEventId = eventId;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::replaceAudioClipEvents(
+cydaw::base::Result AudioTrackController::replaceAudioClipEvents(
     const std::size_t index, const std::uint64_t clipId,
     std::vector<AudioEvent> events)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     auto clip = std::find_if(
         track->audioClips.begin(), track->audioClips.end(),
         [clipId](const auto& value) { return value.id == clipId; });
     if (clip == track->audioClips.end())
-        return juce::Result::fail("Invalid clip content");
+        return cydaw::base::Result::fail("Invalid clip content");
     for (auto& event : events) {
-        auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
             formatManager_.createReaderFor(event.sourceFile));
         if (reader == nullptr || reader->sampleRate <= 0.0
             || reader->lengthInSamples <= 0)
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 tr("error.openAudio", "file",
                    event.sourceFile.getFileName()));
         event.sourceLengthSeconds
@@ -9396,7 +9438,7 @@ juce::Result AudioTrackController::replaceAudioClipEvents(
     if (wasPlaying)
         track->transportSource.start();
     recordArrangementEdit(*track, std::move(previous));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool AudioTrackController::updateAudioClipEvent(
@@ -9423,15 +9465,15 @@ bool AudioTrackController::updateAudioClipEvent(
         return false;
     event->startSeconds = std::max(0.0, localStartSeconds);
     event->sourceOffsetSeconds = std::max(0.0, sourceOffsetSeconds);
-    event->durationSeconds = juce::jlimit(0.001, 86'400.0,
+    event->durationSeconds = cydaw::base::limit(0.001, 86'400.0,
                                          durationSeconds);
-    event->sourceDurationSeconds = juce::jlimit(
+    event->sourceDurationSeconds = cydaw::base::limit(
         0.001, 86'400.0, sourceDurationSeconds);
     if (fadeInSeconds >= 0.0)
-        event->fadeInSeconds = juce::jlimit(
+        event->fadeInSeconds = cydaw::base::limit(
             0.0, event->durationSeconds, fadeInSeconds);
     if (fadeOutSeconds >= 0.0)
-        event->fadeOutSeconds = juce::jlimit(
+        event->fadeOutSeconds = cydaw::base::limit(
             0.0, event->durationSeconds, fadeOutSeconds);
     std::erase_if(event->stretchMarkers, [event](const auto& marker) {
         return marker.sourceSeconds <= event->sourceOffsetSeconds + 0.0005
@@ -9494,8 +9536,8 @@ bool AudioTrackController::setAudioClipEventProperties(
     }
     if (event == clip->events.end())
         return false;
-    event->gainDb = juce::jlimit(-60.0f, 24.0f, gainDb);
-    event->sourceTempoBpm = juce::jlimit(0.0, 400.0, sourceTempoBpm);
+    event->gainDb = cydaw::base::limit(-60.0f, 24.0f, gainDb);
+    event->sourceTempoBpm = cydaw::base::limit(0.0, 400.0, sourceTempoBpm);
     event->stretchMode = mode;
     if (mode == StretchMode::raw) {
         // Never stretched: as long as its part of the file, no stretch
@@ -9536,8 +9578,8 @@ std::uint64_t AudioTrackController::addAudioClipAutomationPoint(
     const auto previous = track->audioClips;
     const auto id = nextClipAutomationPointId_++;
     clip->automation.push_back(
-        { id, juce::jlimit(0.0, clip->durationSeconds, timeSeconds),
-          juce::jlimit(-60.0f, 12.0f, valueDb) });
+        { id, cydaw::base::limit(0.0, clip->durationSeconds, timeSeconds),
+          cydaw::base::limit(-60.0f, 12.0f, valueDb) });
     std::sort(clip->automation.begin(), clip->automation.end(),
               [](const auto& left, const auto& right) {
                   return left.timeSeconds < right.timeSeconds;
@@ -9569,9 +9611,9 @@ bool AudioTrackController::updateAudioClipAutomationPoint(
     if (point == clip->automation.end())
         return false;
     const auto previous = track->audioClips;
-    point->timeSeconds = juce::jlimit(0.0, clip->durationSeconds,
+    point->timeSeconds = cydaw::base::limit(0.0, clip->durationSeconds,
                                       timeSeconds);
-    point->valueDb = juce::jlimit(-60.0f, 12.0f, valueDb);
+    point->valueDb = cydaw::base::limit(-60.0f, 12.0f, valueDb);
     std::sort(clip->automation.begin(), clip->automation.end(),
               [](const auto& left, const auto& right) {
                   return left.timeSeconds < right.timeSeconds;
@@ -9605,7 +9647,7 @@ bool AudioTrackController::setAudioClipAutomationPointCurve(
         return false;
     const auto previous = track->audioClips;
     point->curve = curve;
-    point->curveAmount = juce::jlimit(-1.0f, 1.0f, curveAmount);
+    point->curveAmount = cydaw::base::limit(-1.0f, 1.0f, curveAmount);
     if (rebuildArrangementPlan(*track).failed()) {
         track->audioClips = previous;
         (void) rebuildArrangementPlan(*track);
@@ -9654,7 +9696,7 @@ AudioTrackController::audioClipAutomationPoints(
 
 bool AudioTrackController::setAudioClipLanes(
     const std::size_t index, const std::uint64_t clipId,
-    std::map<juce::String, std::vector<AutomationPoint>> lanes)
+    std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
@@ -9686,7 +9728,7 @@ void AudioTrackController::setTrackClipAutomation(
     std::sort(pan.begin(), pan.end(), [](const auto& a, const auto& b) { return a.timeSeconds < b.timeSeconds; });
     auto lane = std::make_shared<std::vector<GainAutomationPoint>>();
     for (const auto& point : pan)
-        lane->push_back({ point.timeSeconds, juce::jlimit(-1.0f, 1.0f, point.valueDb), static_cast<int>(point.curve), point.curveAmount,
+        lane->push_back({ point.timeSeconds, cydaw::base::limit(-1.0f, 1.0f, point.valueDb), static_cast<int>(point.curve), point.curveAmount,
                           point.handles });
     track->gainPanSource.setPanAutomation(std::move(lane));
 }
@@ -9851,11 +9893,11 @@ std::uint64_t AudioTrackController::addAudioClipEventStretchMarker(
     const auto markerId = nextStretchMarkerId_++;
     event->stretchMarkers.push_back({
         markerId,
-        juce::jlimit(event->sourceOffsetSeconds + 0.001,
+        cydaw::base::limit(event->sourceOffsetSeconds + 0.001,
                      event->sourceOffsetSeconds
                          + event->sourceDurationSeconds - 0.001,
                      sourceSeconds),
-        juce::jlimit(0.001, event->durationSeconds - 0.001,
+        cydaw::base::limit(0.001, event->durationSeconds - 0.001,
                      localTimelineSeconds) });
     std::sort(event->stretchMarkers.begin(), event->stretchMarkers.end(),
               [](const auto& left, const auto& right) {
@@ -9918,7 +9960,7 @@ bool AudioTrackController::updateAudioClipEventStretchMarker(
         : event->stretchMarkers[position + 1].timelineSeconds - 0.001;
     if (maximum <= minimum)
         return false;
-    marker->timelineSeconds = juce::jlimit(minimum, maximum,
+    marker->timelineSeconds = cydaw::base::limit(minimum, maximum,
                                           localTimelineSeconds);
     const auto wasPlaying = track->transportSource.isPlaying();
     if (wasPlaying)
@@ -9976,30 +10018,30 @@ bool AudioTrackController::removeAudioClipEventStretchMarker(
     return true;
 }
 
-juce::Result AudioTrackController::commitAudioClipEventEdit(
+cydaw::base::Result AudioTrackController::commitAudioClipEventEdit(
     const std::size_t index, const std::uint64_t clipId,
-    const std::uint64_t eventId, const juce::File& renderedFile)
+    const std::uint64_t eventId, const cydaw::base::File& renderedFile)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     auto clip = std::find_if(track->audioClips.begin(),
                              track->audioClips.end(),
         [clipId](const auto& value) { return value.id == clipId; });
     if (clip == track->audioClips.end())
-        return juce::Result::fail("Clip not found");
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        return cydaw::base::Result::fail("Clip not found");
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(renderedFile));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             tr("error.openAudio", "file", renderedFile.getFileName()));
     auto previous = track->audioClips;
     materialiseLegacyAudioEvent(*clip);
     auto event = std::find_if(clip->events.begin(), clip->events.end(),
         [eventId](const auto& value) { return value.id == eventId; });
     if (event == clip->events.end())
-        return juce::Result::fail("Audio event not found");
+        return cydaw::base::Result::fail("Audio event not found");
     event->sourceFile = renderedFile;
     event->sourceLengthSeconds
         = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
@@ -10016,7 +10058,7 @@ juce::Result AudioTrackController::commitAudioClipEventEdit(
     if (wasPlaying)
         track->transportSource.start();
     recordArrangementEdit(*track, std::move(previous));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool AudioTrackController::moveAudioClip(const std::size_t index,
@@ -10110,7 +10152,7 @@ bool AudioTrackController::moveAudioClips(
     const auto currentPosition = track->transportSource.getCurrentPosition();
     const auto sessionLength = transportLength();
     track->transportSource.setPosition(
-        juce::jlimit(0.0, sessionLength, currentPosition));
+        cydaw::base::limit(0.0, sessionLength, currentPosition));
     if (wasPlaying && currentPosition < sessionLength)
         track->transportSource.start();
     recordArrangementEdit(*track, std::move(previous));
@@ -10276,7 +10318,7 @@ AudioTrackController::moveAudioClipsAcrossTracks(
         auto& track = *tracks_[index];
         const auto trackLength = track.clipSource->arrangementLengthSeconds();
         track.transportSource.setPosition(
-            juce::jlimit(0.0, sessionLength,
+            cydaw::base::limit(0.0, sessionLength,
                          playbackStates[index].position));
         if (playbackStates[index].wasPlaying
             && playbackStates[index].position < sessionLength)
@@ -10396,8 +10438,8 @@ std::vector<std::uint64_t> AudioTrackController::insertAudioClips(
     auto firstStart = std::numeric_limits<double>::max();
     for (const auto& clip : clips) {
         if (clip.durationSeconds <= 0.0
-            || (clip.sourceFile == juce::File {}
-                && track->file == juce::File {}))
+            || (clip.sourceFile == cydaw::base::File {}
+                && track->file == cydaw::base::File {}))
             return {};
         firstStart = std::min(firstStart, clip.startSeconds);
     }
@@ -10414,7 +10456,7 @@ std::vector<std::uint64_t> AudioTrackController::insertAudioClips(
         copy.startSeconds = destination
                             + std::max(0.0, source.startSeconds - firstStart);
         copy.sourceLengthSeconds = 0.0;
-        if (copy.sourceFile == juce::File {})
+        if (copy.sourceFile == cydaw::base::File {})
             copy.sourceFile = track->file;
         inserted.push_back(copy.id);
         track->audioClips.push_back(std::move(copy));
@@ -10637,7 +10679,7 @@ AudioTrackController::editAudioClipRange(
                                  : candidateNextClipId++;
                 if (segmentIndex != 0)
                     segment.name = clip.name + " "
-                                   + juce::String(
+                                   + cydaw::base::Text(
                                        static_cast<int>(segmentIndex + 1));
                 segment.startSeconds = segmentStart;
                 const auto relativeStart = segmentStart - clipStart;
@@ -10767,7 +10809,7 @@ AudioTrackController::editAudioClipRange(
     const auto trackLength = track->clipSource->arrangementLengthSeconds();
     const auto sessionLength = transportLength();
     track->transportSource.setPosition(
-        juce::jlimit(0.0, sessionLength, currentPosition));
+        cydaw::base::limit(0.0, sessionLength, currentPosition));
     if (wasPlaying && currentPosition < sessionLength)
         track->transportSource.start();
     for (auto& point : track->automation)
@@ -10881,7 +10923,7 @@ bool AudioTrackController::removeAudioClip(const std::size_t index,
     const auto trackLength = track->clipSource->arrangementLengthSeconds();
     const auto sessionLength = transportLength();
     track->transportSource.setPosition(
-        juce::jlimit(0.0, sessionLength, currentPosition));
+        cydaw::base::limit(0.0, sessionLength, currentPosition));
     if (wasPlaying && currentPosition < sessionLength)
         track->transportSource.start();
     for (auto& point : track->automation)
@@ -10946,7 +10988,7 @@ bool AudioTrackController::removeAudioClips(
     const auto trackLength = track->clipSource->arrangementLengthSeconds();
     const auto sessionLength = transportLength();
     track->transportSource.setPosition(
-        juce::jlimit(0.0, sessionLength, currentPosition));
+        cydaw::base::limit(0.0, sessionLength, currentPosition));
     if (wasPlaying && currentPosition < sessionLength)
         track->transportSource.start();
     for (auto& point : track->automation)
@@ -11180,14 +11222,14 @@ void AudioTrackController::setTrackEffects(const std::size_t index,
                                             const float filterCutoffHz)
 {
     if (auto* track = findTrack(index)) {
-        track->driveDb = juce::jlimit(0.0f, 36.0f, driveDb);
-        track->filterCutoffHz = juce::jlimit(20.0f, 20'000.0f, filterCutoffHz);
+        track->driveDb = cydaw::base::limit(0.0f, 36.0f, driveDb);
+        track->filterCutoffHz = cydaw::base::limit(20.0f, 20'000.0f, filterCutoffHz);
         track->gainPanSource.setDrive(track->driveDb);
         track->gainPanSource.setFilterCutoff(track->filterCutoffHz);
     }
 }
 
-juce::Result AudioTrackController::setNativeDspGraph(
+cydaw::base::Result AudioTrackController::setNativeDspGraph(
     const cydaw::engine::NativeDspGraph& graph)
 {
     for (auto& track : tracks_) {
@@ -11197,16 +11239,16 @@ juce::Result AudioTrackController::setNativeDspGraph(
         track->nativeDspGraph = graph;
     }
     defaultNativeDspGraph_ = graph;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::setTrackNativeDspGraph(
+cydaw::base::Result AudioTrackController::setTrackNativeDspGraph(
     const std::size_t index,
     const cydaw::engine::NativeDspGraph& graph)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail("The selected audio track does not exist");
+        return cydaw::base::Result::fail("The selected audio track does not exist");
 
     const auto result = track->gainPanSource.setNativeDspGraph(graph);
     if (result.wasOk())
@@ -11214,13 +11256,13 @@ juce::Result AudioTrackController::setTrackNativeDspGraph(
     return result;
 }
 
-juce::Result AudioTrackController::updateTrackNativeDspParameters(
+cydaw::base::Result AudioTrackController::updateTrackNativeDspParameters(
     const std::size_t index,
     const cydaw::engine::NativeDspGraph& graph)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail("The selected audio track does not exist");
+        return cydaw::base::Result::fail("The selected audio track does not exist");
 
     const auto result = track->gainPanSource.updateNativeDspParameters(graph);
     if (result.wasOk())
@@ -11299,7 +11341,7 @@ bool AudioTrackController::popMasterAnalysisFrame(
     return masterOutput_.tryPopAnalysisFrame(frame);
 }
 
-juce::Result AudioTrackController::normaliseTrackRange(
+cydaw::base::Result AudioTrackController::normaliseTrackRange(
     const std::size_t index,
     const double sourceStartSeconds,
     const double durationSeconds,
@@ -11308,7 +11350,7 @@ juce::Result AudioTrackController::normaliseTrackRange(
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.normalizeNoTrack"));
+        return cydaw::base::Result::fail(tr("error.normalizeNoTrack"));
     const auto source = track->file;
     const auto pan = track->pan;
     const auto muted = track->muted;
@@ -11319,90 +11361,90 @@ juce::Result AudioTrackController::normaliseTrackRange(
         return result;
     track = findTrack(index);
     if (track == nullptr || track->file != source)
-        return juce::Result::fail(tr("error.normalizeNoTrack"));
+        return cydaw::base::Result::fail(tr("error.normalizeNoTrack"));
     setTrackMixer(index, gainDb, pan, muted);
     if (appliedGainDb != nullptr)
         *appliedGainDb = gainDb;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::exportTrackRange(
+cydaw::base::Result AudioTrackController::exportTrackRange(
     const std::size_t index,
     const double sourceStartSeconds,
     const double durationSeconds,
-    const juce::File& destination)
+    const cydaw::base::File& destination)
 {
     const auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     return exportAudioRange(track->file, sourceStartSeconds, durationSeconds,
                             destination);
 }
 
-juce::Result AudioTrackController::analyseAudioRangeGain(
-    const juce::File& source,
+cydaw::base::Result AudioTrackController::analyseAudioRangeGain(
+    const cydaw::base::File& source,
     const double sourceStartSeconds,
     const double durationSeconds,
     const float targetPeakDb,
     float& gainDb,
     const std::atomic<bool>* const cancellation)
 {
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
-        return juce::Result::fail(tr("error.openAudio", "file", source.getFileName()));
+        return cydaw::base::Result::fail(tr("error.openAudio", "file", source.getFileName()));
 
-    const auto startSample = juce::jlimit<juce::int64>(
+    const auto startSample = cydaw::base::limit<std::int64_t>(
         0, reader->lengthInSamples,
-        static_cast<juce::int64>(std::llround(std::max(0.0, sourceStartSeconds)
+        static_cast<std::int64_t>(std::llround(std::max(0.0, sourceStartSeconds)
                                               * reader->sampleRate)));
-    const auto requestedSamples = static_cast<juce::int64>(std::llround(
+    const auto requestedSamples = static_cast<std::int64_t>(std::llround(
         std::max(0.0, durationSeconds) * reader->sampleRate));
     const auto sampleCount = std::min(requestedSamples,
                                       reader->lengthInSamples - startSample);
     if (sampleCount <= 0)
-        return juce::Result::fail(tr("error.normalizeEmpty"));
+        return cydaw::base::Result::fail(tr("error.normalizeEmpty"));
 
     constexpr int blockSize = 65'536;
     const auto channelCount = static_cast<int>(reader->numChannels);
-    juce::AudioBuffer<float> buffer(channelCount, blockSize);
+    cydaw::audio::SampleBuffer<float> buffer(channelCount, blockSize);
     auto peak = 0.0f;
-    juce::int64 readPosition = startSample;
-    juce::int64 remaining = sampleCount;
+    std::int64_t readPosition = startSample;
+    std::int64_t remaining = sampleCount;
     while (remaining > 0) {
         if (cancellation != nullptr
             && cancellation->load(std::memory_order_acquire))
-            return juce::Result::fail(tr("error.audioEditCancelled"));
-        const auto currentBlock = static_cast<int>(std::min<juce::int64>(
+            return cydaw::base::Result::fail(tr("error.audioEditCancelled"));
+        const auto currentBlock = static_cast<int>(std::min<std::int64_t>(
             remaining, blockSize));
         buffer.clear();
         if (!reader->read(&buffer, 0, currentBlock, readPosition, true, true))
-            return juce::Result::fail(tr("error.audioEditRead"));
+            return cydaw::base::Result::fail(tr("error.audioEditRead"));
         for (int channel = 0; channel < channelCount; ++channel)
             peak = std::max(peak, buffer.getMagnitude(channel, 0, currentBlock));
         readPosition += currentBlock;
         remaining -= currentBlock;
     }
     if (peak <= 1.0e-7f)
-        return juce::Result::fail(tr("error.normalizeSilent"));
+        return cydaw::base::Result::fail(tr("error.normalizeSilent"));
 
-    const auto measuredDb = juce::Decibels::gainToDecibels(peak, -120.0f);
-    gainDb = juce::jlimit(-60.0f, 12.0f,
-                          juce::jlimit(-12.0f, 0.0f, targetPeakDb)
+    const auto measuredDb = cydaw::audio::Decibels::gainToDecibels(peak, -120.0f);
+    gainDb = cydaw::base::limit(-60.0f, 12.0f,
+                          cydaw::base::limit(-12.0f, 0.0f, targetPeakDb)
                               - measuredDb);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 std::optional<AudioTrackController::TempoDetectionResult>
 AudioTrackController::detectAudioTempo(
-    const juce::File& source,
+    const cydaw::base::File& source,
     const std::atomic<bool>* const cancellation)
 {
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->numChannels == 0 || reader->lengthInSamples <= 0)
@@ -11412,26 +11454,26 @@ AudioTrackController::detectAudioTempo(
     constexpr double maximumAnalysisSeconds = 240.0;
     const auto hopSamples = std::max(
         1, static_cast<int>(std::llround(reader->sampleRate / envelopeRate)));
-    const auto analysisSamples = std::min<juce::int64>(
+    const auto analysisSamples = std::min<std::int64_t>(
         reader->lengthInSamples,
-        static_cast<juce::int64>(std::llround(
+        static_cast<std::int64_t>(std::llround(
             maximumAnalysisSeconds * reader->sampleRate)));
-    if (analysisSamples < static_cast<juce::int64>(reader->sampleRate * 2.0))
+    if (analysisSamples < static_cast<std::int64_t>(reader->sampleRate * 2.0))
         return std::nullopt;
 
     std::vector<float> envelope;
     envelope.reserve(static_cast<std::size_t>(analysisSamples / hopSamples + 1));
     constexpr int blockSize = 32'768;
-    juce::AudioBuffer<float> block(
+    cydaw::audio::SampleBuffer<float> block(
         static_cast<int>(reader->numChannels), blockSize);
     auto accumulated = 0.0;
     auto accumulatedSamples = 0;
-    auto readPosition = juce::int64 {};
+    auto readPosition = std::int64_t {};
     while (readPosition < analysisSamples) {
         if (cancellation != nullptr
             && cancellation->load(std::memory_order_acquire))
             return std::nullopt;
-        const auto samples = static_cast<int>(std::min<juce::int64>(
+        const auto samples = static_cast<int>(std::min<std::int64_t>(
             blockSize, analysisSamples - readPosition));
         block.clear();
         if (!reader->read(&block, 0, samples, readPosition, true, true))
@@ -11525,7 +11567,7 @@ AudioTrackController::detectAudioTempo(
         const auto right = scores[static_cast<std::size_t>(bestLag + 1)];
         const auto denominator = left - 2.0 * centre + right;
         if (std::abs(denominator) > 1.0e-9)
-            refinedLag += juce::jlimit(-0.5, 0.5,
+            refinedLag += cydaw::base::limit(-0.5, 0.5,
                                        0.5 * (left - right) / denominator);
     }
     auto bpm = envelopeRate * 60.0 / refinedLag;
@@ -11536,92 +11578,92 @@ AudioTrackController::detectAudioTempo(
     bpm = std::round(bpm * 10.0) / 10.0;
     return TempoDetectionResult {
         bpm,
-        juce::jlimit(0.0, 1.0, bestScore)
+        cydaw::base::limit(0.0, 1.0, bestScore)
     };
 }
 
-juce::Result AudioTrackController::exportAudioRange(
-    const juce::File& source,
+cydaw::base::Result AudioTrackController::exportAudioRange(
+    const cydaw::base::File& source,
     const double sourceStartSeconds,
     const double durationSeconds,
-    const juce::File& destination,
+    const cydaw::base::File& destination,
     const std::atomic<bool>* const cancellation)
 {
-    if (source == juce::File {} || destination == juce::File {}
+    if (source == cydaw::base::File {} || destination == cydaw::base::File {}
         || destination == source)
-        return juce::Result::fail(tr("error.exportSource"));
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        return cydaw::base::Result::fail(tr("error.exportSource"));
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
-        return juce::Result::fail(tr("error.openAudio", "file", source.getFileName()));
+        return cydaw::base::Result::fail(tr("error.openAudio", "file", source.getFileName()));
 
-    const auto startSample = juce::jlimit<juce::int64>(
+    const auto startSample = cydaw::base::limit<std::int64_t>(
         0, reader->lengthInSamples,
-        static_cast<juce::int64>(std::llround(std::max(0.0, sourceStartSeconds)
+        static_cast<std::int64_t>(std::llround(std::max(0.0, sourceStartSeconds)
                                               * reader->sampleRate)));
-    const auto requestedSamples = static_cast<juce::int64>(std::llround(
+    const auto requestedSamples = static_cast<std::int64_t>(std::llround(
         std::max(0.0, durationSeconds) * reader->sampleRate));
     const auto sampleCount = std::min(requestedSamples,
                                       reader->lengthInSamples - startSample);
     if (sampleCount <= 0)
-        return juce::Result::fail(tr("error.exportEmpty"));
+        return cydaw::base::Result::fail(tr("error.exportEmpty"));
     if (!destination.getParentDirectory().createDirectory())
-        return juce::Result::fail(tr("error.exportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file",
                                      destination.getFullPathName()));
 
     auto fileOutput = destination.createOutputStream();
     if (fileOutput == nullptr || !fileOutput->setPosition(0)
         || fileOutput->truncate().failed())
-        return juce::Result::fail(tr("error.exportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file",
                                      destination.getFullPathName()));
-    std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat format;
+    std::unique_ptr<cydaw::base::OutputStream> output { std::move(fileOutput) };
+    cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(
         output,
-        juce::AudioFormatWriterOptions()
+        cydaw::audio::AudioFormatWriterOptions()
             .withSampleRate(reader->sampleRate)
             .withNumChannels(static_cast<int>(reader->numChannels))
             .withBitsPerSample(24));
     if (writer == nullptr) {
         destination.deleteFile();
-        return juce::Result::fail(tr("error.exportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file",
                                      destination.getFullPathName()));
     }
 
     constexpr int blockSize = 8'192;
-    juce::AudioBuffer<float> buffer(static_cast<int>(reader->numChannels), blockSize);
-    juce::int64 readPosition = startSample;
-    juce::int64 remaining = sampleCount;
+    cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(reader->numChannels), blockSize);
+    std::int64_t readPosition = startSample;
+    std::int64_t remaining = sampleCount;
     while (remaining > 0) {
         if (cancellation != nullptr
             && cancellation->load(std::memory_order_acquire)) {
             writer.reset();
             destination.deleteFile();
-            return juce::Result::fail(tr("error.audioEditCancelled"));
+            return cydaw::base::Result::fail(tr("error.audioEditCancelled"));
         }
-        const auto currentBlock = static_cast<int>(std::min<juce::int64>(remaining,
+        const auto currentBlock = static_cast<int>(std::min<std::int64_t>(remaining,
                                                                          blockSize));
         buffer.clear();
         if (!reader->read(&buffer, 0, currentBlock, readPosition, true, true)
             || !writer->writeFromAudioSampleBuffer(buffer, 0, currentBlock)) {
             writer.reset();
             destination.deleteFile();
-            return juce::Result::fail(tr("error.exportWrite"));
+            return cydaw::base::Result::fail(tr("error.exportWrite"));
         }
         readPosition += currentBlock;
         remaining -= currentBlock;
     }
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::renderAudioEdit(
-    const juce::File& source,
+cydaw::base::Result AudioTrackController::renderAudioEdit(
+    const cydaw::base::File& source,
     const double sourceStartSeconds,
     const double durationSeconds,
     const AudioEditOperation operation,
-    const juce::File& destination,
+    const cydaw::base::File& destination,
     const std::atomic<bool>* const cancellation)
 {
     const auto defaultLevel = operation == AudioEditOperation::normalisePeak
@@ -11632,68 +11674,68 @@ juce::Result AudioTrackController::renderAudioEdit(
                            cancellation);
 }
 
-juce::Result AudioTrackController::renderAudioEdit(
-    const juce::File& source,
+cydaw::base::Result AudioTrackController::renderAudioEdit(
+    const cydaw::base::File& source,
     const double sourceStartSeconds,
     const double durationSeconds,
     const AudioEditRequest request,
-    const juce::File& destination,
+    const cydaw::base::File& destination,
     const std::atomic<bool>* const cancellation)
 {
-    if (source == juce::File {} || destination == juce::File {}
+    if (source == cydaw::base::File {} || destination == cydaw::base::File {}
         || source == destination)
-        return juce::Result::fail(tr("error.audioEditDestination"));
+        return cydaw::base::Result::fail(tr("error.audioEditDestination"));
     if (changesLength(request.operation))
         return renderAudioSplice(source, sourceStartSeconds, durationSeconds, request, destination, cancellation);
 
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
-        return juce::Result::fail(tr("error.openAudio", "file",
+        return cydaw::base::Result::fail(tr("error.openAudio", "file",
                                      source.getFileName()));
 
-    const auto selectionStart = juce::jlimit<juce::int64>(
+    const auto selectionStart = cydaw::base::limit<std::int64_t>(
         0, reader->lengthInSamples,
-        static_cast<juce::int64>(std::llround(
+        static_cast<std::int64_t>(std::llround(
             std::max(0.0, sourceStartSeconds) * reader->sampleRate)));
-    const auto requestedSamples = static_cast<juce::int64>(std::llround(
+    const auto requestedSamples = static_cast<std::int64_t>(std::llround(
         std::max(0.0, durationSeconds) * reader->sampleRate));
     const auto selectionLength = std::min(
         requestedSamples, reader->lengthInSamples - selectionStart);
     if (selectionLength <= 0)
-        return juce::Result::fail(tr("error.audioEditEmpty"));
+        return cydaw::base::Result::fail(tr("error.audioEditEmpty"));
     const auto selectionEnd = selectionStart + selectionLength;
     const auto channelCount = static_cast<int>(reader->numChannels);
 
     if (request.operation == AudioEditOperation::swapStereo
         && channelCount < 2)
-        return juce::Result::fail(tr("error.audioEditStereoRequired"));
+        return cydaw::base::Result::fail(tr("error.audioEditStereoRequired"));
 
     std::vector<double> dcOffsets(static_cast<std::size_t>(channelCount), 0.0);
     auto renderedGain = 1.0f;
     if (request.operation == AudioEditOperation::amplify) {
-        renderedGain = juce::Decibels::decibelsToGain(
-            juce::jlimit(-60.0f, 24.0f, request.levelDb), -60.0f);
+        renderedGain = cydaw::audio::Decibels::decibelsToGain(
+            cydaw::base::limit(-60.0f, 24.0f, request.levelDb), -60.0f);
     } else if (request.operation == AudioEditOperation::normalisePeak
                || request.operation == AudioEditOperation::removeDcOffset) {
         constexpr int analysisBlockSize = 65'536;
-        juce::AudioBuffer<float> analysisBuffer(channelCount,
+        cydaw::audio::SampleBuffer<float> analysisBuffer(channelCount,
                                                 analysisBlockSize);
         auto peak = 0.0f;
-        juce::int64 readPosition = selectionStart;
-        juce::int64 remaining = selectionLength;
+        std::int64_t readPosition = selectionStart;
+        std::int64_t remaining = selectionLength;
         while (remaining > 0) {
             if (cancellation != nullptr
                 && cancellation->load(std::memory_order_acquire))
-                return juce::Result::fail(tr("error.audioEditCancelled"));
-            const auto currentBlock = static_cast<int>(std::min<juce::int64>(
+                return cydaw::base::Result::fail(tr("error.audioEditCancelled"));
+            const auto currentBlock = static_cast<int>(std::min<std::int64_t>(
                 remaining, analysisBlockSize));
             analysisBuffer.clear();
             if (!reader->read(&analysisBuffer, 0, currentBlock, readPosition,
                               true, true))
-                return juce::Result::fail(tr("error.audioEditRead"));
+                return cydaw::base::Result::fail(tr("error.audioEditRead"));
             for (int channel = 0; channel < channelCount; ++channel) {
                 if (request.operation == AudioEditOperation::normalisePeak) {
                     peak = std::max(
@@ -11712,13 +11754,13 @@ juce::Result AudioTrackController::renderAudioEdit(
         }
         if (request.operation == AudioEditOperation::normalisePeak) {
             if (peak <= 1.0e-7f)
-                return juce::Result::fail(tr("error.normalizeSilent"));
-            const auto targetDb = juce::jlimit(-24.0f, 0.0f,
+                return cydaw::base::Result::fail(tr("error.normalizeSilent"));
+            const auto targetDb = cydaw::base::limit(-24.0f, 0.0f,
                                                 request.levelDb);
-            const auto measuredDb = juce::Decibels::gainToDecibels(
+            const auto measuredDb = cydaw::audio::Decibels::gainToDecibels(
                 peak, -120.0f);
-            renderedGain = juce::Decibels::decibelsToGain(
-                juce::jlimit(-60.0f, 24.0f, targetDb - measuredDb), -60.0f);
+            renderedGain = cydaw::audio::Decibels::decibelsToGain(
+                cydaw::base::limit(-60.0f, 24.0f, targetDb - measuredDb), -60.0f);
         } else {
             for (auto& offset : dcOffsets)
                 offset /= static_cast<double>(selectionLength);
@@ -11726,49 +11768,49 @@ juce::Result AudioTrackController::renderAudioEdit(
     }
 
     if (!destination.getParentDirectory().createDirectory())
-        return juce::Result::fail(tr("error.exportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file",
                                      destination.getFullPathName()));
     auto fileOutput = destination.createOutputStream();
     if (fileOutput == nullptr || !fileOutput->setPosition(0)
         || fileOutput->truncate().failed())
-        return juce::Result::fail(tr("error.exportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file",
                                      destination.getFullPathName()));
-    std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat format;
+    std::unique_ptr<cydaw::base::OutputStream> output { std::move(fileOutput) };
+    cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(
         output,
-        juce::AudioFormatWriterOptions()
+        cydaw::audio::AudioFormatWriterOptions()
             .withSampleRate(reader->sampleRate)
             .withNumChannels(static_cast<int>(reader->numChannels))
             .withBitsPerSample(24));
     if (writer == nullptr) {
         destination.deleteFile();
-        return juce::Result::fail(tr("error.exportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file",
                                      destination.getFullPathName()));
     }
 
     constexpr int blockSize = 8'192;
-    juce::AudioBuffer<float> buffer(channelCount, blockSize);
-    juce::AudioBuffer<float> reverseBuffer(channelCount, blockSize);
+    cydaw::audio::SampleBuffer<float> buffer(channelCount, blockSize);
+    cydaw::audio::SampleBuffer<float> reverseBuffer(channelCount, blockSize);
     const auto fadeDenominator = static_cast<double>(
-        std::max<juce::int64>(1, selectionLength - 1));
+        std::max<std::int64_t>(1, selectionLength - 1));
 
-    for (juce::int64 blockStart = 0; blockStart < reader->lengthInSamples;
+    for (std::int64_t blockStart = 0; blockStart < reader->lengthInSamples;
          blockStart += blockSize) {
         if (cancellation != nullptr
             && cancellation->load(std::memory_order_acquire)) {
             writer.reset();
             destination.deleteFile();
-            return juce::Result::fail(tr("error.audioEditCancelled"));
+            return cydaw::base::Result::fail(tr("error.audioEditCancelled"));
         }
 
-        const auto currentBlock = static_cast<int>(std::min<juce::int64>(
+        const auto currentBlock = static_cast<int>(std::min<std::int64_t>(
             blockSize, reader->lengthInSamples - blockStart));
         buffer.clear();
         if (!reader->read(&buffer, 0, currentBlock, blockStart, true, true)) {
             writer.reset();
             destination.deleteFile();
-            return juce::Result::fail(tr("error.audioEditRead"));
+            return cydaw::base::Result::fail(tr("error.audioEditRead"));
         }
 
         const auto overlapStart = std::max(blockStart, selectionStart);
@@ -11787,7 +11829,7 @@ juce::Result AudioTrackController::renderAudioEdit(
                                   reverseReadStart, true, true)) {
                     writer.reset();
                     destination.deleteFile();
-                    return juce::Result::fail(tr("error.audioEditRead"));
+                    return cydaw::base::Result::fail(tr("error.audioEditRead"));
                 }
                 for (int channel = 0; channel < channelCount; ++channel)
                     for (int sample = 0; sample < overlapLength; ++sample)
@@ -11803,7 +11845,7 @@ juce::Result AudioTrackController::renderAudioEdit(
                     const auto amount = selectionPosition / fadeDenominator;
                     const auto rising = request.operation == AudioEditOperation::fadeIn ? amount : 1.0 - amount;
                     // The shape: straight, equal power, slow start, fast start.
-                    const auto shaped = request.curve == FadeCurve::equalPower ? std::sin(rising * juce::MathConstants<double>::halfPi)
+                    const auto shaped = request.curve == FadeCurve::equalPower ? std::sin(rising * cydaw::base::MathConstants<double>::halfPi)
                                         : request.curve == FadeCurve::slowStart ? rising * rising
                                         : request.curve == FadeCurve::fastStart ? 1.0 - (1.0 - rising) * (1.0 - rising)
                                                                                 : rising;
@@ -11838,7 +11880,7 @@ juce::Result AudioTrackController::renderAudioEdit(
                             value -= offset;
                         else
                             value *= renderedGain;
-                        samples[sample] = juce::jlimit(-1.0f, 1.0f, value);
+                        samples[sample] = cydaw::base::limit(-1.0f, 1.0f, value);
                     }
                 }
             }
@@ -11847,58 +11889,58 @@ juce::Result AudioTrackController::renderAudioEdit(
         if (!writer->writeFromAudioSampleBuffer(buffer, 0, currentBlock)) {
             writer.reset();
             destination.deleteFile();
-            return juce::Result::fail(tr("error.exportWrite"));
+            return cydaw::base::Result::fail(tr("error.exportWrite"));
         }
     }
 
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 // ---- Destructive edits that change the length, takes, comping, versions ------------------------
 
-juce::Result AudioTrackController::renderAudioSplice(
-    const juce::File& source,
+cydaw::base::Result AudioTrackController::renderAudioSplice(
+    const cydaw::base::File& source,
     const double sourceStartSeconds,
     const double durationSeconds,
     const AudioEditRequest& request,
-    const juce::File& destination,
+    const cydaw::base::File& destination,
     const std::atomic<bool>* const cancellation)
 {
-    if (source == juce::File {} || destination == juce::File {} || source == destination)
-        return juce::Result::fail(tr("error.audioEditDestination"));
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
-    const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(source));
+    if (source == cydaw::base::File {} || destination == cydaw::base::File {} || source == destination)
+        return cydaw::base::Result::fail(tr("error.audioEditDestination"));
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
+    const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
-        return juce::Result::fail(tr("error.openAudio", "file", source.getFileName()));
+        return cydaw::base::Result::fail(tr("error.openAudio", "file", source.getFileName()));
     const auto rate = reader->sampleRate;
     const auto length = reader->lengthInSamples;
     const auto channels = static_cast<int>(reader->numChannels);
-    const auto a = juce::jlimit<juce::int64>(0, length, static_cast<juce::int64>(std::llround(std::max(0.0, sourceStartSeconds) * rate)));
-    auto selection = static_cast<juce::int64>(std::llround(std::max(0.0, durationSeconds) * rate));
+    const auto a = cydaw::base::limit<std::int64_t>(0, length, static_cast<std::int64_t>(std::llround(std::max(0.0, sourceStartSeconds) * rate)));
+    auto selection = static_cast<std::int64_t>(std::llround(std::max(0.0, durationSeconds) * rate));
     if (request.operation != AudioEditOperation::insertSilence && request.operation != AudioEditOperation::paste)
         selection = std::min(selection, length - a);
     if (selection <= 0 && request.operation != AudioEditOperation::paste)
-        return juce::Result::fail(tr("error.audioEditEmpty"));
+        return cydaw::base::Result::fail(tr("error.audioEditEmpty"));
     const auto b = std::min(length, a + selection);
 
     // What is pasted: read whole (a clipboard is short), its channels spread
     // onto the file's.
-    juce::AudioBuffer<float> pasted;
+    cydaw::audio::SampleBuffer<float> pasted;
     if (request.operation == AudioEditOperation::paste) {
-        const std::unique_ptr<juce::AudioFormatReader> from(formats.createReaderFor(request.pasteFile));
+        const std::unique_ptr<cydaw::audio::AudioFormatReader> from(formats.createReaderFor(request.pasteFile));
         if (from == nullptr || from->sampleRate <= 0.0)
-            return juce::Result::fail(tr("error.openAudio", "file", request.pasteFile.getFileName()));
+            return cydaw::base::Result::fail(tr("error.openAudio", "file", request.pasteFile.getFileName()));
         if (std::abs(from->sampleRate - rate) > 0.5)
-            return juce::Result::fail("The pasted sound is at another sample rate (" + juce::String(from->sampleRate, 0) + " Hz)");
-        const auto start = juce::jlimit<juce::int64>(0, from->lengthInSamples,
-                                                     static_cast<juce::int64>(std::llround(request.pasteStartSeconds * rate)));
-        const auto count = static_cast<int>(juce::jlimit<juce::int64>(
-            0, std::min<juce::int64>(from->lengthInSamples - start, static_cast<juce::int64>(rate * 600.0)),
-            static_cast<juce::int64>(std::llround(request.pasteDurationSeconds * rate))));
+            return cydaw::base::Result::fail("The pasted sound is at another sample rate (" + cydaw::base::Text(from->sampleRate, 0) + " Hz)");
+        const auto start = cydaw::base::limit<std::int64_t>(0, from->lengthInSamples,
+                                                     static_cast<std::int64_t>(std::llround(request.pasteStartSeconds * rate)));
+        const auto count = static_cast<int>(cydaw::base::limit<std::int64_t>(
+            0, std::min<std::int64_t>(from->lengthInSamples - start, static_cast<std::int64_t>(rate * 600.0)),
+            static_cast<std::int64_t>(std::llround(request.pasteDurationSeconds * rate))));
         if (count <= 0)
-            return juce::Result::fail(tr("error.audioEditEmpty"));
-        juce::AudioBuffer<float> read(static_cast<int>(from->numChannels), count);
+            return cydaw::base::Result::fail(tr("error.audioEditEmpty"));
+        cydaw::audio::SampleBuffer<float> read(static_cast<int>(from->numChannels), count);
         (void) from->read(&read, 0, count, start, true, true);
         pasted.setSize(channels, count);
         for (int channel = 0; channel < channels; ++channel)
@@ -11906,28 +11948,28 @@ juce::Result AudioTrackController::renderAudioSplice(
     }
 
     if (!destination.getParentDirectory().createDirectory())
-        return juce::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
     auto fileOutput = destination.createOutputStream();
     if (fileOutput == nullptr || !fileOutput->setPosition(0) || fileOutput->truncate().failed())
-        return juce::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
-    std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat format;
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
+    std::unique_ptr<cydaw::base::OutputStream> output { std::move(fileOutput) };
+    cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(
-        output, juce::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(channels).withBitsPerSample(24));
+        output, cydaw::audio::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(channels).withBitsPerSample(24));
     if (writer == nullptr) {
         destination.deleteFile();
-        return juce::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
     }
     // The pieces written in turn, each with a short fade where it meets
     // another (no click at a join).
     const auto fade = static_cast<int>(std::max(8.0, rate * 0.0015));
     constexpr int blockSize = 8'192;
-    juce::AudioBuffer<float> buffer(channels, blockSize);
-    const auto copy = [&](const juce::int64 from, const juce::int64 to, const bool fadeInAtStart, const bool fadeOutAtEnd) {
+    cydaw::audio::SampleBuffer<float> buffer(channels, blockSize);
+    const auto copy = [&](const std::int64_t from, const std::int64_t to, const bool fadeInAtStart, const bool fadeOutAtEnd) {
         for (auto start = from; start < to; start += blockSize) {
             if (cancellation != nullptr && cancellation->load(std::memory_order_acquire))
                 return false;
-            const auto count = static_cast<int>(std::min<juce::int64>(blockSize, to - start));
+            const auto count = static_cast<int>(std::min<std::int64_t>(blockSize, to - start));
             buffer.clear();
             if (!reader->read(&buffer, 0, count, start, true, true))
                 return false;
@@ -11935,9 +11977,9 @@ juce::Result AudioTrackController::renderAudioSplice(
                 const auto at = start + i;
                 auto gain = 1.0f;
                 if (fadeInAtStart && at - from < fade)
-                    gain *= std::sin(static_cast<float>(at - from) / static_cast<float>(fade) * juce::MathConstants<float>::halfPi);
+                    gain *= std::sin(static_cast<float>(at - from) / static_cast<float>(fade) * cydaw::base::MathConstants<float>::halfPi);
                 if (fadeOutAtEnd && to - at <= fade)
-                    gain *= std::sin(static_cast<float>(to - at - 1) / static_cast<float>(fade) * juce::MathConstants<float>::halfPi);
+                    gain *= std::sin(static_cast<float>(to - at - 1) / static_cast<float>(fade) * cydaw::base::MathConstants<float>::halfPi);
                 if (gain < 1.0f)
                     for (int channel = 0; channel < channels; ++channel)
                         buffer.setSample(channel, i, buffer.getSample(channel, i) * gain);
@@ -11947,10 +11989,10 @@ juce::Result AudioTrackController::renderAudioSplice(
         }
         return true;
     };
-    const auto silence = [&](juce::int64 count) {
+    const auto silence = [&](std::int64_t count) {
         buffer.clear();
         while (count > 0) {
-            const auto block = static_cast<int>(std::min<juce::int64>(blockSize, count));
+            const auto block = static_cast<int>(std::min<std::int64_t>(blockSize, count));
             if (!writer->writeFromAudioSampleBuffer(buffer, 0, block))
                 return false;
             count -= block;
@@ -11974,7 +12016,7 @@ juce::Result AudioTrackController::renderAudioSplice(
             // The pasted sound faded at both ends.
             const auto count = pasted.getNumSamples();
             for (int i = 0; i < std::min(fade, count); ++i) {
-                const auto gain = std::sin(static_cast<float>(i) / static_cast<float>(fade) * juce::MathConstants<float>::halfPi);
+                const auto gain = std::sin(static_cast<float>(i) / static_cast<float>(fade) * cydaw::base::MathConstants<float>::halfPi);
                 for (int channel = 0; channel < channels; ++channel) {
                     pasted.setSample(channel, i, pasted.getSample(channel, i) * gain);
                     pasted.setSample(channel, count - 1 - i, pasted.getSample(channel, count - 1 - i) * gain);
@@ -11990,10 +12032,10 @@ juce::Result AudioTrackController::renderAudioSplice(
     writer.reset();
     if (!written) {
         destination.deleteFile();
-        return juce::Result::fail(cancellation != nullptr && cancellation->load() ? tr("error.audioEditCancelled")
+        return cydaw::base::Result::fail(cancellation != nullptr && cancellation->load() ? tr("error.audioEditCancelled")
                                                                                    : tr("error.exportWrite"));
     }
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 double AudioTrackController::clipSourceTime(const AudioClip& clip, const double timelineSeconds)
@@ -12011,31 +12053,31 @@ double AudioTrackController::eventSourceTime(const AudioEvent& event, const doub
     return sourceTimeForClipTimeline(mapping, timelineSeconds);
 }
 
-juce::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, const juce::File& destination,
+cydaw::base::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, const cydaw::base::File& destination,
                                                        const std::atomic<bool>* const cancellation)
 {
     if (clip.takes.size() < 2 || clip.comp.empty())
-        return juce::Result::fail("The clip plays one take: there is nothing to join");
-    if (destination == juce::File {})
-        return juce::Result::fail(tr("error.audioEditDestination"));
-    juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+        return cydaw::base::Result::fail("The clip plays one take: there is nothing to join");
+    if (destination == cydaw::base::File {})
+        return cydaw::base::Result::fail(tr("error.audioEditDestination"));
+    cydaw::audio::AudioFormatManager formats;
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     // Every take's file, at one rate; the widest gives the file its channels.
-    std::vector<std::unique_ptr<juce::AudioFormatReader>> readers;
+    std::vector<std::unique_ptr<cydaw::audio::AudioFormatReader>> readers;
     auto rate = 0.0;
     auto channels = 1;
     for (const auto& take : clip.takes) {
-        const auto file = take.sourceFile != juce::File {} ? take.sourceFile : clip.sourceFile;
+        const auto file = take.sourceFile != cydaw::base::File {} ? take.sourceFile : clip.sourceFile;
         if (file == destination)
-            return juce::Result::fail(tr("error.audioEditDestination"));
-        std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+            return cydaw::base::Result::fail(tr("error.audioEditDestination"));
+        std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
         if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
-            return juce::Result::fail(tr("error.openAudio", "file", file.getFileName()));
+            return cydaw::base::Result::fail(tr("error.openAudio", "file", file.getFileName()));
         if (rate <= 0.0)
             rate = reader->sampleRate;
         else if (std::abs(reader->sampleRate - rate) > 0.5)
-            return juce::Result::fail("The takes are at different sample rates (" + juce::String(rate, 0) + " and "
-                                      + juce::String(reader->sampleRate, 0) + " Hz): join them in one rate first");
+            return cydaw::base::Result::fail("The takes are at different sample rates (" + cydaw::base::Text(rate, 0) + " and "
+                                      + cydaw::base::Text(reader->sampleRate, 0) + " Hz): join them in one rate first");
         channels = std::max(channels, static_cast<int>(reader->numChannels));
         readers.push_back(std::move(reader));
     }
@@ -12043,9 +12085,9 @@ juce::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, co
     // On the clip's own source time, as long as its source, or as far as it
     // plays.
     const auto lengthSeconds = std::max(clip.sourceLengthSeconds, clip.sourceOffsetSeconds + clip.sourceDurationSeconds);
-    const auto length = static_cast<juce::int64>(std::llround(lengthSeconds * rate));
+    const auto length = static_cast<std::int64_t>(std::llround(lengthSeconds * rate));
     if (length <= 0)
-        return juce::Result::fail(tr("error.audioEditEmpty"));
+        return cydaw::base::Result::fail(tr("error.audioEditEmpty"));
 
     // The passages in source time, each heard between its ends; where two
     // meet they cross over 10 ms of the clip's time, as when it plays. The
@@ -12056,7 +12098,7 @@ juce::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, co
         double to {};
         bool open[2] {};
         std::size_t take {};
-        juce::int64 shift {};
+        std::int64_t shift {};
     };
     const auto speed = clip.sourceDurationSeconds / std::max(1.0e-6, clip.durationSeconds);
     const auto crossfade = 0.01 * speed * rate;
@@ -12073,7 +12115,7 @@ juce::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, co
         span.to = clipSourceTime(clip, part.endSeconds) * rate + crossfade * 0.5;
         span.open[0] = index == 0 && part.startSeconds <= 1.0e-6;
         span.open[1] = index + 1 == comp.size() && part.endSeconds >= clip.durationSeconds - 1.0e-6;
-        span.shift = static_cast<juce::int64>(std::llround(clip.takes[span.take].shiftSeconds * rate));
+        span.shift = static_cast<std::int64_t>(std::llround(clip.takes[span.take].shiftSeconds * rate));
         spans.push_back(span);
     }
     const auto weight = [crossfade](const Span& span, const double at) {
@@ -12086,28 +12128,28 @@ juce::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, co
     };
 
     if (!destination.getParentDirectory().createDirectory())
-        return juce::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
     auto fileOutput = destination.createOutputStream();
     if (fileOutput == nullptr || !fileOutput->setPosition(0) || fileOutput->truncate().failed())
-        return juce::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
-    std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat format;
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
+    std::unique_ptr<cydaw::base::OutputStream> output { std::move(fileOutput) };
+    cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(
-        output, juce::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(channels).withBitsPerSample(24));
+        output, cydaw::audio::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(channels).withBitsPerSample(24));
     if (writer == nullptr) {
         destination.deleteFile();
-        return juce::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
+        return cydaw::base::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
     }
     constexpr int blockSize = 8'192;
-    juce::AudioBuffer<float> mix(channels, blockSize);
-    juce::AudioBuffer<float> read(8, blockSize);
+    cydaw::audio::SampleBuffer<float> mix(channels, blockSize);
+    cydaw::audio::SampleBuffer<float> read(8, blockSize);
     auto written = true;
-    for (juce::int64 start = 0; start < length && written; start += blockSize) {
+    for (std::int64_t start = 0; start < length && written; start += blockSize) {
         if (cancellation != nullptr && cancellation->load(std::memory_order_acquire)) {
             written = false;
             break;
         }
-        const auto count = static_cast<int>(std::min<juce::int64>(blockSize, length - start));
+        const auto count = static_cast<int>(std::min<std::int64_t>(blockSize, length - start));
         mix.clear();
         for (const auto& span : spans) {
             if (!span.open[1] && static_cast<double>(start) >= span.to)
@@ -12133,25 +12175,25 @@ juce::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, co
     writer.reset();
     if (!written) {
         destination.deleteFile();
-        return juce::Result::fail(cancellation != nullptr && cancellation->load() ? tr("error.audioEditCancelled")
+        return cydaw::base::Result::fail(cancellation != nullptr && cancellation->load() ? tr("error.audioEditCancelled")
                                                                                    : tr("error.exportWrite"));
     }
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::commitAudioClipCompFlatten(const std::size_t index, const std::uint64_t clipId,
-                                                              const juce::File& renderedFile, const juce::String& label)
+cydaw::base::Result AudioTrackController::commitAudioClipCompFlatten(const std::size_t index, const std::uint64_t clipId,
+                                                              const cydaw::base::File& renderedFile, const cydaw::base::Text& label)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     const auto found = std::find_if(track->audioClips.begin(), track->audioClips.end(),
                                     [clipId](const auto& clip) { return clip.id == clipId; });
     if (found == track->audioClips.end())
-        return juce::Result::fail(tr("error.audioTakeClip"));
-    const std::unique_ptr<juce::AudioFormatReader> reader(formatManager_.createReaderFor(renderedFile));
+        return cydaw::base::Result::fail(tr("error.audioTakeClip"));
+    const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formatManager_.createReaderFor(renderedFile));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
-        return juce::Result::fail(tr("error.openAudio", "file", renderedFile.getFileName()));
+        return cydaw::base::Result::fail(tr("error.openAudio", "file", renderedFile.getFileName()));
     const auto newLength = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
     auto previous = track->audioClips;
     const auto clipBefore = *found;
@@ -12175,10 +12217,10 @@ juce::Result AudioTrackController::commitAudioClipCompFlatten(const std::size_t 
         return result;
     }
     recordArrangementEdit(*track, std::move(previous));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::String AudioTrackController::audioClipEditProblem(const std::size_t index, const std::uint64_t clipId,
+cydaw::base::Text AudioTrackController::audioClipEditProblem(const std::size_t index, const std::uint64_t clipId,
                                                         const AudioEditOperation operation) const
 {
     const auto* track = findTrack(index);
@@ -12199,25 +12241,25 @@ juce::String AudioTrackController::audioClipEditProblem(const std::size_t index,
     return {};
 }
 
-juce::Result AudioTrackController::commitAudioClipSourceEdit(
+cydaw::base::Result AudioTrackController::commitAudioClipSourceEdit(
     const std::size_t index,
     const std::uint64_t clipId,
-    const juce::File& renderedFile,
-    const juce::String& label,
+    const cydaw::base::File& renderedFile,
+    const cydaw::base::Text& label,
     const AudioEditOperation operation,
     const double selectionStartSeconds,
     const double selectionSeconds)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     if (const auto problem = audioClipEditProblem(index, clipId, operation); problem.isNotEmpty())
-        return juce::Result::fail(problem);
+        return cydaw::base::Result::fail(problem);
     const auto found = std::find_if(track->audioClips.begin(), track->audioClips.end(),
                                     [clipId](const auto& clip) { return clip.id == clipId; });
-    const std::unique_ptr<juce::AudioFormatReader> reader(formatManager_.createReaderFor(renderedFile));
+    const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formatManager_.createReaderFor(renderedFile));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
-        return juce::Result::fail(tr("error.openAudio", "file", renderedFile.getFileName()));
+        return cydaw::base::Result::fail(tr("error.openAudio", "file", renderedFile.getFileName()));
     const auto newLength = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
 
     auto previous = track->audioClips;
@@ -12243,8 +12285,8 @@ juce::Result AudioTrackController::commitAudioClipSourceEdit(
         break;
     }
     case AudioEditOperation::crop:
-        start = juce::jlimit(0.0, length, start - a);
-        end = juce::jlimit(0.0, length, end - a);
+        start = cydaw::base::limit(0.0, length, start - a);
+        end = cydaw::base::limit(0.0, length, end - a);
         break;
     case AudioEditOperation::insertSilence:
     case AudioEditOperation::paste: {
@@ -12260,7 +12302,7 @@ juce::Result AudioTrackController::commitAudioClipSourceEdit(
     }
     if (end - start < 0.001) {
         clip = clipBefore;
-        return juce::Result::fail("Nothing of the clip would be left");
+        return cydaw::base::Result::fail("Nothing of the clip would be left");
     }
     clip.sourceFile = renderedFile;
     if (!clip.takes.empty())
@@ -12281,7 +12323,7 @@ juce::Result AudioTrackController::commitAudioClipSourceEdit(
         return result;
     }
     recordArrangementEdit(*track, std::move(previous));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool AudioTrackController::setAudioClipVersion(const std::size_t index, const std::uint64_t clipId, const std::size_t version)
@@ -12343,7 +12385,7 @@ bool AudioTrackController::setAudioClipPitch(const std::size_t index, const std:
                                     [clipId](const auto& clip) { return clip.id == clipId; });
     if (found == track->audioClips.end())
         return false;
-    const auto pitch = juce::jlimit(-48.0, 48.0, semitones);
+    const auto pitch = cydaw::base::limit(-48.0, 48.0, semitones);
     if (std::abs(found->pitchSemitones - pitch) < 1.0e-9)
         return true;
     auto previous = track->audioClips;
@@ -12373,8 +12415,8 @@ bool AudioTrackController::setAudioClipComp(const std::size_t index, const std::
     std::sort(comp.begin(), comp.end(), [](const auto& left, const auto& right) { return left.startSeconds < right.startSeconds; });
     std::vector<CompSegment> clean;
     for (auto segment : comp) {
-        segment.startSeconds = juce::jlimit(0.0, found->durationSeconds, segment.startSeconds);
-        segment.endSeconds = juce::jlimit(segment.startSeconds, found->durationSeconds, segment.endSeconds);
+        segment.startSeconds = cydaw::base::limit(0.0, found->durationSeconds, segment.startSeconds);
+        segment.endSeconds = cydaw::base::limit(segment.startSeconds, found->durationSeconds, segment.endSeconds);
         if (segment.endSeconds - segment.startSeconds < 0.001 || segment.take >= std::max<std::size_t>(1, found->takes.size()))
             continue;
         if (!clean.empty() && segment.startSeconds < clean.back().endSeconds)
@@ -12409,22 +12451,22 @@ bool AudioTrackController::setAudioClipComp(const std::size_t index, const std::
     return true;
 }
 
-juce::Result AudioTrackController::addAudioTakes(const std::size_t index, const std::uint64_t clipId, std::vector<AudioTake> takes,
+cydaw::base::Result AudioTrackController::addAudioTakes(const std::size_t index, const std::uint64_t clipId, std::vector<AudioTake> takes,
                                                  const bool activateLast)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.recordedTakeTrack"));
+        return cydaw::base::Result::fail(tr("error.recordedTakeTrack"));
     const auto found = std::find_if(track->audioClips.begin(), track->audioClips.end(),
                                     [clipId](const auto& clip) { return clip.id == clipId; });
     if (found == track->audioClips.end())
-        return juce::Result::fail(tr("error.audioTakeClip"));
+        return cydaw::base::Result::fail(tr("error.audioTakeClip"));
     if (takes.empty())
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     for (auto& take : takes) {
-        const std::unique_ptr<juce::AudioFormatReader> reader(formatManager_.createReaderFor(take.sourceFile));
+        const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formatManager_.createReaderFor(take.sourceFile));
         if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
-            return juce::Result::fail(tr("error.openAudio", "file", take.sourceFile.getFileName()));
+            return cydaw::base::Result::fail(tr("error.openAudio", "file", take.sourceFile.getFileName()));
         take.sourceLengthSeconds = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
         if (take.name.isEmpty())
             take.name = take.sourceFile.getFileNameWithoutExtension();
@@ -12450,25 +12492,25 @@ juce::Result AudioTrackController::addAudioTakes(const std::size_t index, const 
         return result;
     }
     recordArrangementEdit(*track, std::move(previous));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::commitTrackAudioEdit(
+cydaw::base::Result AudioTrackController::commitTrackAudioEdit(
     const std::size_t index,
-    const juce::File& renderedFile)
+    const cydaw::base::File& renderedFile)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     if (!renderedFile.existsAsFile() || renderedFile == track->file)
-        return juce::Result::fail(tr("error.audioEditDestination"));
-    auto firstReader = std::unique_ptr<juce::AudioFormatReader>(
+        return cydaw::base::Result::fail(tr("error.audioEditDestination"));
+    auto firstReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(renderedFile));
-    auto secondReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto secondReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(renderedFile));
     if (firstReader == nullptr || secondReader == nullptr
         || firstReader->sampleRate <= 0.0 || firstReader->numChannels == 0)
-        return juce::Result::fail(tr("error.openAudio", "file",
+        return cydaw::base::Result::fail(tr("error.openAudio", "file",
                                      renderedFile.getFileName()));
 
     static constexpr std::size_t maximumHistorySize = 32;
@@ -12498,25 +12540,25 @@ juce::Result AudioTrackController::commitTrackAudioEdit(
                                       : rebuildLauncherPlans(*track);
 }
 
-juce::Result AudioTrackController::commitAudioClipEdit(
+cydaw::base::Result AudioTrackController::commitAudioClipEdit(
     const std::size_t index,
     const std::uint64_t clipId,
-    const juce::File& renderedFile)
+    const cydaw::base::File& renderedFile)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     const auto found = std::find_if(
         track->audioClips.begin(), track->audioClips.end(),
         [clipId](const auto& clip) { return clip.id == clipId; });
     if (found == track->audioClips.end() || !renderedFile.existsAsFile()
         || renderedFile == found->sourceFile)
-        return juce::Result::fail(tr("error.audioEditDestination"));
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        return cydaw::base::Result::fail(tr("error.audioEditDestination"));
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(renderedFile));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail(tr("error.openAudio", "file",
+        return cydaw::base::Result::fail(tr("error.openAudio", "file",
                                      renderedFile.getFileName()));
 
     const auto previous = *found;
@@ -12540,7 +12582,7 @@ juce::Result AudioTrackController::commitAudioClipEdit(
         track->clipAudioEditUndoStates.erase(
             track->clipAudioEditUndoStates.begin());
     track->clipAudioEditRedoStates.clear();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool AudioTrackController::undoTrackAudioEdit(const std::size_t index)
@@ -12567,9 +12609,9 @@ bool AudioTrackController::undoTrackAudioEdit(const std::size_t index)
     if (track == nullptr || track->audioEditUndoSources.empty())
         return false;
     const auto previous = track->audioEditUndoSources.back();
-    auto firstReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto firstReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(previous));
-    auto secondReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto secondReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(previous));
     if (firstReader == nullptr || secondReader == nullptr)
         return false;
@@ -12616,9 +12658,9 @@ bool AudioTrackController::redoTrackAudioEdit(const std::size_t index)
     if (track == nullptr || track->audioEditRedoSources.empty())
         return false;
     const auto next = track->audioEditRedoSources.back();
-    auto firstReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto firstReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(next));
-    auto secondReader = std::unique_ptr<juce::AudioFormatReader>(
+    auto secondReader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(next));
     if (firstReader == nullptr || secondReader == nullptr)
         return false;
@@ -12657,26 +12699,26 @@ bool AudioTrackController::canRedoTrackAudioEdit(const std::size_t index) const 
                || !track->audioEditRedoSources.empty());
 }
 
-juce::Result AudioTrackController::setTrackPlugin(const std::size_t index,
-                                                   const juce::File& pluginFile,
+cydaw::base::Result AudioTrackController::setTrackPlugin(const std::size_t index,
+                                                   const cydaw::base::File& pluginFile,
                                                    std::size_t* const pluginIndex)
 {
     auto* track = findTrack(index);
     if (track == nullptr)
-        return juce::Result::fail("Unknown audio track");
+        return cydaw::base::Result::fail("Unknown audio track");
     auto* device = deviceManager_.getCurrentAudioDevice();
     const auto sampleRate = device != nullptr ? device->getCurrentSampleRate() : 48'000.0;
     const auto blockSize = device != nullptr ? device->getCurrentBufferSizeSamples() : 512;
     const auto channels = track->channelCount;
     const auto result = track->gainPanSource.addPlugin(pluginFile, sampleRate,
-                                                       juce::jlimit(1, 2'048, blockSize), channels,
+                                                       cydaw::base::limit(1, 2'048, blockSize), channels,
                                                        pluginIndex);
     refreshLatencyCompensation();
     return result;
 }
 
-juce::Result AudioTrackController::reloadTrackPlugin(std::size_t index,std::size_t plugin) {
-    auto* track=findTrack(index);if(!track)return juce::Result::fail("Unknown audio track");
+cydaw::base::Result AudioTrackController::reloadTrackPlugin(std::size_t index,std::size_t plugin) {
+    auto* track=findTrack(index);if(!track)return cydaw::base::Result::fail("Unknown audio track");
     auto* device=deviceManager_.getCurrentAudioDevice();auto result=track->gainPanSource.reloadPlugin(plugin,device?device->getCurrentSampleRate():48000,device?device->getCurrentBufferSizeSamples():512,track->channelCount);
     refreshLatencyCompensation();return result;
 }
@@ -12739,7 +12781,7 @@ void AudioTrackController::pollPluginWorkers()
     // settings): the plug-ins started for the old ones start again.
     if (auto* device = deviceManager_.getCurrentAudioDevice()) {
         const auto rate = device->getCurrentSampleRate();
-        const auto block = juce::jlimit(1, 2'048, device->getCurrentBufferSizeSamples());
+        const auto block = cydaw::base::limit(1, 2'048, device->getCurrentBufferSizeSamples());
         if (rate > 0.0)
             for (auto& track : tracks_)
                 (void) track->gainPanSource.followDevice(rate, block, track->channelCount);
@@ -12749,53 +12791,53 @@ void AudioTrackController::pollPluginWorkers()
     refreshLatencyCompensation();
 }
 
-juce::Result AudioTrackController::getTrackPluginState(const std::size_t index,
+cydaw::base::Result AudioTrackController::getTrackPluginState(const std::size_t index,
                                                         const std::size_t pluginIndex,
-                                                        juce::MemoryBlock& destination)
+                                                        cydaw::base::MemoryBlock& destination)
 {
     if (auto* track = findTrack(index))
         return track->gainPanSource.getPluginState(pluginIndex, destination);
-    return juce::Result::fail("Unknown audio track");
+    return cydaw::base::Result::fail("Unknown audio track");
 }
 
-juce::Result AudioTrackController::getCachedTrackPluginState(
+cydaw::base::Result AudioTrackController::getCachedTrackPluginState(
     const std::size_t index, const std::size_t pluginIndex,
-    juce::MemoryBlock& destination) const
+    cydaw::base::MemoryBlock& destination) const
 {
     if (const auto* track = findTrack(index))
         return track->gainPanSource.getCachedPluginState(pluginIndex,
                                                          destination);
-    return juce::Result::fail("Unknown audio track");
+    return cydaw::base::Result::fail("Unknown audio track");
 }
 
-juce::Result AudioTrackController::setTrackPluginState(const std::size_t index,
+cydaw::base::Result AudioTrackController::setTrackPluginState(const std::size_t index,
                                                         const std::size_t pluginIndex,
-                                                        const juce::MemoryBlock& state)
+                                                        const cydaw::base::MemoryBlock& state)
 {
     if (auto* track = findTrack(index))
         return track->gainPanSource.setPluginState(pluginIndex, state);
-    return juce::Result::fail("Unknown audio track");
+    return cydaw::base::Result::fail("Unknown audio track");
 }
 
-juce::Result AudioTrackController::showTrackPluginEditor(const std::size_t index,
+cydaw::base::Result AudioTrackController::showTrackPluginEditor(const std::size_t index,
                                                          const std::size_t pluginIndex)
 {
     if (auto* track = findTrack(index))
         return track->gainPanSource.showPluginEditor(pluginIndex);
-    return juce::Result::fail("Unknown audio track");
+    return cydaw::base::Result::fail("Unknown audio track");
 }
 
-juce::Result AudioTrackController::refreshTrackPluginParameters(
+cydaw::base::Result AudioTrackController::refreshTrackPluginParameters(
     const std::size_t index,
     const std::size_t pluginIndex,
     std::vector<IsolatedPluginHost::ParameterSnapshot>& destination)
 {
     if (auto* track = findTrack(index))
         return track->gainPanSource.refreshPluginParameters(pluginIndex, destination);
-    return juce::Result::fail("Unknown audio track");
+    return cydaw::base::Result::fail("Unknown audio track");
 }
 
-juce::Result AudioTrackController::setTrackPluginParameter(const std::size_t index,
+cydaw::base::Result AudioTrackController::setTrackPluginParameter(const std::size_t index,
                                                             const std::size_t pluginIndex,
                                                             const std::uint32_t parameterIndex,
                                                             const float normalisedValue)
@@ -12803,27 +12845,27 @@ juce::Result AudioTrackController::setTrackPluginParameter(const std::size_t ind
     if (auto* track = findTrack(index))
         return track->gainPanSource.setPluginParameter(pluginIndex, parameterIndex,
                                                        normalisedValue);
-    return juce::Result::fail("Unknown audio track");
+    return cydaw::base::Result::fail("Unknown audio track");
 }
 
-juce::Result AudioTrackController::getTrackPluginPrograms(const std::size_t index, const std::size_t pluginIndex,
-                                                          juce::StringArray& names, int& current)
+cydaw::base::Result AudioTrackController::getTrackPluginPrograms(const std::size_t index, const std::size_t pluginIndex,
+                                                          cydaw::base::TextList& names, int& current)
 {
     names.clear();
     current = -1;
     if (auto* track = findTrack(index))
         if (auto* host = track->gainPanSource.pluginHost(pluginIndex))
             return host->getPrograms(names, current);
-    return juce::Result::fail("Unknown plugin slot");
+    return cydaw::base::Result::fail("Unknown plugin slot");
 }
 
-juce::Result AudioTrackController::setTrackPluginProgram(const std::size_t index, const std::size_t pluginIndex,
+cydaw::base::Result AudioTrackController::setTrackPluginProgram(const std::size_t index, const std::size_t pluginIndex,
                                                          const int program)
 {
     if (auto* track = findTrack(index))
         if (auto* host = track->gainPanSource.pluginHost(pluginIndex))
             return host->setProgram(program);
-    return juce::Result::fail("Unknown plugin slot");
+    return cydaw::base::Result::fail("Unknown plugin slot");
 }
 
 std::uint64_t AudioTrackController::addMidiNote(const int noteNumber,
@@ -12877,11 +12919,11 @@ std::vector<AudioTrackController::MidiNote> AudioTrackController::midiNotes() co
     return {};
 }
 
-std::uint64_t AudioTrackController::addMidiTrack(juce::String name)
+std::uint64_t AudioTrackController::addMidiTrack(cydaw::base::Text name)
 {
     const auto id = nextMidiTrackId_++;
     if (name.isEmpty())
-        name = "Instrument " + juce::String(static_cast<int>(midiTracks_.size() + 1));
+        name = "Instrument " + cydaw::base::Text(static_cast<int>(midiTracks_.size() + 1));
     auto track = std::make_unique<MidiPlaybackTrack>(
         *this, id, std::move(name), midiCollector_, midiKeyboardState_);
     track->clips.push_back({ nextMidiClipId_++, "Clip 1", 0.0, 16.0,
@@ -12969,7 +13011,7 @@ std::vector<AudioTrackController::MidiTrackInfo> AudioTrackController::midiTrack
 
 std::uint64_t AudioTrackController::addMidiClip(
     const std::uint64_t trackId,
-    juce::String name,
+    cydaw::base::Text name,
     const double startBeats,
     const double lengthBeats,
     const bool looping,
@@ -12981,7 +13023,7 @@ std::uint64_t AudioTrackController::addMidiClip(
         return 0;
     const auto id = nextMidiClipId_++;
     if (name.isEmpty())
-        name = "Clip " + juce::String(static_cast<int>(track->clips.size() + 1));
+        name = "Clip " + cydaw::base::Text(static_cast<int>(track->clips.size() + 1));
     MidiClip clip;
     clip.id = id;
     clip.name = std::move(name);
@@ -13010,7 +13052,7 @@ bool AudioTrackController::setMidiClipLauncherScene(const std::uint64_t trackId,
 }
 
 bool AudioTrackController::setMidiTrackName(const std::uint64_t trackId,
-                                            juce::String name)
+                                            cydaw::base::Text name)
 {
     auto* track = findMidiTrack(trackId);
     if (track == nullptr || name.trim().isEmpty())
@@ -13074,15 +13116,15 @@ bool AudioTrackController::setMidiClipTimelineBounds(
     auto* clip = track != nullptr ? findMidiClip(*track, clipId) : nullptr;
     if (clip == nullptr)
         return false;
-    const auto length = juce::jlimit(0.25, 86'400.0, lengthBeats);
-    const auto start = juce::jlimit(0.0, std::max(0.0, length - 0.03125),
+    const auto length = cydaw::base::limit(0.25, 86'400.0, lengthBeats);
+    const auto start = cydaw::base::limit(0.0, std::max(0.0, length - 0.03125),
                                     playStartBeats);
-    const auto end = juce::jlimit(start + 0.03125, length,
+    const auto end = cydaw::base::limit(start + 0.03125, length,
                                   playEndBeats > start ? playEndBeats
                                                        : length);
-    const auto loopStart = juce::jlimit(
+    const auto loopStart = cydaw::base::limit(
         start, std::max(start, end - 0.03125), loopStartBeats);
-    const auto loopEnd = juce::jlimit(
+    const auto loopEnd = cydaw::base::limit(
         loopStart + 0.03125, end,
         loopEndBeats > loopStart ? loopEndBeats : end);
     clip->lengthBeats = length;
@@ -13117,14 +13159,14 @@ std::uint64_t AudioTrackController::addMidiNote(
                               + std::max(0.03125, durationBeats);
     if (requestedEnd > clip->lengthBeats)
         clip->lengthBeats = std::ceil(requestedEnd / 4.0) * 4.0;
-    const auto safeStart = juce::jlimit(0.0,
+    const auto safeStart = cydaw::base::limit(0.0,
                                         std::max(0.0, clip->lengthBeats - 0.03125),
                                         std::max(0.0, startBeats));
-    clip->notes.push_back({ id, juce::jlimit(0, 127, noteNumber), safeStart,
-                            juce::jlimit(0.03125,
+    clip->notes.push_back({ id, cydaw::base::limit(0, 127, noteNumber), safeStart,
+                            cydaw::base::limit(0.03125,
                                          std::max(0.03125, clip->lengthBeats - safeStart),
                                          durationBeats),
-                            juce::jlimit(0.01f, 1.0f, velocity) });
+                            cydaw::base::limit(0.01f, 1.0f, velocity) });
     publishMidiSequence(*track);
     return id;
 }
@@ -13153,14 +13195,14 @@ bool AudioTrackController::updateMidiNote(
                               + std::max(0.03125, durationBeats);
     if (requestedEnd > clip->lengthBeats)
         clip->lengthBeats = std::ceil(requestedEnd / 4.0) * 4.0;
-    found->noteNumber = juce::jlimit(0, 127, noteNumber);
-    found->startBeats = juce::jlimit(0.0,
+    found->noteNumber = cydaw::base::limit(0, 127, noteNumber);
+    found->startBeats = cydaw::base::limit(0.0,
                                      std::max(0.0, clip->lengthBeats - 0.03125),
                                      std::max(0.0, startBeats));
-    found->durationBeats = juce::jlimit(
+    found->durationBeats = cydaw::base::limit(
         0.03125, std::max(0.03125, clip->lengthBeats - found->startBeats),
         durationBeats);
-    found->velocity = juce::jlimit(0.01f, 1.0f, velocity);
+    found->velocity = cydaw::base::limit(0.01f, 1.0f, velocity);
     publishMidiSequence(*track);
     return true;
 }
@@ -13231,9 +13273,9 @@ bool AudioTrackController::setMidiNoteCurve(const std::uint64_t trackId, const s
     // In order along the note, inside it and its range.
     const auto [low, high] = noteCurveRange(curve);
     for (auto& point : points) {
-        point.position = juce::jlimit(0.0f, 1.0f, point.position);
-        point.value = juce::jlimit(low, high, point.value);
-        point.bend = std::isfinite(point.bend) ? juce::jlimit(-1.0f, 1.0f, point.bend) : 0.0f;
+        point.position = cydaw::base::limit(0.0f, 1.0f, point.position);
+        point.value = cydaw::base::limit(low, high, point.value);
+        point.bend = std::isfinite(point.bend) ? cydaw::base::limit(-1.0f, 1.0f, point.bend) : 0.0f;
     }
     std::stable_sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.position < b.position; });
     if (points.size() > 256)
@@ -13257,7 +13299,7 @@ bool AudioTrackController::setMidiNoteChance(const std::uint64_t trackId, const 
     const auto note = std::find_if(clip->notes.begin(), clip->notes.end(), [noteId](const auto& item) { return item.id == noteId; });
     if (note == clip->notes.end())
         return false;
-    const auto value = std::isfinite(chance) ? juce::jlimit(0.0f, 1.0f, chance) : 1.0f;
+    const auto value = std::isfinite(chance) ? cydaw::base::limit(0.0f, 1.0f, chance) : 1.0f;
     if (std::abs(note->chance - value) < 1.0e-6f)
         return true;
     prepareMidiMutation(trackId, clipId);
@@ -13280,9 +13322,9 @@ bool AudioTrackController::setMidiNoteExpression(const std::uint64_t trackId, co
     // In order along the note, inside it, within what the voices take.
     const auto tidy = [](std::vector<NoteExpressionPoint>& points, const float low, const float high) {
         for (auto& point : points) {
-            point.position = juce::jlimit(0.0f, 1.0f, point.position);
-            point.value = juce::jlimit(low, high, point.value);
-            point.bend = std::isfinite(point.bend) ? juce::jlimit(-1.0f, 1.0f, point.bend) : 0.0f;
+            point.position = cydaw::base::limit(0.0f, 1.0f, point.position);
+            point.value = cydaw::base::limit(low, high, point.value);
+            point.bend = std::isfinite(point.bend) ? cydaw::base::limit(-1.0f, 1.0f, point.bend) : 0.0f;
         }
         std::stable_sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.position < b.position; });
         if (points.size() > 256)
@@ -13326,10 +13368,10 @@ bool AudioTrackController::replaceMidiNotes(
                      || usedIds.contains(note.id));
             usedIds.insert(note.id);
         }
-        note.noteNumber = juce::jlimit(0, 127, note.noteNumber);
+        note.noteNumber = cydaw::base::limit(0, 127, note.noteNumber);
         note.startBeats = std::max(0.0, note.startBeats);
         note.durationBeats = std::max(0.03125, note.durationBeats);
-        note.velocity = juce::jlimit(0.01f, 1.0f, note.velocity);
+        note.velocity = cydaw::base::limit(0.01f, 1.0f, note.velocity);
         requiredEnd = std::max(requiredEnd,
                                note.startBeats + note.durationBeats);
     }
@@ -13339,9 +13381,9 @@ bool AudioTrackController::replaceMidiNotes(
         targetLength = std::ceil(requiredEnd / 4.0) * 4.0;
     targetLength = std::max(0.25, targetLength);
     for (auto& note : notes) {
-        note.startBeats = juce::jlimit(
+        note.startBeats = cydaw::base::limit(
             0.0, std::max(0.0, targetLength - 0.03125), note.startBeats);
-        note.durationBeats = juce::jlimit(
+        note.durationBeats = cydaw::base::limit(
             0.03125,
             std::max(0.03125, targetLength - note.startBeats),
             note.durationBeats);
@@ -13358,56 +13400,32 @@ bool AudioTrackController::replaceMidiNotes(
     return true;
 }
 
-juce::Result AudioTrackController::importMidiFile(
-    const juce::File& file,
+cydaw::base::Result AudioTrackController::importMidiFile(
+    const cydaw::base::File& file,
     MidiFileImportSummary& summary,
     const bool adoptFileTempo)
 {
     summary = {};
     summary.tempoBpm = tempoBpm_;
     if (midiRecordingActive_.load(std::memory_order_acquire))
-        return juce::Result::fail(tr("error.midiImportRecording"));
+        return cydaw::base::Result::fail(tr("error.midiImportRecording"));
     if (!file.existsAsFile())
-        return juce::Result::fail(tr("error.midiImportMissing"));
-    auto input = file.createInputStream();
-    if (input == nullptr)
-        return juce::Result::fail(tr("error.midiImportRead"));
-
-    juce::MidiFile midiFile;
-    int midiFileType = -1;
-    if (!midiFile.readFrom(*input, true, &midiFileType)
-        || midiFile.getNumTracks() <= 0)
-        return juce::Result::fail(tr("error.midiImportInvalid"));
-    juce::ignoreUnused(midiFileType);
-
+        return cydaw::base::Result::fail(tr("error.midiImportMissing"));
+    cyaudio::MidiFile midiFile;
+    if (cydaw::midi::loadStandardFile(file,midiFile).failed() || midiFile.tracks.empty())
+        return cydaw::base::Result::fail(tr("error.midiImportInvalid"));
     auto importedTempo = tempoBpm_;
-    auto earliestTempoTime = std::numeric_limits<double>::max();
-    for (int trackIndex = 0; trackIndex < midiFile.getNumTracks();
-         ++trackIndex) {
-        const auto* sequence = midiFile.getTrack(trackIndex);
-        if (sequence == nullptr)
-            continue;
-        for (int eventIndex = 0; eventIndex < sequence->getNumEvents();
-             ++eventIndex) {
-            const auto* event = sequence->getEventPointer(eventIndex);
-            if (event == nullptr || !event->message.isTempoMetaEvent()
-                || event->message.getTimeStamp() >= earliestTempoTime)
-                continue;
-            const auto secondsPerQuarter =
-                event->message.getTempoSecondsPerQuarterNote();
-            if (secondsPerQuarter > 0.0
-                && std::isfinite(secondsPerQuarter)) {
-                importedTempo = juce::jlimit(
-                    20.0, 400.0, 60.0 / secondsPerQuarter);
-                earliestTempoTime = event->message.getTimeStamp();
+    auto earliestTempoTime = std::numeric_limits<std::uint64_t>::max();
+    for (const auto& events : midiFile.tracks)
+        for (const auto& event : events)
+            if (const auto bpm = cydaw::midi::tempo(event); bpm && event.tick < earliestTempoTime) {
+                importedTempo = std::clamp(*bpm,20.0,400.0); earliestTempoTime = event.tick;
             }
-        }
-    }
     summary.tempoBpm = importedTempo;
 
-    const auto timeFormat = midiFile.getTimeFormat();
+    const auto timeFormat = static_cast<std::int16_t>(midiFile.division);
     if (timeFormat == 0)
-        return juce::Result::fail(tr("error.midiImportInvalid"));
+        return cydaw::base::Result::fail(tr("error.midiImportInvalid"));
     const auto timestampToBeats = [timeFormat, importedTempo](
                                       const double timestamp) {
         if (!std::isfinite(timestamp) || timestamp <= 0.0)
@@ -13432,7 +13450,7 @@ juce::Result AudioTrackController::importMidiFile(
     struct ImportedGroup {
         int sourceTrack {};
         int channel { 1 };
-        juce::String name;
+        cydaw::base::Text name;
         std::vector<MidiNote> notes;
         double requiredEndBeats {};
     };
@@ -13443,73 +13461,56 @@ juce::Result AudioTrackController::importMidiFile(
     const auto fileBaseName = file.getFileNameWithoutExtension();
     auto totalNotes = std::size_t {};
 
-    for (int trackIndex = 0; trackIndex < midiFile.getNumTracks();
-         ++trackIndex) {
-        const auto* sequence = midiFile.getTrack(trackIndex);
-        if (sequence == nullptr)
-            continue;
-        auto sourceName = juce::String {};
-        for (int eventIndex = 0; eventIndex < sequence->getNumEvents();
-             ++eventIndex) {
-            const auto* event = sequence->getEventPointer(eventIndex);
-            if (event != nullptr && event->message.isTrackNameEvent()) {
-                sourceName = event->message.getTextFromTextMetaEvent().trim();
-                if (sourceName.isNotEmpty())
-                    break;
-            }
-        }
+    for (std::size_t trackIndex = 0; trackIndex < midiFile.tracks.size(); ++trackIndex) {
+        const auto& sequence = midiFile.tracks[trackIndex];
+        auto sourceName = cydaw::midi::trackName(sequence);
         if (sourceName.isEmpty()) {
             sourceName = fileBaseName;
-            if (midiFile.getNumTracks() > 1)
-                sourceName += " " + juce::String(trackIndex + 1);
+            if (midiFile.tracks.size() > 1)
+                sourceName += " " + cydaw::base::Text(trackIndex + 1);
         }
 
         std::array<int, 16> channelGroupIndices;
         channelGroupIndices.fill(-1);
-        for (int eventIndex = 0; eventIndex < sequence->getNumEvents();
-             ++eventIndex) {
-            const auto* event = sequence->getEventPointer(eventIndex);
-            if (event == nullptr || !event->message.isNoteOn())
-                continue;
+        for (const auto& note : cydaw::midi::pairedNotes(sequence)) {
             if (++totalNotes > maximumImportedNotes)
-                return juce::Result::fail(tr("error.midiImportTooLarge"));
-            const auto channel = juce::jlimit(
-                1, 16, event->message.getChannel());
+                return cydaw::base::Result::fail(tr("error.midiImportTooLarge"));
+            const auto channel = cydaw::base::limit(
+                1, 16, int(note.channel));
             auto& groupIndex = channelGroupIndices[
                 static_cast<std::size_t>(channel - 1)];
             if (groupIndex < 0) {
                 if (groups.size() >= maximumImportedTracks)
-                    return juce::Result::fail(
+                    return cydaw::base::Result::fail(
                         tr("error.midiImportTooLarge"));
                 groupIndex = static_cast<int>(groups.size());
                 groups.push_back(
-                    { trackIndex, channel, sourceName, {}, 0.0 });
+                    { int(trackIndex), channel, sourceName, {}, 0.0 });
             }
             auto startBeats = timestampToBeats(
-                event->message.getTimeStamp());
+                double(note.tick));
             auto endBeats = startBeats + 0.25;
-            if (event->noteOffObject != nullptr)
-                endBeats = timestampToBeats(
-                    event->noteOffObject->message.getTimeStamp());
+            if (note.end)
+                endBeats = timestampToBeats(double(*note.end));
             startBeats = std::max(0.0, startBeats);
             const auto durationBeats = std::max(
                 0.03125, endBeats - startBeats);
             if (startBeats > maximumImportedBeat
                 || durationBeats > maximumImportedBeat
                 || startBeats + durationBeats > maximumImportedBeat)
-                return juce::Result::fail(tr("error.midiImportTooLarge"));
+                return cydaw::base::Result::fail(tr("error.midiImportTooLarge"));
             auto& group = groups[static_cast<std::size_t>(groupIndex)];
             group.notes.push_back(
-                { 0, event->message.getNoteNumber(), startBeats,
-                  durationBeats, juce::jlimit(
+                { 0, int(note.key), startBeats,
+                  durationBeats, cydaw::base::limit(
                                      0.01f, 1.0f,
-                                     event->message.getFloatVelocity()) });
+                                     float(note.velocity)/127.f) });
             group.requiredEndBeats = std::max(
                 group.requiredEndBeats, startBeats + durationBeats);
         }
     }
     if (groups.empty())
-        return juce::Result::fail(tr("error.midiImportEmpty"));
+        return cydaw::base::Result::fail(tr("error.midiImportEmpty"));
 
     static constexpr std::array<std::uint32_t, 8> colours {
         0xff4fd3ae, 0xffff8a00, 0xff8e9dff, 0xffff657a,
@@ -13522,7 +13523,7 @@ juce::Result AudioTrackController::importMidiFile(
                 return candidate.sourceTrack == group.sourceTrack;
             });
         if (sameSourceCount > 1)
-            group.name += " - Ch " + juce::String(group.channel);
+            group.name += " - Ch " + cydaw::base::Text(group.channel);
         std::stable_sort(group.notes.begin(), group.notes.end(),
                          [](const auto& first, const auto& second) {
                              if (first.startBeats != second.startBeats)
@@ -13547,86 +13548,53 @@ juce::Result AudioTrackController::importMidiFile(
     }
     summary.noteCount = totalNotes;
     if (adoptFileTempo)
-        tempoBpm_ = importedTempo;
-        NativeDspRuntime::setSessionTempo(tempoBpm_);
+        setTempo(importedTempo);
     (void) setLiveMidiTrack(summary.trackIds.front());
     clearMidiEditHistory();
     publishAllMidiSequences();
     refreshTrackGains();
     refreshLatencyCompensation();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::exportMidiClipToFile(
+cydaw::base::Result AudioTrackController::exportMidiClipToFile(
     const std::uint64_t trackId,
     const std::uint64_t clipId,
-    const juce::File& file) const
+    const cydaw::base::File& file) const
 {
     const auto* track = findMidiTrack(trackId);
     const auto* clip = track != nullptr ? findMidiClip(*track, clipId)
                                         : nullptr;
     if (track == nullptr || clip == nullptr)
-        return juce::Result::fail(tr("error.midiExportNoClip"));
+        return cydaw::base::Result::fail(tr("error.midiExportNoClip"));
     if (clip->notes.empty())
-        return juce::Result::fail(tr("error.midiExportEmpty"));
-    if (file == juce::File {})
-        return juce::Result::fail(tr("error.midiExportCreate"));
+        return cydaw::base::Result::fail(tr("error.midiExportEmpty"));
+    if (file == cydaw::base::File {})
+        return cydaw::base::Result::fail(tr("error.midiExportCreate"));
 
     constexpr int ticksPerQuarterNote = 960;
-    juce::MidiMessageSequence sequence;
-    auto trackName = juce::MidiMessage::textMetaEvent(
-        3, track->name + " - " + clip->name);
-    trackName.setTimeStamp(0.0);
-    sequence.addEvent(std::move(trackName));
-    const auto microsecondsPerQuarter = static_cast<int>(std::lround(
-        60'000'000.0 / juce::jlimit(20.0, 400.0, tempoBpm_)));
-    auto tempo = juce::MidiMessage::tempoMetaEvent(
-        microsecondsPerQuarter);
-    tempo.setTimeStamp(0.0);
-    sequence.addEvent(std::move(tempo));
-    auto timeSignature = juce::MidiMessage::timeSignatureMetaEvent(timeSignatureNumerator_, timeSignatureDenominator_);
-    timeSignature.setTimeStamp(0.0);
-    sequence.addEvent(std::move(timeSignature));
-
-    auto latestEndBeats = 0.0;
-    for (const auto& note : clip->notes) {
-        const auto startBeats = std::max(0.0, note.startBeats);
-        const auto endBeats = std::max(
-            startBeats + 0.03125,
-            note.startBeats + note.durationBeats);
-        auto noteOn = juce::MidiMessage::noteOn(
-            1, juce::jlimit(0, 127, note.noteNumber),
-            juce::jlimit(0.01f, 1.0f, note.velocity));
-        noteOn.setTimeStamp(startBeats * ticksPerQuarterNote);
-        sequence.addEvent(std::move(noteOn));
-        auto noteOff = juce::MidiMessage::noteOff(
-            1, juce::jlimit(0, 127, note.noteNumber));
-        noteOff.setTimeStamp(endBeats * ticksPerQuarterNote);
-        sequence.addEvent(std::move(noteOff));
-        latestEndBeats = std::max(latestEndBeats, endBeats);
+    cyaudio::MidiFile midiFile; midiFile.format=0; midiFile.division=ticksPerQuarterNote;
+    auto& events=midiFile.tracks.emplace_back();
+    const auto addMeta=[&](std::uint64_t tick,std::uint8_t type,std::vector<std::uint8_t> data){events.push_back({tick,cyaudio::MidiFileEventKind::meta,type,std::move(data)});};
+    const auto name=(track->name+" - "+clip->name).toStdString();
+    addMeta(0,3,{name.begin(),name.end()});
+    const auto micros=static_cast<unsigned>(std::lround(60000000./std::clamp(tempoBpm_,20.,400.)));
+    addMeta(0,0x51,{std::uint8_t(micros>>16),std::uint8_t(micros>>8),std::uint8_t(micros)});
+    unsigned denominatorPower=0;while((1u<<denominatorPower)<unsigned(timeSignatureDenominator_)&&denominatorPower<7)++denominatorPower;
+    addMeta(0,0x58,{std::uint8_t(timeSignatureNumerator_),std::uint8_t(denominatorPower),24,8});
+    auto latestEndBeats=0.;
+    const auto addMessage=[&](double beat,cyaudio::ShortMidiMessage message){events.push_back({static_cast<std::uint64_t>(std::llround(beat*ticksPerQuarterNote)),cyaudio::MidiFileEventKind::message,0,{message.bytes().begin(),message.bytes().end()}});};
+    for(const auto& note:clip->notes){
+        const auto start=std::max(0.,note.startBeats);
+        const auto end=std::max(start+.03125,note.startBeats+note.durationBeats);
+        addMessage(start,cyaudio::midiNoteOn(1,std::clamp(note.noteNumber,0,127),unsigned(std::lround(std::clamp(note.velocity,.01f,1.f)*127.f))));
+        addMessage(end,cyaudio::midiNoteOff(1,std::clamp(note.noteNumber,0,127)));
+        latestEndBeats=std::max(latestEndBeats,end);
     }
-    auto endOfTrack = juce::MidiMessage::endOfTrack();
-    endOfTrack.setTimeStamp(
-        std::max(latestEndBeats, clip->lengthBeats)
-        * ticksPerQuarterNote);
-    sequence.addEvent(std::move(endOfTrack));
-    sequence.updateMatchedPairs();
-    sequence.sort();
-
-    juce::MidiFile midiFile;
-    midiFile.setTicksPerQuarterNote(ticksPerQuarterNote);
-    midiFile.addTrack(sequence);
-    auto output = file.createOutputStream();
-    if (output == nullptr || !output->setPosition(0)
-        || output->truncate().failed())
-        return juce::Result::fail(tr("error.midiExportCreate"));
-    if (!midiFile.writeTo(*output, 0)) {
-        output.reset();
-        (void) file.deleteFile();
-        return juce::Result::fail(tr("error.midiExportWrite"));
-    }
-    output->flush();
-    return juce::Result::ok();
+    addMeta(static_cast<std::uint64_t>(std::llround(std::max(latestEndBeats,clip->lengthBeats)*ticksPerQuarterNote)),0x2f,{});
+    if(cydaw::midi::saveStandardFile(file,std::move(midiFile)).failed())
+        return cydaw::base::Result::fail(tr("error.midiExportWrite"));
+    return cydaw::base::Result::ok();
 }
 
 std::vector<AudioTrackController::MidiNote> AudioTrackController::midiNotes(
@@ -13740,22 +13708,22 @@ void AudioTrackController::clearMidiEditHistory() noexcept
     midiEditBatch_.reset();
 }
 
-juce::Result AudioTrackController::startMidiRecording(
+cydaw::base::Result AudioTrackController::startMidiRecording(
     const std::uint64_t trackId,
     const std::uint64_t clipId,
     const bool overdub,
     const MidiRecordQuantization quantization)
 {
     if (midiRecordingActive_.load(std::memory_order_acquire))
-        return juce::Result::fail(tr("error.midiRecordActive"));
+        return cydaw::base::Result::fail(tr("error.midiRecordActive"));
     auto* track = findMidiTrack(trackId);
     auto* clip = track != nullptr ? findMidiClip(*track, clipId) : nullptr;
     if (track == nullptr || clip == nullptr)
-        return juce::Result::fail(tr("error.midiRecordNoClip"));
+        return cydaw::base::Result::fail(tr("error.midiRecordNoClip"));
     if (midiEditBatch_.has_value())
-        return juce::Result::fail(tr("error.midiRecordEditActive"));
+        return cydaw::base::Result::fail(tr("error.midiRecordEditActive"));
     if (!setLiveMidiTrack(trackId))
-        return juce::Result::fail(tr("error.midiRecordNoClip"));
+        return cydaw::base::Result::fail(tr("error.midiRecordNoClip"));
 
     MidiRecordingEvent stale;
     while (midiRecordingEvents_.tryPop(stale)) {}
@@ -13774,11 +13742,11 @@ juce::Result AudioTrackController::startMidiRecording(
     // The keyboard plays the track recorded while it records.
     refreshMidiInputs();
     refreshTransportRanges();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool AudioTrackController::enqueueMidiRecordingMessage(
-    const juce::MidiMessage& message,
+    const cydaw::midi::Message& message,
     const double timelineSeconds) noexcept
 {
     if (!midiRecordingActive_.load(std::memory_order_acquire)
@@ -13786,10 +13754,10 @@ bool AudioTrackController::enqueueMidiRecordingMessage(
         return false;
     const MidiRecordingEvent event {
         std::max(0.0, timelineSeconds),
-        juce::jlimit(0.01f, 1.0f, message.getFloatVelocity()),
-        static_cast<std::uint8_t>(juce::jlimit(0, 127,
+        cydaw::base::limit(0.01f, 1.0f, message.getFloatVelocity()),
+        static_cast<std::uint8_t>(cydaw::base::limit(0, 127,
                                                message.getNoteNumber())),
-        static_cast<std::uint8_t>(juce::jlimit(1, 16,
+        static_cast<std::uint8_t>(cydaw::base::limit(1, 16,
                                                message.getChannel())),
         message.isNoteOn()
     };
@@ -13813,9 +13781,9 @@ bool AudioTrackController::pollMidiRecording()
     auto changed = false;
     MidiRecordingEvent event;
     while (midiRecordingEvents_.tryPop(event)) {
-        const auto channel = juce::jlimit(1, 16,
+        const auto channel = cydaw::base::limit(1, 16,
                                           static_cast<int>(event.channel));
-        const auto noteNumber = juce::jlimit(
+        const auto noteNumber = cydaw::base::limit(
             0, 127, static_cast<int>(event.noteNumber));
         const auto activeIndex = static_cast<std::size_t>(
             (channel - 1) * 128 + noteNumber);
@@ -13879,7 +13847,7 @@ bool AudioTrackController::pollMidiRecording()
                               duration, active.velocity)
                           || changed;
             }
-            juce::ignoreUnused(channel);
+            cydaw::base::ignoreUnused(channel);
         }
     }
     return changed;
@@ -13933,8 +13901,8 @@ void AudioTrackController::setMidiTrackMixer(const std::uint64_t trackId,
                                              const bool solo)
 {
     if (auto* track = findMidiTrack(trackId)) {
-        track->gainDb = juce::jlimit(-60.0f, 12.0f, gainDb);
-        track->pan = juce::jlimit(-1.0f, 1.0f, pan);
+        track->gainDb = cydaw::base::limit(-60.0f, 12.0f, gainDb);
+        track->pan = cydaw::base::limit(-1.0f, 1.0f, pan);
         track->muted = muted;
         track->solo = solo;
         track->gainPanSource.setPan(track->pan);
@@ -13953,8 +13921,8 @@ std::uint64_t AudioTrackController::addMidiAutomationPoint(
     const auto duration = std::max(
         0.001, std::max(track->synth.length(), length()));
     track->automation.push_back(
-        { id, juce::jlimit(0.0, duration, timeSeconds),
-          juce::jlimit(-60.0f, 12.0f, valueDb) });
+        { id, cydaw::base::limit(0.0, duration, timeSeconds),
+          cydaw::base::limit(-60.0f, 12.0f, valueDb) });
     publishMidiTrackAutomation(*track);
     return id;
 }
@@ -13973,8 +13941,8 @@ bool AudioTrackController::updateMidiAutomationPoint(
         return false;
     const auto duration = std::max(
         0.001, std::max(track->synth.length(), length()));
-    found->timeSeconds = juce::jlimit(0.0, duration, timeSeconds);
-    found->valueDb = juce::jlimit(-60.0f, 12.0f, valueDb);
+    found->timeSeconds = cydaw::base::limit(0.0, duration, timeSeconds);
+    found->valueDb = cydaw::base::limit(-60.0f, 12.0f, valueDb);
     publishMidiTrackAutomation(*track);
     return true;
 }
@@ -13992,7 +13960,7 @@ bool AudioTrackController::setMidiAutomationPointCurve(
     if (found == track->automation.end())
         return false;
     found->curve = curve;
-    found->curveAmount = juce::jlimit(-1.0f, 1.0f, curveAmount);
+    found->curveAmount = cydaw::base::limit(-1.0f, 1.0f, curveAmount);
     publishMidiTrackAutomation(*track);
     return true;
 }
@@ -14035,9 +14003,9 @@ void tidyLane(std::vector<Point>& points, std::uint64_t& nextId, const double le
             point.id = nextId++;
         seen.insert(point.id);
         nextId = std::max(nextId, point.id + 1);
-        point.timeSeconds = juce::jlimit(0.0, std::max(0.001, length), point.timeSeconds);
+        point.timeSeconds = cydaw::base::limit(0.0, std::max(0.001, length), point.timeSeconds);
         value(point);
-        point.curveAmount = juce::jlimit(-1.0f, 1.0f, point.curveAmount);
+        point.curveAmount = cydaw::base::limit(-1.0f, 1.0f, point.curveAmount);
     }
     std::stable_sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.timeSeconds < b.timeSeconds; });
 }
@@ -14050,7 +14018,7 @@ void AudioTrackController::replaceMidiAutomationPoints(const std::uint64_t track
     if (track == nullptr)
         return;
     tidyLane(points, track->nextAutomationId, std::max(track->synth.length(), length()),
-             [](AutomationPoint& point) { point.valueDb = juce::jlimit(-60.0f, 12.0f, point.valueDb); });
+             [](AutomationPoint& point) { point.valueDb = cydaw::base::limit(-60.0f, 12.0f, point.valueDb); });
     track->automation = std::move(points);
     publishMidiTrackAutomation(*track);
 }
@@ -14067,8 +14035,8 @@ std::uint64_t AudioTrackController::addMidiClipAutomationPoint(
         0.001, clip->lengthBeats * 60.0 / std::max(20.0, tempoBpm_));
     const auto id = nextClipAutomationPointId_++;
     clip->automation.push_back(
-        { id, juce::jlimit(0.0, duration, timeSeconds),
-          juce::jlimit(-60.0f, 12.0f, valueDb) });
+        { id, cydaw::base::limit(0.0, duration, timeSeconds),
+          cydaw::base::limit(-60.0f, 12.0f, valueDb) });
     std::sort(clip->automation.begin(), clip->automation.end(),
               [](const auto& left, const auto& right) {
                   return left.timeSeconds < right.timeSeconds;
@@ -14094,8 +14062,8 @@ bool AudioTrackController::updateMidiClipAutomationPoint(
         return false;
     const auto duration = std::max(
         0.001, clip->lengthBeats * 60.0 / std::max(20.0, tempoBpm_));
-    found->timeSeconds = juce::jlimit(0.0, duration, timeSeconds);
-    found->valueDb = juce::jlimit(-60.0f, 12.0f, valueDb);
+    found->timeSeconds = cydaw::base::limit(0.0, duration, timeSeconds);
+    found->valueDb = cydaw::base::limit(-60.0f, 12.0f, valueDb);
     std::sort(clip->automation.begin(), clip->automation.end(),
               [](const auto& left, const auto& right) {
                   return left.timeSeconds < right.timeSeconds;
@@ -14121,7 +14089,7 @@ bool AudioTrackController::setMidiClipAutomationPointCurve(
     if (found == clip->automation.end())
         return false;
     found->curve = curve;
-    found->curveAmount = juce::jlimit(-1.0f, 1.0f, curveAmount);
+    found->curveAmount = cydaw::base::limit(-1.0f, 1.0f, curveAmount);
     if (track->activeEditorClipId.load(std::memory_order_acquire)
         == clipId)
         publishMidiClipAutomation(*track, *clip);
@@ -14183,35 +14151,35 @@ bool AudioTrackController::setMidiTrackArmed(
     return true;
 }
 
-juce::Result AudioTrackController::setMidiTrackInstrumentGraph(
+cydaw::base::Result AudioTrackController::setMidiTrackInstrumentGraph(
     const std::uint64_t trackId,
     const cydaw::engine::PolySynthGraphPlan& graph)
 {
     auto* track = findMidiTrack(trackId);
     if (track == nullptr)
-        return juce::Result::fail("MIDI instrument track not found.");
+        return cydaw::base::Result::fail("MIDI instrument track not found.");
     track->synth.setInstrumentGraph(graph);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::setMidiTrackEffectGraph(
+cydaw::base::Result AudioTrackController::setMidiTrackEffectGraph(
     const std::uint64_t trackId, const cydaw::engine::NativeDspGraph& graph)
 {
     auto* track = findMidiTrack(trackId);
     if (track == nullptr)
-        return juce::Result::fail("MIDI instrument track not found.");
+        return cydaw::base::Result::fail("MIDI instrument track not found.");
     const auto result = track->synth.setEffectGraph(graph);
     if (result.wasOk())
         track->effectGraph = graph;
     return result;
 }
 
-juce::Result AudioTrackController::updateMidiTrackEffectParameters(
+cydaw::base::Result AudioTrackController::updateMidiTrackEffectParameters(
     const std::uint64_t trackId, const cydaw::engine::NativeDspGraph& graph)
 {
     auto* track = findMidiTrack(trackId);
     if (track == nullptr)
-        return juce::Result::fail("MIDI instrument track not found.");
+        return cydaw::base::Result::fail("MIDI instrument track not found.");
     const auto result = track->synth.updateEffectParameters(graph);
     if (result.wasOk())
         track->effectGraph = graph;
@@ -14226,29 +14194,29 @@ AudioTrackController::midiTrackControlValues(const std::uint64_t trackId) const
     return {};
 }
 
-juce::Result AudioTrackController::setMidiTrackRackPad(const std::uint64_t trackId, const std::size_t pad,
+cydaw::base::Result AudioTrackController::setMidiTrackRackPad(const std::uint64_t trackId, const std::size_t pad,
                                                       const cydaw::engine::PolySynthGraphPlan& plan,
                                                       const cydaw::engine::NativeDspGraph& effects)
 {
     auto* track = findMidiTrack(trackId);
     if (track == nullptr)
-        return juce::Result::fail("MIDI instrument track not found.");
+        return cydaw::base::Result::fail("MIDI instrument track not found.");
     auto* slot = track->synth.padAt(pad);
     if (slot == nullptr)
-        return juce::Result::fail("No such pad.");
+        return cydaw::base::Result::fail("No such pad.");
     auto voices = plan;
     voices.voiceCount = 12;
-    voices.oscillatorLevel = juce::jlimit(0.0f, cydaw::engine::playsRecordingLevel(voices.waveform) ? 1.0f : 0.5f, voices.oscillatorLevel);
-    voices.attackSeconds = juce::jlimit(0.0001f, 5.0f, voices.attackSeconds);
-    voices.decaySeconds = juce::jlimit(0.0001f, 5.0f, voices.decaySeconds);
-    voices.sustainLevel = juce::jlimit(0.0f, 1.0f, voices.sustainLevel);
-    voices.releaseSeconds = juce::jlimit(0.0001f, 10.0f, voices.releaseSeconds);
-    voices.filterCutoffHz = juce::jlimit(20.0f, 20'000.0f, voices.filterCutoffHz);
+    voices.oscillatorLevel = cydaw::base::limit(0.0f, cydaw::engine::playsRecordingLevel(voices.waveform) ? 1.0f : 0.5f, voices.oscillatorLevel);
+    voices.attackSeconds = cydaw::base::limit(0.0001f, 5.0f, voices.attackSeconds);
+    voices.decaySeconds = cydaw::base::limit(0.0001f, 5.0f, voices.decaySeconds);
+    voices.sustainLevel = cydaw::base::limit(0.0f, 1.0f, voices.sustainLevel);
+    voices.releaseSeconds = cydaw::base::limit(0.0001f, 10.0f, voices.releaseSeconds);
+    voices.filterCutoffHz = cydaw::base::limit(20.0f, 20'000.0f, voices.filterCutoffHz);
     // A pad's notes reach it already through the track's MIDI effects.
     voices.midiEffects.reset();
     slot->plan.store(std::make_shared<const cydaw::engine::PolySynthGraphPlan>(voices));
     if (slot->effects.updateParameters(effects).wasOk())
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     slot->effects.prepare(track->synth.sampleRateHz.load(std::memory_order_acquire), track->synth.blockSize.load(std::memory_order_acquire), 2);
     return slot->effects.setGraph(effects);
 }
@@ -14263,15 +14231,15 @@ void AudioTrackController::setMidiTrackRackPadMix(const std::uint64_t trackId, c
     if (slot == nullptr)
         return;
     slot->playAs.store(mix.playAs, std::memory_order_relaxed);
-    slot->gain.store(juce::Decibels::decibelsToGain(mix.gainDb, -96.0f), std::memory_order_relaxed);
-    slot->pan.store(juce::jlimit(-1.0f, 1.0f, mix.pan), std::memory_order_relaxed);
+    slot->gain.store(cydaw::audio::Decibels::decibelsToGain(mix.gainDb, -96.0f), std::memory_order_relaxed);
+    slot->pan.store(cydaw::base::limit(-1.0f, 1.0f, mix.pan), std::memory_order_relaxed);
     slot->muted.store(mix.muted, std::memory_order_relaxed);
     slot->solo.store(mix.solo, std::memory_order_relaxed);
     slot->choke.store(mix.choke, std::memory_order_relaxed);
-    slot->keyLow.store(juce::jlimit(0, 127, mix.keyLow), std::memory_order_relaxed);
-    slot->keyHigh.store(juce::jlimit(0, 127, mix.keyHigh), std::memory_order_relaxed);
-    slot->velocityLow.store(juce::jlimit(1, 127, mix.velocityLow), std::memory_order_relaxed);
-    slot->velocityHigh.store(juce::jlimit(1, 127, mix.velocityHigh), std::memory_order_relaxed);
+    slot->keyLow.store(cydaw::base::limit(0, 127, mix.keyLow), std::memory_order_relaxed);
+    slot->keyHigh.store(cydaw::base::limit(0, 127, mix.keyHigh), std::memory_order_relaxed);
+    slot->velocityLow.store(cydaw::base::limit(1, 127, mix.velocityLow), std::memory_order_relaxed);
+    slot->velocityHigh.store(cydaw::base::limit(1, 127, mix.velocityHigh), std::memory_order_relaxed);
     slot->note.store(mix.note >= 0 && mix.note < 128 ? mix.note : -1, std::memory_order_release);
 }
 
@@ -14389,17 +14357,17 @@ bool AudioTrackController::startMidiClipPreview(
 
     setArrangementPlaybackEnabled(false);
     const auto secondsPerBeat = 60.0 / std::max(20.0, tempoBpm_);
-    const auto playStart = juce::jlimit(
+    const auto playStart = cydaw::base::limit(
         0.0, std::max(0.0, clip->lengthBeats - 0.03125),
         clip->playStartBeats);
-    const auto playEnd = juce::jlimit(
+    const auto playEnd = cydaw::base::limit(
         playStart + 0.03125, clip->lengthBeats,
         clip->playEndBeats > playStart ? clip->playEndBeats
                                        : clip->lengthBeats);
-    const auto loopStart = juce::jlimit(
+    const auto loopStart = cydaw::base::limit(
         playStart, std::max(playStart, playEnd - 0.03125),
         clip->loopStartBeats);
-    const auto loopEnd = juce::jlimit(
+    const auto loopEnd = cydaw::base::limit(
         loopStart + 0.03125, playEnd,
         clip->loopEndBeats > loopStart ? clip->loopEndBeats : playEnd);
     track->synth.setPlaying(false);
@@ -14448,24 +14416,24 @@ bool AudioTrackController::startMidiClipEditorPreview(
         return false;
 
     const auto secondsPerBeat = 60.0 / std::max(20.0, tempoBpm_);
-    const auto playStart = juce::jlimit(
+    const auto playStart = cydaw::base::limit(
         0.0, std::max(0.0, clip->lengthBeats - 0.03125),
         clip->playStartBeats);
-    const auto playEnd = juce::jlimit(
+    const auto playEnd = cydaw::base::limit(
         playStart + 0.03125, clip->lengthBeats,
         clip->playEndBeats > playStart ? clip->playEndBeats
                                        : clip->lengthBeats);
-    const auto loopStart = juce::jlimit(
+    const auto loopStart = cydaw::base::limit(
         playStart, std::max(playStart, playEnd - 0.03125),
         clip->loopStartBeats);
-    const auto loopEnd = juce::jlimit(
+    const auto loopEnd = cydaw::base::limit(
         loopStart + 0.03125, playEnd,
         clip->loopEndBeats > loopStart ? clip->loopEndBeats : playEnd);
     const auto playStartSeconds = playStart * secondsPerBeat;
     const auto playEndSeconds = playEnd * secondsPerBeat;
     const auto loopStartSeconds = loopStart * secondsPerBeat;
     const auto loopEndSeconds = loopEnd * secondsPerBeat;
-    auto position = juce::jlimit(playStartSeconds, playEndSeconds,
+    auto position = cydaw::base::limit(playStartSeconds, playEndSeconds,
                                  std::max(0.0, localStartSeconds));
     if (clip->looping && position >= loopEndSeconds)
         position = loopStartSeconds;
@@ -14501,7 +14469,7 @@ bool AudioTrackController::seekMidiClipEditorPreview(
     const auto endBeat = clip->playEndBeats > clip->playStartBeats
                              ? clip->playEndBeats : clip->lengthBeats;
     const auto end = endBeat * secondsPerBeat;
-    track->synth.setPosition(juce::jlimit(start, end,
+    track->synth.setPosition(cydaw::base::limit(start, end,
                                           std::max(0.0, localSeconds)));
     return true;
 }
@@ -14574,20 +14542,20 @@ float AudioTrackController::midiLauncherClipProgress(
         std::memory_order_acquire);
     const auto end = track->launcherEndSeconds.load(
         std::memory_order_acquire);
-    return juce::jlimit(
+    return cydaw::base::limit(
         0.0f, 1.0f,
         static_cast<float>((track->synth.position() - start)
                            / std::max(0.000001, end - start)));
 }
 
-juce::Result AudioTrackController::selfTestMidiLauncherClip()
+cydaw::base::Result AudioTrackController::selfTestMidiLauncherClip()
 {
     AudioTrackController controller;
     controller.clearMidiTracks();
     const auto trackId = controller.addMidiTrack("Launcher MIDI");
     auto tracks = controller.midiTracks();
     if (tracks.empty())
-        return juce::Result::fail("Cannot create a MIDI launcher track");
+        return cydaw::base::Result::fail("Cannot create a MIDI launcher track");
     for (const auto& clip : tracks.front().clips)
         (void) controller.removeMidiClip(trackId, clip.id);
 
@@ -14600,11 +14568,11 @@ juce::Result AudioTrackController::selfTestMidiLauncherClip()
                                   0.8f) == 0
         || controller.addMidiNote(trackId, laterClipId, 67, 0.0, 1.0,
                                   0.8f) == 0)
-        return juce::Result::fail("Cannot populate MIDI launcher clips");
+        return cydaw::base::Result::fail("Cannot populate MIDI launcher clips");
 
     auto* track = controller.findMidiTrack(trackId);
     if (track == nullptr)
-        return juce::Result::fail("MIDI launcher track disappeared");
+        return cydaw::base::Result::fail("MIDI launcher track disappeared");
     auto graph = track->synth.instrumentPlan();
     graph.enabled = true;
     graph.attackSeconds = 0.0001f;
@@ -14617,17 +14585,17 @@ juce::Result AudioTrackController::selfTestMidiLauncherClip()
 
     if (!controller.startMidiClipPreview(trackId, clipId, 3)) {
         track->synth.releaseResources();
-        return juce::Result::fail("MIDI launcher clip did not start");
+        return cydaw::base::Result::fail("MIDI launcher clip did not start");
     }
     const auto expectedDuration = 4.0 * 60.0 / controller.tempo();
     if (std::abs(track->synth.length() - expectedDuration) > 0.000001
         || track->synth.position() > 0.000001) {
         track->synth.releaseResources();
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "MIDI launcher preview did not use clip-local time");
     }
 
-    juce::AudioBuffer<float> rendered(2, 2'048);
+    cydaw::audio::SampleBuffer<float> rendered(2, 2'048);
     rendered.clear();
     track->synth.getNextAudioBlock(
         { &rendered, 0, rendered.getNumSamples() });
@@ -14645,7 +14613,7 @@ juce::Result AudioTrackController::selfTestMidiLauncherClip()
         || !controller.startMidiClipEditorPreview(
                trackId, clipId, 0.75)) {
         track->synth.releaseResources();
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "MIDI clip editor preview did not start");
     }
     const auto editorStartedLocally
@@ -14668,14 +14636,14 @@ juce::Result AudioTrackController::selfTestMidiLauncherClip()
     if (audible <= 0.001f || progressed <= 0.0f
         || !editorStartedLocally || !editorSequenceUsesClipTimeline
         || !editorSeeked || !editorProgressed || !arrangementRestored)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             "MIDI launcher/editor playback was silent, unsynchronised, or did not restore arrangement");
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 void AudioTrackController::setTimeSignature(const int numerator, const int denominator) noexcept
 {
-    timeSignatureNumerator_ = juce::jlimit(1, 32, numerator);
+    timeSignatureNumerator_ = cydaw::base::limit(1, 32, numerator);
     timeSignatureDenominator_ = denominator == 1 || denominator == 2 || denominator == 8 || denominator == 16
                                         || denominator == 32
                                     ? denominator
@@ -14686,10 +14654,11 @@ void AudioTrackController::setTimeSignature(const int numerator, const int denom
 void AudioTrackController::setTempo(const double beatsPerMinute)
 {
     const auto before = tempoBpm_;
-    tempoBpm_ = juce::jlimit(20.0, 400.0, beatsPerMinute);
+    tempoBpm_ = cydaw::base::limit(20.0, 400.0, beatsPerMinute);
     NativeDspRuntime::setSessionTempo(tempoBpm_);
+    masterOutput_.setTempo(tempoBpm_);
     // A loop auditioned at the tempo follows it.
-    if (tempoPreview_.file != juce::File() && before != tempoBpm_)
+    if (tempoPreview_.file != cydaw::base::File() && before != tempoBpm_)
         (void) startTempoPreview(tempoPreview_.file, samplePreviewPositionSeconds(), tempoPreview_.tempo);
     publishAllMidiSequences();
     if (simulation_ != nullptr && !simulationPattern_.empty())
@@ -14714,8 +14683,8 @@ std::uint64_t AudioTrackController::addAutomationPoint(const std::size_t trackIn
         return 0;
     const auto id = track->nextAutomationId++;
     track->automation.push_back({ id,
-                                  juce::jlimit(0.0, track->clipSource->arrangementLengthSeconds(), timeSeconds),
-                                  juce::jlimit(-60.0f, 12.0f, valueDb) });
+                                  cydaw::base::limit(0.0, track->clipSource->arrangementLengthSeconds(), timeSeconds),
+                                  cydaw::base::limit(-60.0f, 12.0f, valueDb) });
     publishTrackAutomation(*track);
     return id;
 }
@@ -14733,8 +14702,8 @@ bool AudioTrackController::updateAutomationPoint(const std::size_t trackIndex,
     });
     if (found == track->automation.end())
         return false;
-    found->timeSeconds = juce::jlimit(0.0, track->clipSource->arrangementLengthSeconds(), timeSeconds);
-    found->valueDb = juce::jlimit(-60.0f, 12.0f, valueDb);
+    found->timeSeconds = cydaw::base::limit(0.0, track->clipSource->arrangementLengthSeconds(), timeSeconds);
+    found->valueDb = cydaw::base::limit(-60.0f, 12.0f, valueDb);
     publishTrackAutomation(*track);
     return true;
 }
@@ -14752,7 +14721,7 @@ bool AudioTrackController::setAutomationPointCurve(
     if (found == track->automation.end())
         return false;
     found->curve = curve;
-    found->curveAmount = juce::jlimit(-1.0f, 1.0f, curveAmount);
+    found->curveAmount = cydaw::base::limit(-1.0f, 1.0f, curveAmount);
     publishTrackAutomation(*track);
     return true;
 }
@@ -14804,13 +14773,13 @@ void AudioTrackController::replaceAutomationPoints(const std::size_t trackIndex,
     if (track == nullptr)
         return;
     tidyLane(points, track->nextAutomationId, track->clipSource->arrangementLengthSeconds(),
-             [](AutomationPoint& point) { point.valueDb = juce::jlimit(-60.0f, 12.0f, point.valueDb); });
+             [](AutomationPoint& point) { point.valueDb = cydaw::base::limit(-60.0f, 12.0f, point.valueDb); });
     track->automation = std::move(points);
     publishTrackAutomation(*track);
 }
 
 void AudioTrackController::replacePluginAutomationPoints(const std::size_t trackIndex, const std::size_t pluginIndex,
-                                                         const std::uint32_t parameterIndex, juce::String parameterName,
+                                                         const std::uint32_t parameterIndex, cydaw::base::Text parameterName,
                                                          std::vector<PluginAutomationPoint> points)
 {
     auto* track = findTrack(trackIndex);
@@ -14833,7 +14802,7 @@ void AudioTrackController::replacePluginAutomationPoints(const std::size_t track
         lane->parameterName = std::move(parameterName);
     }
     tidyLane(points, track->nextPluginAutomationId, track->clipSource->arrangementLengthSeconds(),
-             [](PluginAutomationPoint& point) { point.normalisedValue = juce::jlimit(0.0f, 1.0f, point.normalisedValue); });
+             [](PluginAutomationPoint& point) { point.normalisedValue = cydaw::base::limit(0.0f, 1.0f, point.normalisedValue); });
     lane->points = std::move(points);
     publishTrackPluginAutomation(*track);
 }
@@ -14842,7 +14811,7 @@ std::uint64_t AudioTrackController::addPluginAutomationPoint(
     const std::size_t trackIndex,
     const std::size_t pluginIndex,
     const std::uint32_t parameterIndex,
-    juce::String parameterName,
+    cydaw::base::Text parameterName,
     const double timeSeconds,
     const float normalisedValue)
 {
@@ -14866,9 +14835,9 @@ std::uint64_t AudioTrackController::addPluginAutomationPoint(
 
     const auto id = track->nextPluginAutomationId++;
     lane->points.push_back({ id,
-                             juce::jlimit(0.0, track->clipSource->arrangementLengthSeconds(),
+                             cydaw::base::limit(0.0, track->clipSource->arrangementLengthSeconds(),
                                           timeSeconds),
-                             juce::jlimit(0.0f, 1.0f, normalisedValue) });
+                             cydaw::base::limit(0.0f, 1.0f, normalisedValue) });
     publishTrackPluginAutomation(*track);
     return id;
 }
@@ -14897,9 +14866,9 @@ bool AudioTrackController::updatePluginAutomationPoint(
     });
     if (point == lane->points.end())
         return false;
-    point->timeSeconds = juce::jlimit(0.0, track->clipSource->arrangementLengthSeconds(),
+    point->timeSeconds = cydaw::base::limit(0.0, track->clipSource->arrangementLengthSeconds(),
                                       timeSeconds);
-    point->normalisedValue = juce::jlimit(0.0f, 1.0f, normalisedValue);
+    point->normalisedValue = cydaw::base::limit(0.0f, 1.0f, normalisedValue);
     publishTrackPluginAutomation(*track);
     return true;
 }
@@ -14926,7 +14895,7 @@ bool AudioTrackController::setPluginAutomationPointCurve(
     if (point == lane->points.end())
         return false;
     point->curve = curve;
-    point->curveAmount = juce::jlimit(-1.0f, 1.0f, curveAmount);
+    point->curveAmount = cydaw::base::limit(-1.0f, 1.0f, curveAmount);
     publishTrackPluginAutomation(*track);
     return true;
 }
@@ -14998,12 +14967,12 @@ AudioTrackController::pluginAutomationLanes(const std::size_t trackIndex) const
 
 bool AudioTrackController::setLauncherClip(const std::size_t trackIndex,
                                            const int sceneIndex,
-                                           juce::String name,
+                                           cydaw::base::Text name,
                                            const double sourceOffsetSeconds,
                                            const double durationSeconds,
                                            const bool looping,
                                            const std::uint32_t colour,
-                                           const juce::File& sourceFile)
+                                           const cydaw::base::File& sourceFile)
 {
     auto* track = findTrack(trackIndex);
     if (track == nullptr || sceneIndex < 0 || sceneIndex >= maximumLauncherScenes)
@@ -15011,7 +14980,7 @@ bool AudioTrackController::setLauncherClip(const std::size_t trackIndex,
     const auto resolvedSource = sourceFile.existsAsFile()
                                     ? sourceFile
                                     : track->file;
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(resolvedSource));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
@@ -15019,10 +14988,10 @@ bool AudioTrackController::setLauncherClip(const std::size_t trackIndex,
     const auto sourceLength = static_cast<double>(reader->lengthInSamples)
                               / reader->sampleRate;
     const auto minimumDuration = 1.0 / reader->sampleRate;
-    const auto offset = juce::jlimit(
+    const auto offset = cydaw::base::limit(
         0.0, std::max(0.0, sourceLength - minimumDuration),
         sourceOffsetSeconds);
-    const auto duration = juce::jlimit(
+    const auto duration = cydaw::base::limit(
         minimumDuration,
         std::max(minimumDuration, sourceLength - offset), durationSeconds);
     auto clip = std::find_if(track->launcherClips.begin(), track->launcherClips.end(),
@@ -15041,7 +15010,7 @@ bool AudioTrackController::setLauncherClip(const std::size_t trackIndex,
         value.sceneIndex = sceneIndex;
         value.name = name.isNotEmpty()
                          ? std::move(name)
-                         : "Scene " + juce::String(sceneIndex + 1);
+                         : "Scene " + cydaw::base::Text(sceneIndex + 1);
         value.sourceFile = resolvedSource;
         value.sourceOffsetSeconds = offset;
         value.durationSeconds = duration;
@@ -15071,7 +15040,7 @@ bool AudioTrackController::setLauncherClip(const std::size_t trackIndex,
 }
 
 bool AudioTrackController::createEmptyLauncherClip(
-    const std::size_t trackIndex, const int sceneIndex, juce::String name,
+    const std::size_t trackIndex, const int sceneIndex, cydaw::base::Text name,
     const double durationSeconds, const std::uint32_t colour)
 {
     auto* track = findTrack(trackIndex);
@@ -15089,8 +15058,8 @@ bool AudioTrackController::createEmptyLauncherClip(
     LauncherClip value;
     value.sceneIndex = sceneIndex;
     value.name = name.isNotEmpty() ? std::move(name)
-                                   : "Clip " + juce::String(sceneIndex + 1);
-    value.durationSeconds = juce::jlimit(0.001, 86'400.0,
+                                   : "Clip " + cydaw::base::Text(sceneIndex + 1);
+    value.durationSeconds = cydaw::base::limit(0.001, 86'400.0,
                                          durationSeconds);
     value.playEndSeconds = value.durationSeconds;
     value.loopEndSeconds = value.durationSeconds;
@@ -15161,26 +15130,26 @@ bool AudioTrackController::setLauncherClipTimelineBounds(
     return true;
 }
 
-juce::Result AudioTrackController::addLauncherClipEventFromFile(
+cydaw::base::Result AudioTrackController::addLauncherClipEventFromFile(
     const std::size_t trackIndex, const int sceneIndex,
-    const juce::File& sourceFile, const double localStartSeconds,
+    const cydaw::base::File& sourceFile, const double localStartSeconds,
     std::uint64_t* const newEventId)
 {
     auto* track = findTrack(trackIndex);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     auto clip = std::find_if(track->launcherClips.begin(),
                              track->launcherClips.end(),
                              [sceneIndex](const auto& value) {
                                  return value.sceneIndex == sceneIndex;
                              });
     if (clip == track->launcherClips.end())
-        return juce::Result::fail("Launcher clip not found");
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        return cydaw::base::Result::fail("Launcher clip not found");
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(sourceFile));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             tr("error.openAudio", "file", sourceFile.getFileName()));
     const auto sourceLength = static_cast<double>(reader->lengthInSamples)
                               / reader->sampleRate;
@@ -15209,29 +15178,29 @@ juce::Result AudioTrackController::addLauncherClipEventFromFile(
     }
     if (newEventId != nullptr)
         *newEventId = eventId;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::replaceLauncherClipEvents(
+cydaw::base::Result AudioTrackController::replaceLauncherClipEvents(
     const std::size_t trackIndex, const int sceneIndex,
     std::vector<AudioEvent> events)
 {
     auto* track = findTrack(trackIndex);
     if (track == nullptr)
-        return juce::Result::fail(tr("error.exportNoTrack"));
+        return cydaw::base::Result::fail(tr("error.exportNoTrack"));
     auto clip = std::find_if(track->launcherClips.begin(),
                              track->launcherClips.end(),
                              [sceneIndex](const auto& value) {
                                  return value.sceneIndex == sceneIndex;
                              });
     if (clip == track->launcherClips.end())
-        return juce::Result::fail("Launcher clip not found");
+        return cydaw::base::Result::fail("Launcher clip not found");
     for (auto& event : events) {
-        auto reader = std::unique_ptr<juce::AudioFormatReader>(
+        auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
             formatManager_.createReaderFor(event.sourceFile));
         if (reader == nullptr || reader->sampleRate <= 0.0
             || reader->lengthInSamples <= 0)
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 tr("error.openAudio", "file",
                    event.sourceFile.getFileName()));
         event.sourceLengthSeconds
@@ -15258,7 +15227,7 @@ juce::Result AudioTrackController::replaceLauncherClipEvents(
         (void) rebuildLauncherPlans(*track);
         return result;
     }
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool AudioTrackController::updateLauncherClipEvent(
@@ -15298,15 +15267,15 @@ bool AudioTrackController::updateLauncherClipEvent(
         return false;
     event->startSeconds = std::max(0.0, localStartSeconds);
     event->sourceOffsetSeconds = std::max(0.0, sourceOffsetSeconds);
-    event->durationSeconds = juce::jlimit(0.001, 86'400.0,
+    event->durationSeconds = cydaw::base::limit(0.001, 86'400.0,
                                          durationSeconds);
-    event->sourceDurationSeconds = juce::jlimit(
+    event->sourceDurationSeconds = cydaw::base::limit(
         0.001, 86'400.0, sourceDurationSeconds);
     if (fadeInSeconds >= 0.0)
-        event->fadeInSeconds = juce::jlimit(
+        event->fadeInSeconds = cydaw::base::limit(
             0.0, event->durationSeconds, fadeInSeconds);
     if (fadeOutSeconds >= 0.0)
-        event->fadeOutSeconds = juce::jlimit(
+        event->fadeOutSeconds = cydaw::base::limit(
             0.0, event->durationSeconds, fadeOutSeconds);
     std::erase_if(event->stretchMarkers, [event](const auto& marker) {
         return marker.sourceSeconds <= event->sourceOffsetSeconds + 0.0005
@@ -15361,8 +15330,8 @@ bool AudioTrackController::setLauncherClipEventProperties(
     }
     if (event == clip->events.end())
         return false;
-    event->gainDb = juce::jlimit(-60.0f, 24.0f, gainDb);
-    event->sourceTempoBpm = juce::jlimit(0.0, 400.0, sourceTempoBpm);
+    event->gainDb = cydaw::base::limit(-60.0f, 24.0f, gainDb);
+    event->sourceTempoBpm = cydaw::base::limit(0.0, 400.0, sourceTempoBpm);
     event->stretchMode = mode;
     if (mode == StretchMode::raw) {
         // Never stretched: as long as its part of the file, no stretch
@@ -15397,8 +15366,8 @@ std::uint64_t AudioTrackController::addLauncherClipAutomationPoint(
     const auto previous = track->launcherClips;
     const auto id = nextClipAutomationPointId_++;
     clip->automation.push_back(
-        { id, juce::jlimit(0.0, clip->durationSeconds, timeSeconds),
-          juce::jlimit(-60.0f, 12.0f, valueDb) });
+        { id, cydaw::base::limit(0.0, clip->durationSeconds, timeSeconds),
+          cydaw::base::limit(-60.0f, 12.0f, valueDb) });
     std::sort(clip->automation.begin(), clip->automation.end(),
               [](const auto& left, const auto& right) {
                   return left.timeSeconds < right.timeSeconds;
@@ -15431,9 +15400,9 @@ bool AudioTrackController::updateLauncherClipAutomationPoint(
     if (point == clip->automation.end())
         return false;
     const auto previous = track->launcherClips;
-    point->timeSeconds = juce::jlimit(0.0, clip->durationSeconds,
+    point->timeSeconds = cydaw::base::limit(0.0, clip->durationSeconds,
                                       timeSeconds);
-    point->valueDb = juce::jlimit(-60.0f, 12.0f, valueDb);
+    point->valueDb = cydaw::base::limit(-60.0f, 12.0f, valueDb);
     std::sort(clip->automation.begin(), clip->automation.end(),
               [](const auto& left, const auto& right) {
                   return left.timeSeconds < right.timeSeconds;
@@ -15468,7 +15437,7 @@ bool AudioTrackController::setLauncherClipAutomationPointCurve(
         return false;
     const auto previous = track->launcherClips;
     point->curve = curve;
-    point->curveAmount = juce::jlimit(-1.0f, 1.0f, curveAmount);
+    point->curveAmount = cydaw::base::limit(-1.0f, 1.0f, curveAmount);
     if (rebuildLauncherPlans(*track).failed()) {
         track->launcherClips = previous;
         (void) rebuildLauncherPlans(*track);
@@ -15639,11 +15608,11 @@ std::uint64_t AudioTrackController::addLauncherClipEventStretchMarker(
     const auto markerId = nextStretchMarkerId_++;
     event->stretchMarkers.push_back({
         markerId,
-        juce::jlimit(event->sourceOffsetSeconds + 0.001,
+        cydaw::base::limit(event->sourceOffsetSeconds + 0.001,
                      event->sourceOffsetSeconds
                          + event->sourceDurationSeconds - 0.001,
                      sourceSeconds),
-        juce::jlimit(0.001, event->durationSeconds - 0.001,
+        cydaw::base::limit(0.001, event->durationSeconds - 0.001,
                      localTimelineSeconds) });
     std::sort(event->stretchMarkers.begin(), event->stretchMarkers.end(),
               [](const auto& left, const auto& right) {
@@ -15707,7 +15676,7 @@ bool AudioTrackController::updateLauncherClipEventStretchMarker(
                                        .timelineSeconds - 0.001;
     if (maximum <= minimum)
         return false;
-    marker->timelineSeconds = juce::jlimit(
+    marker->timelineSeconds = cydaw::base::limit(
         minimum, maximum, localTimelineSeconds);
     if (rebuildLauncherPlans(*track).failed()) {
         track->launcherClips = previous;
@@ -15776,7 +15745,7 @@ bool AudioTrackController::clearLauncherClip(const std::size_t trackIndex,
 
 bool AudioTrackController::setLauncherClipLanes(
     const std::size_t trackIndex, const int sceneIndex,
-    std::map<juce::String, std::vector<AutomationPoint>> lanes)
+    std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes)
 {
     auto* track = findTrack(trackIndex);
     if (track == nullptr)
@@ -15874,7 +15843,7 @@ bool AudioTrackController::transferLauncherClip(
         sortClips(sourceTrack->launcherClips);
     const auto targetResult = rebuildLauncherPlans(*targetTrack);
     const auto sourceResult = sourceTrack == targetTrack
-                                  ? juce::Result::ok()
+                                  ? cydaw::base::Result::ok()
                                   : rebuildLauncherPlans(*sourceTrack);
     if (targetResult.failed() || sourceResult.failed()) {
         sourceTrack->launcherClips = sourcePrevious;
@@ -15937,7 +15906,7 @@ bool AudioTrackController::startLauncherClipPreview(
     // other audio or MIDI tracks: the editor is part of the live launcher
     // mix, not a solo preview bus.
     return scheduleLauncherClip(trackIndex, sceneIndex, 0.0,
-                                juce::jlimit(clip->playStartSeconds,
+                                cydaw::base::limit(clip->playStartSeconds,
                                              clip->playEndSeconds,
                                              localStartSeconds));
 }
@@ -15950,7 +15919,7 @@ bool AudioTrackController::seekLauncherClip(
     const auto clip = launcherClip(trackIndex, sceneIndex);
     if (track == nullptr || !clip.has_value())
         return false;
-    const auto position = juce::jlimit(
+    const auto position = cydaw::base::limit(
         clip->playStartSeconds, clip->playEndSeconds, localSeconds);
     if (track->clipSource->activeLauncherScene() != sceneIndex) {
         if (!startLauncherClipPreview(trackIndex, sceneIndex))
@@ -16045,11 +16014,11 @@ void AudioTrackController::beginArrangementBatch() noexcept
     ++arrangementBatchDepth_;
 }
 
-juce::Result AudioTrackController::endArrangementBatch()
+cydaw::base::Result AudioTrackController::endArrangementBatch()
 {
     if (arrangementBatchDepth_ == 0 || --arrangementBatchDepth_ > 0)
-        return juce::Result::ok();
-    auto result = juce::Result::ok();
+        return cydaw::base::Result::ok();
+    auto result = cydaw::base::Result::ok();
     for (auto& track : tracks_) {
         if (!track->arrangementPlanPending)
             continue;
@@ -16072,7 +16041,7 @@ void AudioTrackController::stopTransportsTogether(
     // cost. Stopped together, they wait for the same block. The flags are
     // atomic and the change message is posted, so a stop may run off the
     // message thread.
-    std::vector<juce::AudioTransportSource*> transports;
+    std::vector<cydaw::audio::AudioTransportSource*> transports;
     for (auto& track : tracks_)
         if (track->transportSource.isPlaying() && shouldStop(*track))
             transports.push_back(&track->transportSource);
@@ -16150,7 +16119,7 @@ bool AudioTrackController::launcherUsesDoubleDeckReadAhead(
 void AudioTrackController::setLaunchQuantization(
     const LaunchQuantization quantization) noexcept
 {
-    launchQuantization_ = static_cast<LaunchQuantization>(juce::jlimit(
+    launchQuantization_ = static_cast<LaunchQuantization>(cydaw::base::limit(
         static_cast<int>(LaunchQuantization::none),
         static_cast<int>(LaunchQuantization::oneBar),
         static_cast<int>(quantization)));
@@ -16180,7 +16149,7 @@ double AudioTrackController::quantizedLaunchDelaySeconds(
         case LaunchQuantization::oneBar: intervalBeats = 4.0; break;
         case LaunchQuantization::none: return 0.0;
     }
-    const auto intervalSeconds = intervalBeats * 60.0 / juce::jlimit(20.0, 999.0, tempoBpm);
+    const auto intervalSeconds = intervalBeats * 60.0 / cydaw::base::limit(20.0, 999.0, tempoBpm);
     const auto position = std::max(0.0, positionSeconds);
     auto phase = std::fmod(position, intervalSeconds);
     if (phase < 0.0)
@@ -16272,7 +16241,7 @@ void AudioTrackController::play()
     for (auto& track : tracks_) {
         track->clipSource->clearLauncherClip();
         track->transportSource.setPosition(
-            juce::jlimit(0.0, sessionLength, sessionPosition));
+            cydaw::base::limit(0.0, sessionLength, sessionPosition));
         if (sessionPosition < sessionLength)
             track->transportSource.start();
     }
@@ -16319,7 +16288,7 @@ void AudioTrackController::setPosition(const double seconds)
 {
     const auto sessionLength = std::max(transportLength(),
                                         transportHorizonSeconds);
-    const auto safePosition = juce::jlimit(
+    const auto safePosition = cydaw::base::limit(
         0.0, std::max(0.0, sessionLength), seconds);
     masterOutput_.setClock(safePosition);
     stopTransportsTogether([](PlaybackTrack& track) {
@@ -16416,8 +16385,8 @@ bool AudioTrackController::hasExplicitLoopRange() const noexcept
     return loopRangeExplicit_;
 }
 
-juce::Result AudioTrackController::startRecording(
-    const juce::File& destination, const double startDelaySeconds)
+cydaw::base::Result AudioTrackController::startRecording(
+    const cydaw::base::File& destination, const double startDelaySeconds)
 {
     auto busId = virtualBusRouter_.defaultInputBusId();
     auto afterEffects = true;
@@ -16459,19 +16428,19 @@ bool AudioTrackController::recordingComplete() const noexcept
     return recorder_.recordingComplete();
 }
 
-juce::Result AudioTrackController::commitRecordedTake(
-    const juce::File& recordedFile,
+cydaw::base::Result AudioTrackController::commitRecordedTake(
+    const cydaw::base::File& recordedFile,
     const std::optional<std::size_t> targetTrack,
     const double startSeconds,
     RecordedTakeResult& result,
     const std::optional<std::uint64_t> targetClipId)
 {
     result = {};
-    auto reader = std::unique_ptr<juce::AudioFormatReader>(
+    auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formatManager_.createReaderFor(recordedFile));
     if (reader == nullptr || reader->sampleRate <= 0.0
         || reader->lengthInSamples <= 0)
-        return juce::Result::fail(
+        return cydaw::base::Result::fail(
             tr("error.recordedTakeInvalid", "file",
                recordedFile.getFileName()));
 
@@ -16480,28 +16449,28 @@ juce::Result AudioTrackController::commitRecordedTake(
                           / reader->sampleRate;
     if (targetClipId.has_value()) {
         if (!targetTrack.has_value() || *targetTrack >= tracks_.size())
-            return juce::Result::fail(tr("error.recordedTakeTrack"));
+            return cydaw::base::Result::fail(tr("error.recordedTakeTrack"));
         const auto clip = audioClip(*targetTrack, *targetClipId);
         if (!clip.has_value())
-            return juce::Result::fail(tr("error.audioTakeClip"));
+            return cydaw::base::Result::fail(tr("error.audioTakeClip"));
         const auto addResult = addAudioTake(
             *targetTrack, *targetClipId, recordedFile, true, true);
         if (addResult.failed())
             return addResult;
         result = { *targetTrack, *targetClipId, clip->startSeconds,
                    duration, false };
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
     if (targetTrack.has_value()) {
         if (*targetTrack >= tracks_.size())
-            return juce::Result::fail(tr("error.recordedTakeTrack"));
+            return cydaw::base::Result::fail(tr("error.recordedTakeTrack"));
         std::uint64_t clipId {};
         const auto addResult = addAudioClipFromFile(
             *targetTrack, recordedFile, safeStart, &clipId);
         if (addResult.failed())
             return addResult;
         result = { *targetTrack, clipId, safeStart, duration, false };
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
     std::size_t newTrackIndex {};
@@ -16511,24 +16480,24 @@ juce::Result AudioTrackController::commitRecordedTake(
         return addResult;
     const auto clips = audioClips(newTrackIndex);
     if (clips.empty())
-        return juce::Result::fail(tr("error.recordedTakeTrack"));
+        return cydaw::base::Result::fail(tr("error.recordedTakeTrack"));
     setTrackArmed(newTrackIndex, true);
     result = { newTrackIndex, clips.front().id, safeStart, duration, true };
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::startMasterExport(
-    const juce::File& destination)
+cydaw::base::Result AudioTrackController::startMasterExport(
+    const cydaw::base::File& destination)
 {
     if (isRecording())
-        return juce::Result::fail(tr("error.masterExportRecording"));
+        return cydaw::base::Result::fail(tr("error.masterExportRecording"));
     if (contentLength() <= 0.0)
-        return juce::Result::fail(tr("error.masterExportEmpty"));
+        return cydaw::base::Result::fail(tr("error.masterExportEmpty"));
     for (const auto& track : tracks_)
         if (track->file == destination)
-            return juce::Result::fail(tr("error.masterExportSource"));
+            return cydaw::base::Result::fail(tr("error.masterExportSource"));
 
-    const juce::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+    const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
     stop();
     setPosition(0.0);
     masterExportPreviousLooping_ = looping_;
@@ -16544,43 +16513,49 @@ juce::Result AudioTrackController::startMasterExport(
     }
     masterExportDestination_ = destination;
     play();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::finishMasterExport()
+cydaw::base::Result AudioTrackController::finishMasterExport()
 {
     if (!masterOutput_.isCapturing())
-        return juce::Result::fail(tr("error.masterExportInactive"));
+        return cydaw::base::Result::fail(tr("error.masterExportInactive"));
     const auto destination = masterExportDestination_;
-    const auto dropped = masterOutput_.droppedBlockCount();
+    cydaw::audio::AudioFormatWriter::ThreadedWriter::Result result;
+    int dropped = 0;
+    bool complete = false;
     {
-        const juce::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
-        masterOutput_.stopCapture();
+        const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+        result = masterOutput_.stopCapture();
+        dropped = masterOutput_.droppedBlockCount();
+        complete = masterOutput_.captureComplete();
         stop();
         setPosition(0.0);
         setLooping(masterExportPreviousLooping_);
     }
-    masterExportDestination_ = juce::File {};
+    masterExportDestination_ = cydaw::base::File {};
     if (!destination.existsAsFile())
-        return juce::Result::fail(tr("error.masterExportCreate", "file",
+        return cydaw::base::Result::fail(tr("error.masterExportCreate", "file",
                                      destination.getFullPathName()));
     if (dropped > 0)
-        return juce::Result::fail(tr("error.masterExportDropped", "count",
-                                     juce::String(dropped)));
-    return juce::Result::ok();
+        return cydaw::base::Result::fail(tr("error.masterExportDropped", "count",
+                                     cydaw::base::Text(dropped)));
+    if (!complete || !result.complete())
+        return cydaw::base::Result::fail(tr("error.exportWrite"));
+    return cydaw::base::Result::ok();
 }
 
 void AudioTrackController::cancelMasterExport()
 {
     const auto destination = masterExportDestination_;
     {
-        const juce::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+        const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
         masterOutput_.stopCapture();
         stop();
         setPosition(0.0);
         setLooping(masterExportPreviousLooping_);
     }
-    masterExportDestination_ = juce::File {};
+    masterExportDestination_ = cydaw::base::File {};
     if (destination.existsAsFile())
         (void) destination.deleteFile();
 }
@@ -16609,6 +16584,7 @@ bool AudioTrackController::hasAudioFile() const noexcept { return !tracks_.empty
 
 bool AudioTrackController::isPlaying() const noexcept
 {
+    if(tracks_.empty()&&midiTracks_.empty())return masterOutput_.clockRunning();
     return std::any_of(midiTracks_.begin(), midiTracks_.end(), [](const auto& track) {
                return track->synth.isPlaying();
            })
@@ -16619,6 +16595,8 @@ bool AudioTrackController::isPlaying() const noexcept
 
 double AudioTrackController::position() const noexcept
 {
+    // Transport-only sessions still have the master audio clock.
+    if(tracks_.empty()&&midiTracks_.empty())return masterOutput_.clock();
     double current = 0.0;
     for (const auto& track : tracks_)
         current = std::max(current, track->transportSource.getCurrentPosition());
@@ -16712,27 +16690,27 @@ int AudioTrackController::midiTrackCompensationSamples(const std::uint64_t track
     return track != nullptr ? track->latencySource.delaySamples() : 0;
 }
 
-juce::String AudioTrackController::audioDeviceDescription()
+cydaw::base::Text AudioTrackController::audioDeviceDescription()
 {
     if (auto* device = deviceManager_.getCurrentAudioDevice())
         return deviceManager_.getCurrentAudioDeviceType() + "  |  " + device->getName()
-               + "  |  " + juce::String(device->getCurrentSampleRate() / 1'000.0, 1)
-               + " kHz / " + juce::String(device->getCurrentBufferSizeSamples())
+               + "  |  " + cydaw::base::Text(device->getCurrentSampleRate() / 1'000.0, 1)
+               + " kHz / " + cydaw::base::Text(device->getCurrentBufferSizeSamples())
                + "  |  "
-               + juce::String(device->getActiveInputChannels()
+               + cydaw::base::Text(device->getActiveInputChannels()
                                   .countNumberOfSetBits())
                + " IN / "
-               + juce::String(device->getActiveOutputChannels()
+               + cydaw::base::Text(device->getActiveOutputChannels()
                                   .countNumberOfSetBits())
                + " OUT"
-               + "  |  I/O " + juce::String(device->getInputLatencyInSamples())
-               + "/" + juce::String(device->getOutputLatencyInSamples()) + " smp";
+               + "  |  I/O " + cydaw::base::Text(device->getInputLatencyInSamples())
+               + "/" + cydaw::base::Text(device->getOutputLatencyInSamples()) + " smp";
     return tr("status.offline");
 }
 
-juce::AudioDeviceManager& AudioTrackController::deviceManager() noexcept { return deviceManager_; }
-juce::AudioFormatManager& AudioTrackController::formatManager() noexcept { return formatManager_; }
-juce::MidiKeyboardState& AudioTrackController::keyboardState() noexcept { return midiKeyboardState_; }
+cydaw::integration::DeviceManager& AudioTrackController::deviceManager() noexcept { return deviceManager_; }
+cydaw::audio::AudioFormatManager& AudioTrackController::formatManager() noexcept { return formatManager_; }
+cydaw::midi::KeyboardState& AudioTrackController::keyboardState() noexcept { return midiKeyboardState_; }
 
 AudioTrackController::PlaybackTrack* AudioTrackController::findTrack(const std::size_t index) noexcept
 {
@@ -16794,9 +16772,9 @@ void AudioTrackController::refreshTrackGains() noexcept
                             });
 
     // What a soloed track is routed into, at any distance, is heard too.
-    std::vector<const juce::AudioSource*> reached;
+    std::vector<const cydaw::audio::AudioSource*> reached;
     if (anySolo) {
-        std::vector<const juce::AudioSource*> pending;
+        std::vector<const cydaw::audio::AudioSource*> pending;
         for (const auto& track : tracks_)
             if (track->solo)
                 pending.push_back(&track->latencySource);
@@ -16815,18 +16793,18 @@ void AudioTrackController::refreshTrackGains() noexcept
                         }
         }
     }
-    const auto soloReached = [&reached](const juce::AudioSource* source) {
+    const auto soloReached = [&reached](const cydaw::audio::AudioSource* source) {
         return std::find(reached.begin(), reached.end(), source) != reached.end();
     };
     for (auto& track : tracks_) {
         const auto audible = !track->muted && (!anySolo || track->solo || soloReached(&track->latencySource));
-        const auto gain = audible ? juce::Decibels::decibelsToGain(track->gainDb, -60.0f) : 0.0f;
+        const auto gain = audible ? cydaw::audio::Decibels::decibelsToGain(track->gainDb, -60.0f) : 0.0f;
         track->gainPanSource.setGain(gain);
         track->gainPanSource.setSendsAudible(audible);
     }
     for (auto& track : midiTracks_) {
         const auto audible = !track->muted && (!anySolo || track->solo || soloReached(&track->latencySource));
-        const auto gain = audible ? juce::Decibels::decibelsToGain(track->gainDb, -60.0f) : 0.0f;
+        const auto gain = audible ? cydaw::audio::Decibels::decibelsToGain(track->gainDb, -60.0f) : 0.0f;
         track->gainPanSource.setGain(gain);
         track->gainPanSource.setSendsAudible(audible);
         track->gainPanSource.setPan(track->pan);
@@ -16929,8 +16907,8 @@ bool AudioTrackController::closeRecordedMidiNote(
     const int noteNumber,
     const double timelineSeconds)
 {
-    const auto safeChannel = juce::jlimit(1, 16, channel);
-    const auto safeNote = juce::jlimit(0, 127, noteNumber);
+    const auto safeChannel = cydaw::base::limit(1, 16, channel);
+    const auto safeNote = cydaw::base::limit(0, 127, noteNumber);
     auto& active = activeMidiRecordingNotes_[static_cast<std::size_t>(
         (safeChannel - 1) * 128 + safeNote)];
     if (!active.active)
@@ -17044,17 +17022,17 @@ void AudioTrackController::publishMidiSequence(MidiPlaybackTrack& track)
             const auto currentPosition = track.synth.position();
             publishMidiClipPreviewSequence(track, *clip);
             const auto secondsPerBeat = 60.0 / std::max(20.0, tempoBpm_);
-            const auto playStart = juce::jlimit(
+            const auto playStart = cydaw::base::limit(
                 0.0, std::max(0.0, clip->lengthBeats - 0.03125),
                 clip->playStartBeats);
-            const auto playEnd = juce::jlimit(
+            const auto playEnd = cydaw::base::limit(
                 playStart + 0.03125, clip->lengthBeats,
                 clip->playEndBeats > playStart ? clip->playEndBeats
                                                : clip->lengthBeats);
-            const auto loopStart = juce::jlimit(
+            const auto loopStart = cydaw::base::limit(
                 playStart, std::max(playStart, playEnd - 0.03125),
                 clip->loopStartBeats);
-            const auto loopEnd = juce::jlimit(
+            const auto loopEnd = cydaw::base::limit(
                 loopStart + 0.03125, playEnd,
                 clip->loopEndBeats > loopStart ? clip->loopEndBeats
                                                : playEnd);
@@ -17062,7 +17040,7 @@ void AudioTrackController::publishMidiSequence(MidiPlaybackTrack& track)
                                           loopStart * secondsPerBeat,
                                           loopEnd * secondsPerBeat);
             track.synth.setLooping(clip->looping);
-            track.synth.setPosition(juce::jlimit(
+            track.synth.setPosition(cydaw::base::limit(
                 playStart * secondsPerBeat, playEnd * secondsPerBeat,
                 currentPosition));
             return;
@@ -17083,9 +17061,9 @@ void AudioTrackController::publishMidiSequence(MidiPlaybackTrack& track)
         if (clip.launcherScene >= 0)
             continue;
         for (const auto& note : clip.notes) {
-            const auto clippedStartBeats = juce::jlimit(
+            const auto clippedStartBeats = cydaw::base::limit(
                 0.0, clip.lengthBeats, note.startBeats);
-            const auto clippedEndBeats = juce::jlimit(
+            const auto clippedEndBeats = cydaw::base::limit(
                 clippedStartBeats,
                 clip.lengthBeats,
                 note.startBeats + note.durationBeats);
@@ -17144,18 +17122,18 @@ void AudioTrackController::publishMidiClipPreviewSequence(
         std::vector<MidiSynthEngine::ScheduledNote>>();
     scheduled->reserve(clip.notes.size());
     const auto secondsPerBeat = 60.0 / std::max(20.0, tempoBpm_);
-    const auto playStart = juce::jlimit(
+    const auto playStart = cydaw::base::limit(
         0.0, std::max(0.0, clip.lengthBeats - 0.03125),
         clip.playStartBeats);
-    const auto playEnd = juce::jlimit(
+    const auto playEnd = cydaw::base::limit(
         playStart + 0.03125, clip.lengthBeats,
         clip.playEndBeats > playStart ? clip.playEndBeats
                                       : clip.lengthBeats);
     const auto lengthSeconds = playEnd * secondsPerBeat;
     for (const auto& note : clip.notes) {
-        const auto clippedStartBeats = juce::jlimit(
+        const auto clippedStartBeats = cydaw::base::limit(
             playStart, playEnd, note.startBeats);
-        const auto clippedEndBeats = juce::jlimit(
+        const auto clippedEndBeats = cydaw::base::limit(
             clippedStartBeats, playEnd,
             note.startBeats + note.durationBeats);
         if (clippedEndBeats <= clippedStartBeats + 0.000001)
@@ -17222,7 +17200,7 @@ void AudioTrackController::publishTrackPluginAutomation(PlaybackTrack& track)
     track.gainPanSource.setPluginAutomation(std::move(published));
 }
 
-juce::Result AudioTrackController::setTrackRouting(const std::vector<TrackRouting>& routing)
+cydaw::base::Result AudioTrackController::setTrackRouting(const std::vector<TrackRouting>& routing)
 {
     // Kept by identity: a track that moves keeps its routing, one removed
     // leaves it, and the plan can be made again for a new latency.
@@ -17252,11 +17230,11 @@ juce::Result AudioTrackController::setTrackRouting(const std::vector<TrackRoutin
             if (out.hardwareBus != 0) {
                 const auto bus = virtualBusRouter_.bus(out.hardwareBus);
                 if (!bus || bus->direction != VirtualBusDirection::output)
-                    return juce::Result::fail("a track is routed to an output of the sound card that does not exist");
+                    return cydaw::base::Result::fail("a track is routed to an output of the sound card that does not exist");
             } else if (out.destination) {
                 const auto destination = keyOf(*out.destination);
                 if (!destination || *destination == *track)
-                    return juce::Result::fail("a track is routed into itself or into a track that does not exist");
+                    return cydaw::base::Result::fail("a track is routed into itself or into a track that does not exist");
                 output.destination = destination;
             }
             keptEntry.outputs.push_back(output);
@@ -17268,10 +17246,10 @@ juce::Result AudioTrackController::setTrackRouting(const std::vector<TrackRoutin
         routing_ = std::move(previous);
         return built;
     }
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AudioTrackController::rebuildRouting()
+cydaw::base::Result AudioTrackController::rebuildRouting()
 {
     constexpr auto maximumDelay = LatencyCompensatingAudioSource::maximumDelaySamples;
     struct NodeOutput {
@@ -17286,7 +17264,7 @@ juce::Result AudioTrackController::rebuildRouting()
         RoutingKey key;
         PlaybackTrack* audio {};
         MidiPlaybackTrack* midi {};
-        juce::AudioSource* source {};
+        cydaw::audio::AudioSource* source {};
         RoutedInputReceiver* receiver {};
         GainPanAudioSource* fader {};
         LatencyCompensatingAudioSource* output {};
@@ -17331,7 +17309,7 @@ juce::Result AudioTrackController::rebuildRouting()
         if (!from)
             continue;
         for (const auto& out : entry.outputs) {
-            const auto gain = juce::Decibels::decibelsToGain(juce::jlimit(-60.0f, 12.0f, out.gainDb), -60.0f);
+            const auto gain = cydaw::audio::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 12.0f, out.gainDb), -60.0f);
             if (out.hardwareBus != 0) {
                 // A bus removed since: that output went with it.
                 if (const auto bus = virtualBusRouter_.bus(out.hardwareBus); bus && bus->direction == VirtualBusDirection::output)
@@ -17368,7 +17346,7 @@ juce::Result AudioTrackController::rebuildRouting()
                 ready.push_back(*out.to);
     }
     if (order.size() != nodes.size())
-        return juce::Result::fail("the routing makes a loop");
+        return cydaw::base::Result::fail("the routing makes a loop");
 
     // The latency each track's sound arrives with (the latest of what is
     // routed into it; its own sound waits for that) and leaves with (plus
@@ -17393,7 +17371,7 @@ juce::Result AudioTrackController::rebuildRouting()
     // rest, and a cable taken before the fader (ahead of that delay), get a
     // delay line of their own, kept while its length holds.
     std::vector<EdgeDelay> delays;
-    const auto delayFor = [&](const juce::AudioSource* from, const juce::AudioSource* to, const std::uint32_t bus,
+    const auto delayFor = [&](const cydaw::audio::AudioSource* from, const cydaw::audio::AudioSource* to, const std::uint32_t bus,
                               const bool preFader, const int samples, const int channels) -> std::shared_ptr<AudioDelayLine> {
         if (samples <= 0)
             return {};
@@ -17419,7 +17397,7 @@ juce::Result AudioTrackController::rebuildRouting()
     const auto hardwareSlot = [this, &plan](const std::uint64_t busId, const bool afterEffects, int& channels) {
         channels = 2;
         if (const auto bus = virtualBusRouter_.bus(busId))
-            channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus->channels);
+            channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus->channels);
         for (std::size_t slot = 0; slot < plan->hardware.size(); ++slot)
             if (plan->hardware[slot].busId == busId && plan->hardware[slot].beforeEffects == !afterEffects)
                 return static_cast<int>(slot);
@@ -17450,7 +17428,7 @@ juce::Result AudioTrackController::rebuildRouting()
         entry.receiver = node.receiver;
         entry.fader = node.fader;
         entry.channels = formatOf(node);
-        std::vector<const juce::AudioSource*> destinations;
+        std::vector<const cydaw::audio::AudioSource*> destinations;
         auto preFader = false;
         for (const auto& out : node.outputs) {
             auto* to = out.to ? nodes[*out.to].source : nullptr;
@@ -17479,7 +17457,7 @@ juce::Result AudioTrackController::rebuildRouting()
     mixLatencySamples_.store(masterArrival, std::memory_order_release);
     mixerSource_.setPlan(std::move(plan));
     refreshTrackGains();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 } // namespace cydaw::app

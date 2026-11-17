@@ -1,16 +1,23 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/audio/Sources.h>
+#include <cydaw/base/Process.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "WindowsPluginBridge.h"
 
 #include <cydaw/plugins/PluginIsolation.h>
 
-#include <juce_audio_basics/juce_audio_basics.h>
-#include <juce_core/juce_core.h>
 
+#include <cydaw/plugins/WorkerWake.h>
 #include <atomic>
 #include <array>
 #include <memory>
 #include <vector>
+#include <functional>
+
+namespace cydaw::plugins { class NativeHostedPlugin; class NativePluginEditor; }
 
 namespace cydaw::app {
 
@@ -18,16 +25,22 @@ class IsolatedPluginHost final {
 public:
     // The session's metre, told to every plug-in with the tempo (4/4 until set).
     static void setSessionMetre(int numerator, int denominator) noexcept;
+    struct SleepSnapshot {
+        bool available {}, sleeping {};
+        std::uint32_t processedBlocks {}, skippedBlocks {};
+    };
+    // Control-thread snapshot only. Reading these counters never wakes a worker.
+    [[nodiscard]] SleepSnapshot sleepInfo() const noexcept;
     struct ParameterSnapshot {
         std::uint32_t index {};
-        juce::String name;
-        juce::String label;
+        cydaw::base::Text name;
+        cydaw::base::Text label;
         float value {};
         bool automatable {};
         bool discrete {};
         bool boolean {};
         // The value as the plug-in shows it ("-6.0 dB", "Hall").
-        juce::String text;
+        cydaw::base::Text text;
     };
 
     struct RealtimeParameterValue {
@@ -35,50 +48,51 @@ public:
         float value {};
     };
 
-    IsolatedPluginHost() = default;
+    IsolatedPluginHost();
     ~IsolatedPluginHost();
 
-    [[nodiscard]] juce::Result startPlugin(const juce::File& pluginFile,
+    [[nodiscard]] cydaw::base::Result startPlugin(const cydaw::base::File& pluginFile,
                                            double sampleRate,
                                            int maximumBlockSize,
                                            int channelCount);
-    [[nodiscard]] juce::Result startPassthroughForTest(const juce::File& workerExecutable,
+    [[nodiscard]] cydaw::base::Result startPassthroughForTest(const cydaw::base::File& workerExecutable,
                                                        double sampleRate,
                                                        int maximumBlockSize,
                                                        int channelCount);
-    [[nodiscard]] juce::Result startPluginForTest(const juce::File& workerExecutable,
-                                                  const juce::File& pluginFile,
+    [[nodiscard]] cydaw::base::Result startPluginForTest(const cydaw::base::File& workerExecutable,
+                                                  const cydaw::base::File& pluginFile,
                                                   double sampleRate,
                                                   int maximumBlockSize,
                                                   int channelCount);
     void stop();
     void pollWorkerHealth();
     void terminateWorkerForTest();
-    [[nodiscard]] juce::Result getState(juce::MemoryBlock& destination);
-    [[nodiscard]] juce::Result getCachedState(
-        juce::MemoryBlock& destination) const;
-    [[nodiscard]] juce::Result setState(const juce::MemoryBlock& state);
-    [[nodiscard]] juce::Result refreshParameters(std::vector<ParameterSnapshot>& destination);
-    [[nodiscard]] juce::Result setParameter(std::uint32_t index, float normalisedValue);
+    [[nodiscard]] cydaw::base::Result getState(cydaw::base::MemoryBlock& destination);
+    [[nodiscard]] cydaw::base::Result getCachedState(
+        cydaw::base::MemoryBlock& destination) const;
+    [[nodiscard]] cydaw::base::Result setState(const cydaw::base::MemoryBlock& state);
+    [[nodiscard]] cydaw::base::Result refreshParameters(std::vector<ParameterSnapshot>& destination);
+    [[nodiscard]] cydaw::base::Result setParameter(std::uint32_t index, float normalisedValue);
     // The plug-in's own programs (its factory presets, as a host lists them)
     // and the current one; choosing one, then the state is read again.
-    [[nodiscard]] juce::Result getPrograms(juce::StringArray& names, int& current);
-    [[nodiscard]] juce::Result setProgram(int index);
+    [[nodiscard]] cydaw::base::Result getPrograms(cydaw::base::TextList& names, int& current);
+    [[nodiscard]] cydaw::base::Result setProgram(int index);
     void publishRealtimeParameters(const RealtimeParameterValue* values,
                                    std::size_t valueCount) noexcept;
-    [[nodiscard]] juce::Result showEditor();
-    [[nodiscard]] juce::Result hideEditor();
+    [[nodiscard]] cydaw::base::Result showEditor();
+    [[nodiscard]] cydaw::base::Result hideEditor();
 
     // Called by the audio thread. Returns true only when a fresh processed
-    // block was available; false means that the dry input was left untouched.
-    [[nodiscard]] bool processBlock(juce::AudioBuffer<float>& buffer,
+    // block was available. An active worker missing its deadline emits silence;
+    // a stopped/crashed worker leaves input untouched for safety bypass.
+    [[nodiscard]] bool processBlock(cydaw::audio::SampleBuffer<float>& buffer,
                                     int startSample,
                                     int numSamples, double timelineSeconds = 0.0, double tempo = 120.0, bool playing = false) noexcept;
 
     [[nodiscard]] bool isRunning() const noexcept;
-    [[nodiscard]] juce::File pluginFile() const;
-    [[nodiscard]] juce::String pluginName() const;
-    [[nodiscard]] juce::String statusMessage() const;
+    [[nodiscard]] cydaw::base::File pluginFile() const;
+    [[nodiscard]] cydaw::base::Text pluginName() const;
+    [[nodiscard]] cydaw::base::Text statusMessage() const;
     [[nodiscard]] std::uint64_t missedBlockCount() const noexcept;
     [[nodiscard]] int latencySamples() const noexcept;
     // The sample rate and block size its worker was started with (0: none).
@@ -86,24 +100,34 @@ public:
     [[nodiscard]] int preparedBlockSize() const noexcept { return blockSize_; }
 
 private:
-    [[nodiscard]] juce::Result startWorker(PluginWorkerLaunch launch,
-                                           const juce::File& pluginFile,
+    cydaw::base::Result startNative(const cydaw::base::File& worker,
+        const cydaw::base::File& plugin, double rate, int frames, int channels);
+    cydaw::base::Result nativeControl(const std::function<void()>& operation);
+    std::unique_ptr<cydaw::plugins::NativeHostedPlugin> native_;
+    std::unique_ptr<cydaw::plugins::NativePluginEditor> nativeEditor_;
+    std::atomic<cydaw::plugins::NativeHostedPlugin*> nativeActive_{};
+    std::atomic<bool> nativePresent_{};
+    std::atomic<int> nativeLatency_{};
+    void* nativeWorkerHandle_{}; // Owned child handle, Windows test crash injection.
+    [[nodiscard]] cydaw::base::Result startWorker(PluginWorkerLaunch launch,
+                                           const cydaw::base::File& pluginFile,
                                            bool passthrough,
                                            double sampleRate,
                                            int maximumBlockSize,
                                            int channelCount);
-    [[nodiscard]] juce::Result sendCommand(cydaw::plugins::SharedPluginCommand command,
+    [[nodiscard]] cydaw::base::Result sendCommand(cydaw::plugins::SharedPluginCommand command,
                                            int timeoutMilliseconds = 2'000);
     // A command still running in the worker (one that timed out): its data in
     // the shared block is not written over while it reads it.
     [[nodiscard]] static bool controlBusy(cydaw::plugins::SharedPluginAudio& shared) noexcept;
 
-    juce::ChildProcess process_;
-    juce::File sharedFile_;
-    juce::File pluginFile_;
-    juce::String pluginName_;
-    juce::String lastStatus_;
-    std::unique_ptr<juce::MemoryMappedFile> mapping_;
+    cydaw::plugins::WorkerWake wake_;
+    cydaw::base::ChildProcess process_;
+    cydaw::base::File sharedFile_;
+    cydaw::base::File pluginFile_;
+    cydaw::base::Text pluginName_;
+    cydaw::base::Text lastStatus_;
+    std::unique_ptr<cydaw::base::MemoryMappedFile> mapping_;
     std::atomic<cydaw::plugins::SharedPluginAudio*> active_ {};
     std::atomic<int> callbacksInFlight_ {};
     std::atomic<std::uint64_t> missedBlocks_ {};
@@ -113,7 +137,7 @@ private:
     std::uint64_t submittedAtCallback_ {};
     std::uint64_t nextCommandSequence_ { 1 };
     std::atomic<int> pipelineLatencySamples_ {};
-    juce::MemoryBlock cachedState_;
+    cydaw::base::MemoryBlock cachedState_;
     // A parameter set since the state was last read: read again once the
     // gesture rests (pollWorkerHealth), not at every notch.
     double stateStaleSince_ {};
@@ -130,7 +154,8 @@ private:
     std::uint64_t lastHeartbeat_ {};
     double heartbeatSince_ {};
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IsolatedPluginHost)
+    IsolatedPluginHost(const IsolatedPluginHost&) = delete;
+    IsolatedPluginHost& operator=(const IsolatedPluginHost&) = delete;
 };
 
 } // namespace cydaw::app

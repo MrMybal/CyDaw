@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Résonateurs, Corps, Peigne
 // (ResonanceDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -17,49 +18,49 @@ ImU32 resonanceVoiceColour(const int voice, const ImU32 colour)
 }
 
 // "A2" (in French "La2"), MIDI 60 being C4.
-juce::String resonanceNoteName(const int note)
+cydaw::base::Text resonanceNoteName(const int note)
 {
     const auto pitch = static_cast<std::size_t>(resonanced::resonancePitchClassOf(note));
     const auto* name = ui::french() ? resonanced::resonanceNotesFrench[pitch] : resonanced::resonanceNotesEnglish[pitch];
-    return juce::String::fromUTF8(name) + juce::String(resonanced::resonanceOctaveOf(note));
+    return cydaw::base::Text::fromUTF8(name) + cydaw::base::Text(resonanced::resonanceOctaveOf(note));
 }
 
-juce::String resonanceChoiceName(const resonanced::ResonanceChoice& choice)
+cydaw::base::Text resonanceChoiceName(const resonanced::ResonanceChoice& choice)
 {
-    return juce::String::fromUTF8(ui::french() ? choice.french : choice.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? choice.french : choice.english);
 }
-juce::String resonanceChoiceHint(const resonanced::ResonanceChoice& choice)
+cydaw::base::Text resonanceChoiceHint(const resonanced::ResonanceChoice& choice)
 {
-    return juce::String::fromUTF8(ui::french() ? choice.frenchHint : choice.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? choice.frenchHint : choice.englishHint);
 }
 
-juce::String resonateursModeName(const int index)
+cydaw::base::Text resonateursModeName(const int index)
 {
     return resonanceChoiceName(resonanced::resonateursModes[static_cast<std::size_t>(std::clamp(index, 0, resonanced::resonateursModeCount - 1))]);
 }
-juce::String resonateursModeHint(const int index)
+cydaw::base::Text resonateursModeHint(const int index)
 {
     return resonanceChoiceHint(resonanced::resonateursModes[static_cast<std::size_t>(std::clamp(index, 0, resonanced::resonateursModeCount - 1))]);
 }
-juce::String corpsTypeName(const int index)
+cydaw::base::Text corpsTypeName(const int index)
 {
     return resonanceChoiceName(resonanced::corpsTypes[static_cast<std::size_t>(std::clamp(index, 0, resonanced::corpsTypeCount - 1))]);
 }
-juce::String corpsTypeHint(const int index)
+cydaw::base::Text corpsTypeHint(const int index)
 {
     return resonanceChoiceHint(resonanced::corpsTypes[static_cast<std::size_t>(std::clamp(index, 0, resonanced::corpsTypeCount - 1))]);
 }
-juce::String peigneModeName(const int index)
+cydaw::base::Text peigneModeName(const int index)
 {
     return resonanceChoiceName(resonanced::peigneModes[static_cast<std::size_t>(std::clamp(index, 0, resonanced::peigneModeCount - 1))]);
 }
-juce::String peigneModeHint(const int index)
+cydaw::base::Text peigneModeHint(const int index)
 {
     return resonanceChoiceHint(resonanced::peigneModes[static_cast<std::size_t>(std::clamp(index, 0, resonanced::peigneModeCount - 1))]);
 }
 
 // A choice's name to click in a display's top right corner (Halo's way).
-bool resonanceCornerChooser(const char* id, Param* parameter, const int count, juce::String (*name)(int), juce::String (*hint)(int),
+bool resonanceCornerChooser(const char* id, Param* parameter, const int count, cydaw::base::Text (*name)(int), cydaw::base::Text (*hint)(int),
                             const int current, const Box& box, const ImU32 colour, const Setter& set, const bool large)
 {
     const auto scale = large ? 0.82f : 0.66f;
@@ -266,7 +267,7 @@ bool resonateursDisplay(std::vector<Param>& parameters, const Pane& pane, const 
         const auto key = resonanceKeyBox(keys, notes[v]);
         auto name = resonanceNoteName(notes[v]);
         if (large)
-            name = juce::String(kResonanceRomans[v]) + " " + name;
+            name = cydaw::base::Text(kResonanceRomans[v]) + " " + name;
         const auto tint = levels[v] > 0.0005f ? resonanceVoiceColour(voice, colour) : p.textFaint;
         centred(list, ImVec2((key.min.x + key.max.x) * 0.5f, namesTop + nameHeight * (rank % 2 == 0 ? 0.5f : 1.5f)),
                 theme::alpha(tint, 0.55f + 0.45f * levels[v]), name.toRawUTF8(), small);
@@ -725,7 +726,7 @@ bool resonanceLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& p
 // The values a card shows as knobs (pane indices).
 std::vector<int> resonanceCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     switch (kind) {
     case PaneKind::resonateurs:
         return { resonanced::resonateursNote, resonanced::resonateursDecay, resonanced::resonateursColour, resonanced::resonateursMix };
@@ -736,29 +737,29 @@ std::vector<int> resonanceCardFields(const PaneKind kind, std::vector<Param>& pa
 }
 
 // The suffix of one of these effects' bindings ("note" for "….resonateurs.note"), empty when it is not theirs.
-juce::String resonanceSuffixOf(const juce::String& binding, const char* prefix)
+cydaw::base::Text resonanceSuffixOf(const cydaw::base::Text& binding, const char* prefix)
 {
-    const auto marker = juce::String(prefix) + ".";
+    const auto marker = cydaw::base::Text(prefix) + ".";
     const auto start = binding.lastIndexOf(marker);
     if (start < 0 || (start > 0 && binding[start - 1] != '.'))
         return {};
     return binding.substring(start + marker.length());
 }
 
-juce::String resonanceSigned(const double value)
+cydaw::base::Text resonanceSigned(const double value)
 {
-    return (value > 0.0 ? juce::String("+") : value < 0.0 ? juce::String("-") : juce::String()) + percent(std::abs(value));
+    return (value > 0.0 ? cydaw::base::Text("+") : value < 0.0 ? cydaw::base::Text("-") : cydaw::base::Text()) + percent(std::abs(value));
 }
 
 // A value as these effects show it; empty for none of theirs.
-juce::String resonanceFormat(const juce::String& binding, const double value)
+cydaw::base::Text resonanceFormat(const cydaw::base::Text& binding, const double value)
 {
     if (const auto suffix = resonanceSuffixOf(binding, "resonateurs"); suffix.isNotEmpty()) {
         if (suffix == "note")
             return resonanceNoteName(static_cast<int>(std::lround(value)));
         if (suffix.startsWith("interval")) {
             const auto steps = static_cast<int>(std::lround(value));
-            return (steps > 0 ? juce::String("+") : juce::String()) + juce::String(steps) + (ui::french() ? " dt" : " st");
+            return (steps > 0 ? cydaw::base::Text("+") : cydaw::base::Text()) + cydaw::base::Text(steps) + (ui::french() ? " dt" : " st");
         }
         if (suffix == "mode")
             return resonateursModeName(static_cast<int>(std::lround(value)));
@@ -778,7 +779,7 @@ juce::String resonanceFormat(const juce::String& binding, const double value)
             return corpsTypeName(static_cast<int>(std::lround(value)));
         if (suffix == "decay") {
             const auto seconds = resonanced::corpsSecondsOf(static_cast<float>(value));
-            return juce::String(seconds, seconds < 1.0 ? 2 : 1) + " s";
+            return cydaw::base::Text(seconds, seconds < 1.0 ? 2 : 1) + " s";
         }
         if (suffix == "material") {
             if (value <= 0.02)
@@ -798,16 +799,16 @@ juce::String resonanceFormat(const juce::String& binding, const double value)
             return peigneModeName(static_cast<int>(std::lround(value)));
         if (suffix == "sync") {
             if (const auto* division = engine::noteDivisionFor(static_cast<float>(value)))
-                return juce::String(std::string(division->name));
+                return cydaw::base::Text(std::string(division->name));
             return ui::Ls("Libre", "Free");
         }
         if (suffix == "feedback")
             return resonanceSigned(value);
         if (suffix == "damping")
-            return value >= 19'900.0 ? ui::Ls("Aucun", "Off") : juce::String();
+            return value >= 19'900.0 ? ui::Ls("Aucun", "Off") : cydaw::base::Text();
         if (suffix == "lfoDepth")
             return value <= 0.0005 ? ui::Ls("Coupé", "Off")
-                                   : juce::String::fromUTF8("\xc2\xb1") + juce::String(value * resonanced::peigneLfoOctaves, 2) + " oct";
+                                   : cydaw::base::Text::fromUTF8("\xc2\xb1") + cydaw::base::Text(value * resonanced::peigneLfoOctaves, 2) + " oct";
         if (suffix == "spread" || suffix == "mix")
             return percent(value);
         return {};
@@ -816,7 +817,7 @@ juce::String resonanceFormat(const juce::String& binding, const double value)
 }
 
 // A parameter of theirs that takes whole steps (a choice, a switch).
-bool resonanceStepped(const juce::String& binding)
+bool resonanceStepped(const cydaw::base::Text& binding)
 {
     for (const auto* suffix : { "resonateurs.note", "resonateurs.mode", "resonateurs.interval2", "resonateurs.interval3", "resonateurs.interval4",
                                 "resonateurs.interval5", "corps.type", "peigne.mode", "peigne.sync" })

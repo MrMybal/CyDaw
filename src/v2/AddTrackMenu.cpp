@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "AddTrackMenu.h"
 
 #include "Icons.h"
@@ -23,7 +24,7 @@ void made(UiState& state, const std::optional<TrackRef>& track)
 void instrument(Studio& studio, UiState& state, const char* french, const char* english, const char* key, const char* hint = nullptr)
 {
     if (ImGui::MenuItem(L(french, english)))
-        made(state, studio.addMidiTrack(juce::String::fromUTF8(L(french, english)), key));
+        made(state, studio.addMidiTrack(cydaw::base::Text::fromUTF8(L(french, english)), key));
     if (hint != nullptr)
         ui::tooltip(hint);
 }
@@ -49,9 +50,9 @@ void items(Studio& studio, UiState& state)
         namespace synth = engine::synth;
         for (int index = 1; index < synth::modelCount; ++index) {
             const auto& info = synth::info(static_cast<synth::Model>(index));
-            const auto name = juce::String::fromUTF8((ui::french() ? info.french : info.english).c_str());
+            const auto name = cydaw::base::Text::fromUTF8((ui::french() ? info.french : info.english).c_str());
             if (ImGui::MenuItem(name.toRawUTF8()))
-                made(state, studio.addMidiTrack(name, juce::String(info.instrument)));
+                made(state, studio.addMidiTrack(name, cydaw::base::Text(info.instrument)));
             ui::tooltip(ui::french() ? info.frenchHint.c_str() : info.englishHint.c_str());
         }
         ImGui::Separator();
@@ -67,7 +68,7 @@ void items(Studio& studio, UiState& state)
                    L("Des couches dont une seule joue : choisie, à tour de rôle, au hasard, par keyswitch ou contrôleur.",
                      "Layers of which one plays: chosen, in turn, at random, by key switch or controller."));
         if (ImGui::MenuItem("Batterie")) {
-            juce::String error;
+            cydaw::base::Text error;
             made(state, studio.addBatterieTrack(0, error));
         }
         ui::tooltip(L("La batterie : ses pièces, son mix, ses grooves.", "The drum kit: its pieces, its mix, its grooves."));

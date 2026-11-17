@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "PresetMenu.h"
 
 #include "Icons.h"
@@ -15,7 +16,7 @@ using ui::L;
 
 PresetMenu::PresetMenu(DeviceHost& studio, UiState& state) : studio_(studio), state_(state) {}
 
-void PresetMenu::report(const juce::String& text, const bool error)
+void PresetMenu::report(const cydaw::base::Text& text, const bool error)
 {
     if (text.isEmpty())
         return;
@@ -44,7 +45,7 @@ void PresetMenu::open(const char* id, const PresetHolder& holder, const Programs
 
 bool PresetMenu::load(const presets::Entry& entry, const PresetHolder& holder, const Apply& apply)
 {
-    juce::String error;
+    cydaw::base::Text error;
     const auto state = presets::read(entry, holder.kind, error);
     if (!state.isObject() || !apply(state, error)) {
         report(error, true);
@@ -76,8 +77,8 @@ void PresetMenu::button(const char* id, const PresetHolder& holder, const Captur
                         const ImVec2 size, const Programs* programs, const char* what)
 {
     const auto current = studio_.presetName(holder.key);
-    const auto tip = what != nullptr ? juce::String::fromUTF8(what) + (current.isNotEmpty() ? juce::String::fromUTF8(" \xe2\x80\x94 ") + current
-                                                                                            : juce::String())
+    const auto tip = what != nullptr ? cydaw::base::Text::fromUTF8(what) + (current.isNotEmpty() ? cydaw::base::Text::fromUTF8(" \xe2\x80\x94 ") + current
+                                                                                            : cydaw::base::Text())
                      : current.isNotEmpty() ? ui::Ls("Préréglages — ", "Presets — ") + current
                                             : ui::Ls("Préréglages : en charger, enregistrer celui-ci", "Presets: load one, save this one");
     ImGui::PushID(id);
@@ -98,7 +99,7 @@ void PresetMenu::bar(const char* id, const PresetHolder& holder, const Capture& 
     ui::tooltip(L("Préréglage précédent", "Previous preset"));
     ImGui::SameLine(0.0f, dp(2.0f));
     const auto current = studio_.presetName(holder.key);
-    const auto label = (current.isNotEmpty() ? current : juce::String(ui::Ls("(aucun préréglage)", "(no preset)"))) + "##current";
+    const auto label = (current.isNotEmpty() ? current : cydaw::base::Text(ui::Ls("(aucun préréglage)", "(no preset)"))) + "##current";
     ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(current.isNotEmpty() ? p.text : p.textFaint));
     if (ImGui::Button(label.toRawUTF8(), ImVec2(std::max(dp(80.0f), width - dp(76.0f)), 0.0f)))
         open("##presets", holder, programs);
@@ -146,9 +147,9 @@ void PresetMenu::popup(const char* id, const PresetHolder& holder, const Capture
         for (int index = 0; index < programNames_.size(); ++index) {
             ImGui::PushID(index);
             const auto name = programNames_[index].trim().isNotEmpty() ? programNames_[index]
-                                                                        : ui::Ls("Programme ", "Program ") + juce::String(index + 1);
+                                                                        : ui::Ls("Programme ", "Program ") + cydaw::base::Text(index + 1);
             if (ImGui::Selectable(name.toRawUTF8(), index == programCurrent_, ImGuiSelectableFlags_NoAutoClosePopups)) {
-                juce::String error;
+                cydaw::base::Text error;
                 if (programs->select(index, error)) {
                     programCurrent_ = index;
                     studio_.setPresetName(holder.key, name);
@@ -187,8 +188,8 @@ void PresetMenu::popup(const char* id, const PresetHolder& holder, const Capture
             const auto done = ImGui::InputText("##rename", newName_, sizeof(newName_), ImGuiInputTextFlags_EnterReturnsTrue);
             ImGui::SameLine();
             if (done || ImGui::Button("OK")) {
-                juce::String error;
-                const auto name = juce::String::fromUTF8(newName_).trim();
+                cydaw::base::Text error;
+                const auto name = cydaw::base::Text::fromUTF8(newName_).trim();
                 if (presets::rename(entry, name, error)) {
                     if (current == entry.name)
                         studio_.setPresetName(holder.key, name);
@@ -201,7 +202,7 @@ void PresetMenu::popup(const char* id, const PresetHolder& holder, const Capture
             ImGui::TextColored(theme::vec(p.record), "%s", (ui::Ls("Supprimer « ", "Remove \"") + entry.name + ui::Ls(" » ?", "\"?")).toRawUTF8());
             ImGui::SameLine();
             if (ImGui::SmallButton(L("Supprimer", "Remove"))) {
-                juce::String error;
+                cydaw::base::Text error;
                 if (!presets::remove(entry, error))
                     report(error, true);
                 else if (current == entry.name)
@@ -221,7 +222,7 @@ void PresetMenu::popup(const char* id, const PresetHolder& holder, const Capture
                     entry.name.copyToUTF8(newName_, sizeof(newName_));
                 }
                 if (ImGui::MenuItem(L("Remplacer par les réglages actuels", "Replace with the current settings"))) {
-                    juce::String error;
+                    cydaw::base::Text error;
                     if (presets::save(holder.kind, holder.target, entry.name, capture(), error))
                         studio_.setPresetName(holder.key, entry.name);
                     else
@@ -245,11 +246,11 @@ void PresetMenu::popup(const char* id, const PresetHolder& holder, const Capture
     const auto entered = ImGui::InputTextWithHint("##presetName", L("Nom du préréglage", "Preset name"), name_, sizeof(name_),
                                                   ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
-    const auto name = juce::String::fromUTF8(name_).trim();
+    const auto name = cydaw::base::Text::fromUTF8(name_).trim();
     const auto replaces = presets::find(entries, name) != nullptr && !presets::find(entries, name)->factory;
     ImGui::BeginDisabled(name.isEmpty());
     if (ui::primaryButton(replaces ? L("Remplacer", "Replace") : L("Enregistrer", "Save"), ImVec2(dp(92.0f), 0.0f)) || (entered && name.isNotEmpty())) {
-        juce::String error;
+        cydaw::base::Text error;
         if (presets::save(holder.kind, holder.target, name, capture(), error)) {
             studio_.setPresetName(holder.key, name);
             report(ui::Ls("Préréglage enregistré : ", "Preset saved: ") + name, false);

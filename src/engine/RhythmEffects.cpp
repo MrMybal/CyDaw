@@ -67,7 +67,7 @@ std::size_t powerOfTwoAbove(const double samples) noexcept
 
 // A low-pass of two poles a channel (Butterworth), for the wet sounds.
 struct LowPass {
-    std::array<Biquad, 2> sides {};
+    std::array<Biquad, 2> sides{};
     void design(const double hz, const double rate) noexcept
     {
         const auto c = designEqBand(EqBandType::highCut, std::min(hz, rate * 0.45), 0.0, 0.7071, 0, 0, rate);

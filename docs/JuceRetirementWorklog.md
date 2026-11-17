@@ -1,0 +1,269 @@
+# JUCE retirement — completed production migration
+
+Final status, 13 November 2026: the Windows production desktop and plugin worker
+build and run without JUCE. CyAudioCore owns the CyDSP numerical dependency.
+The [current report](CyAudioCoreIntegrationReport.fr.md) and
+[acceptance manifest](reports/JuceRetirementAcceptance.json) are authoritative.
+Historical, explicitly opt-in comparison fixtures remain outside production.
+Both sibling repositories were kept read-only; no push/publication was performed.
+
+The chronological notes below preserve intermediate discoveries and temporary
+boundaries. Statements about unfinished work describe their checkpoint only;
+they are not the current status or instructions to repeat completed work.
+
+## Historical implementation notes
+
+- Added original application foundation in include/cydaw/base and src/base:
+  UTF-8 Text, containers, Result, Identifier, document Value/Object/JSON,
+  native/std filesystem/streams/memory/time. Nlohmann JSON 3.11.3 is imported
+  unmodified with its MIT notice and provenance.
+- Real NativeDspGraphState and ProjectRecovery implementations now compile in
+  the common no-JUCE core. New tests exercise the actual graph and project
+  serialization, atomic save/read/recovery, Unicode and integer identities.
+- Converted Value/Object/JSON, Result and Identifier use in application sources.
+  The desktop build is being repaired incrementally, not yet validated at runtime.
+- Generic document/text conversion templates currently permit old boundaries;
+  remove those boundaries during the complete port. Their existence does NOT
+  constitute completion. The same applies to src/app/ProjectRecovery.h and
+  NativeDspGraphState.h adapters retaining file/text types.
+
+## Historical continuation notes
+
+1. Finish the current document-port desktop build; inspect only unique errors
+   from output/cyaudio-document-port-build.log. Last iteration had two errors:
+   Array::addArray needed its std::vector base insert (fixed), and a const char*
+   name erroneously got .toRawUTF8() in RemoteCommands.cpp (fixed).
+   Identifier was then ported across sources; rebuild after the running build.
+2. Build/run cydaw_base_tests in build/cyaudio-core and the actual application
+   session checks before considering this foundation checkpoint validated.
+3. Port the remaining text/file/concurrency/platform APIs, separate the hidden
+   legacy graph component's data model from GUI, and replace the native window/
+   event loop with the application's Win32/CyUI implementation.
+4. Replace remaining source/transport/recorder, MIDI/voice bookkeeping and
+   plugin-host boundaries using CyAudioCore/CyDSP and application-owned code.
+   Preserve behavior; no fake no-op features and no rename of JUCE source.
+5. Make a strict no-JUCE production build and run the complete relevant tests.
+
+Important discovery: generated native VST3 exports already use NativePlugin.cmake
+and the official MIT SDK with NO JUCE, just like CLAP/LV2. The historical
+CyDAWGraphRuntime JUCE plugin is a different target/fixture. Do not repeat the
+previous report's overbroad claim that all VST3 exports still need JUCE.
+NativeVisuals.cmake already ports shared drawing to PortableString.h. Reuse the
+existing original native editor/platform implementations where appropriate.
+
+Tooling: cmake/ctest from Visual Studio 2022 Community; see integration guide.
+File writes/builds/Git mutations generally need require_escalated on this host.
+Do not spawn agents unless authorized by user/instructions. No applicable local
+AGENTS.md was found. All changes since 58f8c87 currently belong to this work.
+
+## Validated document checkpoint
+
+- No-JUCE base/real graph/project recovery test passed.
+- Compatibility tests caught and fixed preservation of empty tokens and the
+  previous numeric-display behavior. JSON Unicode must be supplied explicitly
+  as UTF-8 to the old runtime oracle; its const-char constructor uses ANSI.
+- The complete unchanged production format scenario passed with VST3/CLAP/LV2,
+  JSFX reload/tempo/error preservation, project save/reload and export generation:
+  output/cyaudio-documents-runtime/a2d885587576416a96f60f072a315ae5/checks.json.
+- One earlier run failed the live meter after invalid JSFX compilation; a debug
+  run and the final unchanged scenario passed. Do not weaken the assertion.
+- Source File/Value/Result/Identifier ports compile in the desktop. Generic
+  text/document boundary adapters still exist and the application STILL links
+  JUCE. Continue with actual text/file/window/source/MIDI/plugin-host removal.
+
+## Native text, files, preferences and audio-file checkpoint (current work)
+
+- Source text and file/time APIs now use original base::Text/TextList/File/Time.
+  Only explicit old external ABI overrides remain typed with JUCE until those
+  interfaces are removed. Generic boundary conversion templates still exist.
+- Added original XML tree and preference storage using pinned pugixml 1.15 MIT.
+  Existing PROPERTIES XML, nested device XML, Unicode and case-sensitive keys
+  are preserved. Malformed settings are not overwritten. Saves are atomic.
+- Added original audio::AudioFormatReader/Writer/Manager and options. Real
+  sample decoding/encoding runs through CyAudioCore; no JUCE codec fallback.
+  Typed markers/regions/loops and opaque native preservation use Core's metadata.
+  Unsupported metadata export fails explicitly rather than silently dropping it.
+- Recording uses a preallocated bounded SPSC sample queue and a disk worker.
+  Waveform thumbnails now use two background readers and immutable peak data;
+  no JUCE AudioThumbnail. The preview uses the existing application segment
+  source pending the source/transport port.
+- Moved original plugin-interface data/serialization/validation out of graphical
+  ModuleInterfaceEditor into document/ModuleInterface.h + ModuleInterfaceState.cpp.
+  The actual implementation now compiles and tests in the common no-JUCE core.
+- Base and native audio-file tests pass without JUCE, including graph/interface
+  documents, old preferences, atomic saves, recording drain, actual PCM samples,
+  bounds/silence and markers. The actual app format session passed:
+  output/cyaudio-native-files-runtime/5e66d34482db485b85010e802771bfaf/checks.json.
+- Initial regressions: Mix passed. Foundry correctly edited/exported audio but
+  timed out saving session; text replacement copied the remaining string at
+  each newline (quadratic). Fixed exact replacement with a linear byte scan.
+  Project import passed Reaper/FL/Ardour/LMMS/Zrythm/AAF except MIDI-neighbour
+  stems; native findChildFiles now supports semicolon-separated masks.
+  Both unchanged regression scenarios are being rerun; inspect
+  output/cyaudio-native-files-regression-fixes.log. No assertions were weakened.
+- Native export build found a pre-existing notices path problem when called
+  from an exported project: PROJECT_SOURCE_DIR named the outer export project.
+  cydaw_copy_audio_notices now anchors to its own definition directory. Inspect
+  output/cyaudio-native-text-export-build2.log for the rerun.
+- Formatting reordered Windows includes; fixed windows.h before shell headers.
+
+Next: finish these reruns and commit this validated checkpoint, then CONTINUE
+complete retirement (do not end the user task with another partial report).
+The desktop STILL links JUCE. Audio device/source/MIDI/plugin/window/platform
+boundaries and the hidden graph model need actual removal.
+
+Graph separation preparation: tree-sitter installed ONLY under ignored
+output/migration-tools (MIT helper tooling, not an app dependency). Method maps
+are in output/graph-model-functions.json, graph-model-roots.json and
+ graph-model-reached.json. About 292 methods / 15k lines remain after excluding
+old UI refresh paths. New V2 uses these original data/compile/edit methods but
+never shows the old JUCE component. Separate those from UI, preserving actual
+algorithms, notifications, validation and history. Do not create dummy GUI
+compatibility classes. Existing modern GraphEditor already handles its own
+navigation, drawing, selection and embedded device editors. The old model's
+refreshTranslations should only apply translated type titles in the new model.
+ModuleInterface data has already been separated; do not duplicate it again.
+The maps are analysis artifacts, not final generated source, and may have old
+line numbers after edits. Parse the current files when extracting.
+
+Confirmed: both unchanged failing scenarios now PASS (Foundry 5.70s, project
+import 7.26s), including session reload. Base/native audio-file tests PASS.
+Native CLAP/LV2 exports rebuild after the notices fix; check their protocol/editor
+runner results in output/cyaudio-native-text-export-tests.log before committing.
+
+Native runner in build/cyaudio-native currently selects LV2: its real audio,
+state/parameters and editor protocol test PASSED (0.70s). Do not infer a fresh
+CLAP build from this single configured target. The app session independently
+hosted the existing CLAP/LV2/VST3 fixtures. Staged Gitleaks scan: 3.26MB, clean.
+
+## Next services phase after e1fbd3f (uncommitted)
+
+- Native UTF-8 translation embedding in cmake/Translations.cmake replaces
+  juce_add_binary_data. Byte-array generation avoids MSVC literal limits.
+  cydaw_localization + Localization have no JUCE lifecycle, locks or broadcaster.
+  Existing app refreshes languages explicitly; no listeners used the old signal.
+- Original base::Thread/ThreadPool/ThreadPoolJob/WaitableEvent and lock guards
+  replace JUCE types across sources. Actual OS thread naming/priority, cooperative
+  cancellation, restart, TLS job cancellation and task ownership are implemented.
+  Recorder no longer creates unused JUCE TimeSliceThread writers; its own bounded
+  native writer owns the disk thread. Old TimeSlice reader boundaries still exist.
+- Actual desktop NativeDspRuntime buffer adapter is generic and compiles in Core,
+  without a JUCE audio buffer include. A real gain-graph test processes samples.
+- cydaw_assets now compiles actual SamplerMapFile, SoundModelFile,
+  GraphPluginProjectGenerator and PolySynthState with NO JUCE.
+  Sample buffers use CyDSP; background workers use native threads. Explicit
+  SampleStore::shutdown is called after Studio dies. Historical GraphRuntime
+  plugin has a per-module last-user lease to stop sample workers before unload.
+- Original polyphonic serialization/restore and voice/replacer asset attachment
+  moved out of the JUCE renderer into document/PolySynthState.h + PolySynthState.cpp.
+  Do not re-extract ModuleInterface or PolySynthState; already done.
+- Imported miniz 3.1.0 MIT unmodified, SHA256 provenance + generated static export
+  header. base::InflateStream supports zlib/raw/gzip, bounded caller reads, seek,
+  gzip headers/CRC/trailers; Base64 utility uses standard encoding. SoundModel
+  now uses these functions and rejects failed compressed-table checksums.
+- Standalone no-JUCE tests pass: thread restart/events/queue/cancellation;
+  exact embedded en/fr resource bytes and language selection; deferred sample
+  load/cache/original PCM; actual compressed spectral model and corrupt rejection;
+  actual polyphonic state roundtrip; external Python zlib/gzip/raw fixtures with
+  1/17/4096/16384-byte reads, rewind, corruption; real native gain graph.
+  Tests and logs: output/cyaudio-native-*-test-build.log and
+  output/cyaudio-native-plan-state-build.log.
+
+Current build: output/cyaudio-native-services-desktop-build.log (session returned
+by exec). Must verify this full desktop build, then unchanged app format scenario
+and relevant regressions before committing services phase. Previous full desktop
+build with native sample assets passed; newest PolySynthState split is pending.
+Native miniz notice copied/installed/required by package test. Need final format,
+Gitleaks staged scan and commit after validation. No push.
+
+Remaining: complete GraphDocument separation (no new GraphDocument file yet),
+platform window/event loop/dialogs/process/socket/image services; source/transport/
+MIDI/voice/device/plugin-worker ABIs. The production desktop STILL links JUCE.
+Do NOT end task with another partial report. Continue to strict no-JUCE build.
+
+The native service checkpoint also extracts the actual polyphonic instrument plan state and asset attachment code into PolySynthState, compiled without JUCE. The unchanged desktop format scenario passed (output/cyaudio-services-runtime/132af7b4b21d48d3bf3467e97d6b5ce4), as did DJ, Foundry and project import (38.80 s total). Thread, localisation, compression and sample/model service tests passed. The production desktop still requires JUCE; graph document separation is the next step, not a claim of completed retirement.
+
+The actual V2 GraphSlot now owns GraphDocument, an application model extracted from the original catalogue, persistence, graph editing and compilation algorithms. It is compiled as cydaw_graph_document without JUCE. Its native tests exercise catalogue/factory data, editing notifications, JSON restore, undo/redo, alias changes, layout and native effect/instrument compilation. The model owns no window or legacy controls; V2 ticks deferred wavetable work, validation and parameter notifications, preserving the 180 ms history coalescing window. The old NodeGraphComponent remains only in the historical JUCE graph-plugin fixture and legacy shell, pending removal from the final production configuration.
+
+Desktop logos, PNG snapshots and FFmpeg video frames now use the app-owned straight RGBA Image service. Decode/PNG encoding reuse the already-vendored stb implementation (MIT/public-domain, with a separate distribution notice); scaling handles alpha before interpolation. GPU upload consumes contiguous RGBA directly rather than converting every pixel through a JUCE colour object. Native PNG/channel/alpha/resize/error tests pass. The desktop build with these changes succeeded. This is a checkpoint of the complete retirement, not completion of the production no-JUCE build.
+
+The next native service phase routes Standard MIDI File parsing and serialization through CyAudioCore::Core, including the live engine import/export, MIDI/stem imports and Ardour regions. Independent SMF fixtures test running status, tempo/signature/name metadata, repeated-note pairing, zero-velocity note-off, roundtrip and rejection without destroying a previous document.
+
+The application now owns EventLoop dispatch, periodic timers, async coalescing and weak callback lifetimes. The current JUCE shell temporarily drains that queue from its TickTimer; the native shell must take over that dispatch when it is replaced. The shared historical plugin UI ticks GraphSlot pending work as well. Tests cover dispatch ordering, cancellation, timer stop/destruction and weak-owner expiry.
+
+Windows file selection uses IFileDialog (filters, multi-select, directories, overwrite prompts); cancelling or destroying a queued dialog prevents stale callbacks. This native dialog implementation is Windows-only at this stage. Other platform UI integration is not claimed validated. Windows process creation restricts inherited handles and preserves argument quoting; process/mapping/dynamic-library services are original OS implementations. Child argument, exit-code, timeout/kill, shared mapped-view and symbol tests pass. Native TCP sockets also replace the remote-control and Python-service JUCE sockets. The actual remote-control server compiles/tests without JUCE and enforces loopback binding, tokens, UI-thread dispatch and HTTP rejection.
+
+Native platform checkpoint validation: all four standalone tests passed in 0.41 s (output/cyaudio-native-platform-tests.log). The desktop built with the native process, mapping, socket, timer and SMF services. Unchanged DJ, Foundry and project-import scenarios passed in 39.98 s. The actual JSFX/CLAP/LV2/VST3/save/reopen scenario passed at output/cyaudio-native-platform-runtime/e9b6059ad2c04f12b57c8b1907785a01. Native file-dialog cancellation is tested; interactive user selection has not yet been automated. Audio source/voice/MIDI-device ABIs, the production plugin-worker instance API and the main window shell still need removal of their remaining JUCE interfaces; continue to the complete production no-JUCE build.
+
+Audio-source foundation (not yet switched into the production engine): SampleBuffer uses CyDSP aligned ownership and VectorOps, with allocation-free borrowed channel views, deep copies, bounded reuse, gain/ramp and meter operations. Native tests pass. AudioTransportSource delegates timeline/loop processing to CyAudioCore::AudioTransport; the callback alone produces its bounded command queue, while controls publish desired state. Lifecycle, subrange/chunk rendering, immediate seek visibility, pause/resume and gap-free looping tests pass without JUCE.
+
+CyAudioCore ReadAheadSource currently prepares filesystem paths rather than an arbitrary application-rendered AudioSource. CyDaw clips render custom stretch/pitch curves through SegmentReaderSource, so an application ReadAheadScheduler/BufferingAudioSource caches those rendered pages on a worker. The callback takes page access with a single CAS attempt and does not lock, allocate or read files; a missing page is silent and counted. Native prefill/seek/end-of-file/release tests pass. The actual AudioTrackController and device SourcePlayer still use the legacy source ABI and must be switched next. No claim of production integration is made for this foundation until that switch and application scenarios pass.
+
+Production source switch: AudioTrackController, DJ, Foundry, virtual buses, parent plugin IPC buffers and mode rendering now use native SampleBuffer/AudioSource/PositionableAudioSource, the pooled rendered-page cache and CyAudioCore transport. The audition mixer is a native simple mixer retaining the requested channel width rather than the wider track-routing mixer. Native mixer sum/channel-width/lifecycle tests pass. SourcePlayer is explicitly a temporary juce::AudioIODeviceCallback boundary; it renders the native graph, preserves speaker-silence gain and handles missing hardware output pointers with prepared fallback storage. The remaining voice SDK boundary borrows buffers without sample copies and is the next retirement target.
+
+Production validation: desktop build succeeded; effects, routing, mix-effects, DJ, Foundry and project-import scenarios passed (63.13 s total, output/cyaudio-native-sources-regressions.log). The actual JSFX/CLAP/LV2/VST3 scenario also passed with the native buffers at output/cyaudio-native-sources-runtime/96fab81a2b2c40ab9112aa955d6f4466. This confirms the native source graph is used by the real application; it does not yet establish a completely JUCE-free desktop or worker.
+
+Native voice allocation now replaces juce::Synthesiser/SynthesiserVoice/SynthesiserSound in both actual track voices and GraphPolySynthRenderer. PlanSynthesiser retains its original voicing, choke, mono/legato, glide and sampler-context code over the app-owned allocator. The audio renderer remains the existing stereo PolyVoice implementation; Core's generic custom synthesizer renderer is mono, so it cannot directly substitute this stereo voice contract. Prepared EventBuffer delegates event storage/validation/order to CyAudioCore::MidiBuffer, and MidiEffectsHost is independent of JUCE. The graph renderer compiles in cydaw_instrument_renderer with no JUCE includes or links; tests validate actual instrument timing, sustain/release, A4 frequency and channel pitch expression. Generic buffer/event bridges remain only for callers still using old MIDI/device or fixture ABIs, with preallocated event storage.
+
+The production desktop build succeeded after the voice switch. Nine unchanged application scenarios passed in 143.16 s: effects, synths, mode processing, instrument containers, Batterie, live SFZ, tempo audition, knob glide and live voice telemetry (output/cyaudio-native-voices-regressions.log). The JSFX/CLAP/LV2/VST3 runtime scenario passed at output/cyaudio-native-voices-runtime/daf5fc3a6ae342bb83b3efaf75760d7b. Remaining work is still the device/MIDI I/O surface, worker instance API and the main application shell, followed by the strict production no-JUCE build.
+
+Next MIDI foundation: native Message (short inline wire messages, owned SysEx), MessageCollector over CyAudioCore::MidiEventCollector, and KeyboardState are implemented and tested without JUCE. Tests prove exact device-anchor sample offsets, future-event retention, channel-aware keyboard state and queued keyboard injection. SourcePlayer now publishes a thread-local Core AudioClockAnchor from the callback host timestamp/frame/rate for native collectors; fallback anchors are host-clock estimates, not measured physical latency. These services are not yet substituted for the production MIDI input/output classes. The remaining MIDI device-manager/callback surface must be switched before claiming native MIDI I/O complete.
+
+
+Production audio/MIDI I/O checkpoint: DeviceManager, SourcePlayer, input recorder, virtual buses, controller mappings, MIDI device discovery and transport-sync MIDI now use application contracts over CyAudioCore. The native manager mixes independent callback outputs in reverse registration order, preserving input capture before source rendering. It persists the historical DEVICESETUP attribute names, validates active hardware masks separately from dense client channels, and exposes real Core stream metadata. The MIDI ports use serialized Core selectors and Core arrival timestamps; output sends stay on the existing application output workers where applicable.
+
+No-JUCE tests cover callback ordering/summing, duplicate registration, lifecycle, XML roundtrip, invalid channel selection, actual Core null callbacks and host anchors. A silent hardware probe also passed on ASIO Fireface USB. The desktop compiled and five unchanged real-time scenarios passed with an isolated profile: routing, mix effects, DJ, Foundry and voice telemetry (56.29 s; output/cyaudio-native-manager-isolated-regressions.log). Initial testing caught and fixed a DEVICESETUP attribute-name regression. Subsequent scenarios isolate APPDATA/LOCALAPPDATA so they cannot save device choices into the user's profile.
+
+A reproducible Core/provider issue was found: the DirectSound primary-device label is returned in Windows ACP (for example the French primary audio-device label), unlike other UTF-8 labels. The application converts invalid DirectSound labels from ACP at the Windows boundary; the private Core repository was not modified. JSON remote responses now report serialization errors rather than returning an empty line. Core could normalize this label upstream. Hotplug/reconnection and the cross-platform native editor implementations still require explicit validation; the complete no-JUCE desktop/worker objective is not finished at this checkpoint.
+
+
+Native plugin worker/client checkpoint: the production CyDAWPluginWorker target is now an ordinary C++ executable over CyAudioCore::Plugins and app-owned IPC, with no JUCE include paths or libraries. All four providers (VST3, CLAP, LV2, JSFX) are used directly. The original per-instance process/mapped-memory/wake protocol, automation, transport snapshots, parent monitoring and failure silence remain. The Win32 editor embeds real Core native interfaces and supplies native generic parameter controls when appropriate. Plugin command errors return to the parent without killing the worker. The actual application IPC client and Audio Probe also compile independently of JUCE.
+
+The private Core API returns only a Status for JSFX compilation failures and currently lacks preset discovery. App adaptations retain compiler diagnostics through Core's same bundled ysfx runtime and enumerate the explicit LV2 bundle's presets through Core's bundled Lilv, passing standard Turtle state back to the public PluginInstance. No duplicate EEL runtime is linked into the worker. This direct dependency on bundled public third-party headers should become optional once Core exposes equivalent diagnostics/preset APIs. Stereo voice scheduling and rendered-source read-ahead remain the other previously recorded app adaptations.
+
+WASAPI validation exposed a second boundary detail: Core reports the physical period, while miniaudio also has a nominal client callback FIFO. On the available device the physical period is 480 frames at 48 kHz. Retaining a nominal request of 256 caused callback bursts and missed isolated-plugin responses, even when the adapter capacity was enlarged. The app now prepares and opens the client with the negotiated bound, aligning that FIFO too; it reports the resulting client buffer size. The regression probe asserts stable callback frames. Device telemetry now exposes plugin missed-block counters through the existing local status command.
+
+Native host tests pass for exact JSFX 60/120 BPM behavior, state roundtrip, historical bounded six-bit state decoding, and actual LV2 preset selection/state changes. The existing IPC test now runs without JUCE: process passthrough, worker crash/bypass, first-response silence, live parameter mailbox, state/parameter restore, and editor show/hide passed against the actual VST3 gain fixture. Audio Probe enumeration/self-test passed (Windows Audio/shared/exclusive/low-latency, DirectSound; 2 MIDI inputs and 3 outputs). Direct worker validation passed for VST3 graph state/parameter automation and CLAP/LV2/JSFX processing/state/editor creation. The unchanged four-format application scenario passed before the client switch at output/cyaudio-native-worker-runtime/005aa151ee794791934ff79064959124 and, after native client buffers/file streams, on a fresh profile at output/cyaudio-native-client-runtime/0ae0fede854a47c284012d50ec59b391. It covers JSFX edit/reload/diagnostics/tempo, CLAP/LV2/VST3, presets, project save/reopen, and generation of all three export projects.
+
+Remaining objective: retire the desktop window/event-loop and miscellaneous platform/helper services, configure/build the actual desktop without any JUCE target/checkout, and run final application/export checks. This worker checkpoint does not mark the full migration complete.
+
+
+Native desktop checkpoint: the complete production executable now builds in the
+fresh build/cyaudio-native-desktop tree without JUCE configuration, headers or
+libraries. Native main window/EventLoop/D3D surface, UDP/OSC/high-resolution
+transport clock, remaining primitive/file/platform services, streaming WinHTTP
+and ZIP imports are connected. Default presets and packaging no longer fetch
+or require JUCE. Historical comparison fixtures are explicitly opt-in. The
+41-project generated production dependency graph passes the no-JUCE check.
+Full regression acceptance remains in progress; do not stop at this build milestone.
+
+The first full suite exposed a cross-volume native File relative-path bug,
+now fixed with an absolute-path fallback and a regression test. The previously
+failing rhythmic project roundtrip, Unicode ZIP/HTTP/native platform tests,
+base tests and production no-JUCE graph checks all pass after the fix. Optional
+factory banks are reported as absent in isolated profiles, rather than silently
+weakening synthetic sampler assertions; a separate strict installed-bank run
+is required. Windows worker/probe argv parsing now preserves Unicode with the
+native UTF-16 command line. Final runtime/export acceptance is the next step.
+
+
+## Final acceptance
+
+The fresh native Release build succeeds with JUCE fetch and fixtures disabled.
+All 41 generated production dependencies pass the no-JUCE check. The complete
+119-case suite has zero failures; the isolated optional Batterie skip and strict
+sampler bank were then exercised successfully against installed read-only media.
+Native CLAP/LV2 exports pass audio/state/editor checks, native VST3 passes editor
+lifecycle checks and all 47 official validator tests. Actual four-format desktop
+sessions pass both with Unicode paths and on Fireface ASIO. IPC crash/state/editor,
+VST3 pinned controls and five real plugin windows also pass. Eight package checks
+pass and a final local Alpha ZIP is generated without requiring a JUCE checkout.
+
+Final fixes preserve Windows UTF-16 environment paths and argv, cross-volume
+references, asynchronous binary sample caches, empty-session transport clocks,
+lazy cancellable scans, plugin parameter refresh and driver-advertised ASIO
+quanta. COM initialization is required before ASIO discovery. The real factory
+runs pass in both ASIO and WASAPI. Windows production retirement is complete;
+other desktop ports, measured analog latency, recording/hotplug and broad
+third-party plugin compatibility remain separate acceptance work, not a hidden
+JUCE dependency. See the current report for precise upstream Core API gaps.

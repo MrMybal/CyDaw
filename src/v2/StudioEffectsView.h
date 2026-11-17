@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "DeviceVisuals.h"
@@ -15,7 +16,7 @@ namespace cydaw::v2::visual {
 // The file a card holds (a cabinet's impulse response), for the panes that
 // show it; set around a card's panes by whoever draws it (CardFiles.h).
 struct CardFile {
-    juce::String name; // empty: none loaded
+    cydaw::base::Text name; // empty: none loaded
     // Its frequency response: dB at cardFileCurvePoints frequencies spaced
     // evenly in octaves from 20 Hz to 20 kHz, its middle band at 0 dB.
     const std::vector<float>* curveDb {};
@@ -59,7 +60,7 @@ bool compactControl(Param& parameter, ImVec2 origin, float width, ImU32 colour, 
 // onto more rows when they do not: each its title, its choices, its knobs.
 // Returns the height; drawn only when `draw`.
 struct ControlGroup {
-    juce::String title;
+    cydaw::base::Text title;
     std::vector<int> indices;
 };
 float controlGroups(std::vector<Param>& parameters, const std::vector<ControlGroup>& groups, ImVec2 origin, float width,
@@ -71,7 +72,7 @@ float controlGroups(std::vector<Param>& parameters, const std::vector<ControlGro
 
 // A value as these effects show it ("Opto", "4x", "Série"…); empty when the
 // parameter is none of theirs.
-[[nodiscard]] juce::String studioFormat(const Param& parameter, double value);
+[[nodiscard]] cydaw::base::Text studioFormat(const Param& parameter, double value);
 
 // A parameter of theirs that takes whole steps (a style, a type, a switch).
 [[nodiscard]] bool studioStepped(const Param& parameter);

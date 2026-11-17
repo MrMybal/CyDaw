@@ -1,5 +1,5 @@
-# Compile the existing, CyDAW-owned drawing algorithms against a small std::string
-# value type. Authoring-only theme files and translation loading are excluded.
+# Compile the existing CyDaw-owned drawing algorithms with the same native
+# application types. Authoring-only theme files and translation loading are excluded.
 # No JUCE source directory is added to this project.
 set(native_visual_dir "${CMAKE_CURRENT_BINARY_DIR}/native-visuals")
 file(MAKE_DIRECTORY "${native_visual_dir}")
@@ -27,13 +27,11 @@ foreach(name IN LISTS files)
         native_slice("${content}" "// A colour theme:" "// Applies colours and sizes" metadata)
         string(REPLACE "${metadata}" "" content "${content}")
     elseif(name STREQUAL "Widgets.cpp")
-        native_slice("${content}" "    const auto file = juce::File" "\njuce::String language()" loader)
+        native_slice("${content}" "    const auto file = cydaw::base::File" "\ncydaw::base::Text language()" loader)
         string(REPLACE "${loader}" "}\n" content "${content}")
         string(REPLACE "bool gFrench = true;" "bool gFrench = false;" content "${content}")
         string(REPLACE "gLanguage { \"fr\" }" "gLanguage { \"en\" }" content "${content}")
     endif()
-    string(REPLACE "#include <juce_core/juce_core.h>" "#include \"PortableString.h\"" content "${content}")
-    string(REPLACE "juce::" "cydaw::portable::" content "${content}")
     if(content MATCHES "#include [<\"]juce_")
         message(FATAL_ERROR "${name} introduced a JUCE include into the native renderer")
     endif()

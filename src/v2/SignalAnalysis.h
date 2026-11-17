@@ -62,6 +62,7 @@ public:
     [[nodiscard]] const std::array<float, binCount>& peaks() const noexcept { return peaks_; }
     // A row of the waterfall in dB, 0 the newest.
     [[nodiscard]] const float* row(int age) const noexcept;
+    [[nodiscard]] std::uint64_t historyRevision() const noexcept { return historyRevision_; }
     [[nodiscard]] bool active() const noexcept { return active_; }
     [[nodiscard]] static float frequencyOfBin(float bin) noexcept;
 
@@ -71,6 +72,7 @@ private:
     std::array<double, binCount> peakTimes_ {};
     std::array<float, binCount * rowCount> rows_ {};
     int newestRow_ {};
+    std::uint64_t historyRevision_ {};
     double lastUpdate_ {};
     double lastFresh_ { -1.0e9 };
     double lastRow_ {};

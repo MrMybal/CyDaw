@@ -1,4 +1,11 @@
+#include <cydaw/base/DispatchPause.h>
+#include <cydaw/base/EventLoop.h>
+#include <cydaw/base/Thread.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ImGuiHost.h"
+#include "FramePacing.h"
+#include "KeyLatencyProbe.h"
 
 #include "Theme.h"
 #include "Widgets.h"
@@ -6,7 +13,7 @@
 
 #include <imgui.h>
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
  #ifndef WIN32_LEAN_AND_MEAN
   #define WIN32_LEAN_AND_MEAN
  #endif
@@ -32,7 +39,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM,
 
 namespace cydaw::v2 {
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
 
 struct ImGuiHost::Native {
     HWND hwnd {};
@@ -49,8 +56,8 @@ struct ImGuiHost::Native {
     bool backendsReady {};
     float dpi { 1.0f };
     bool rendering {};
-    juce::String adapter;
-    std::map<juce::String, ID3D11ShaderResourceView*> textures;
+    cydaw::base::Text adapter;
+    std::map<cydaw::base::Text, ID3D11ShaderResourceView*> textures;
 
     void releaseTextures()
     {
@@ -102,7 +109,7 @@ struct ImGuiHost::Native {
             return false;
         DXGI_ADAPTER_DESC description {};
         if (SUCCEEDED(dxgiAdapter->GetDesc(&description)))
-            adapter = juce::String(description.Description);
+            adapter = cydaw::base::Text(description.Description);
         dxgiAdapter->GetParent(IID_PPV_ARGS(&factory));
         dxgiAdapter->Release();
         if (factory == nullptr)
@@ -183,13 +190,13 @@ struct NativeAccess {
     }
     static void dropped(ImGuiHost& host, HDROP drop)
     {
-        juce::StringArray files;
+        cydaw::base::TextList files;
         const auto count = DragQueryFileW(drop, 0xffffffff, nullptr, 0);
         for (UINT i = 0; i < count; ++i) {
             const auto length = DragQueryFileW(drop, i, nullptr, 0);
             std::wstring buffer(length + 1, L'\0');
             DragQueryFileW(drop, i, buffer.data(), length + 1);
-            files.add(juce::String(buffer.c_str()));
+            files.add(cydaw::base::Text(buffer.c_str()));
         }
         POINT point {};
         DragQueryPoint(drop, &point);
@@ -224,14 +231,26 @@ const std::wstring& windowClassName()
 
 LRESULT CALLBACK surfaceProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if (message == WM_KEYDOWN && (lParam & (1LL << 30)) == 0)
+        app::key_latency::window(static_cast<int>(wParam));
     auto* host = NativeAccess::hostFor(hwnd);
     auto* native = host != nullptr ? NativeAccess::native(*host) : nullptr;
+    if (message == WM_NCHITTEST && host && host->onWindowHitTest) {
+        const auto x = static_cast<int>(static_cast<short>(LOWORD(lParam)));
+        const auto y = static_cast<int>(static_cast<short>(HIWORD(lParam)));
+        if (host->onWindowHitTest(x, y) != HTCLIENT) return HTTRANSPARENT;
+    }
+
     if (native != nullptr && native->imgui != nullptr && native->backendsReady) {
         ImGui::SetCurrentContext(native->imgui);
         if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
             return 1;
     }
     switch (message) {
+        case WM_TIMER:
+            cydaw::base::EventLoop::dispatchPending();
+            if(host)host->poll();
+            return 0;
         case WM_SIZE:
             if (native != nullptr && wParam != SIZE_MINIMIZED) {
                 native->pendingWidth = LOWORD(lParam);
@@ -291,8 +310,11 @@ LRESULT CALLBACK surfaceProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPar
         }
         case WM_SYSCOMMAND:
             // Alt alone must not open the system menu of the parent window.
-            if ((wParam & 0xfff0) == SC_KEYMENU)
+            if ((wParam & 0xfff0) == SC_KEYMENU) {
+                if (lParam == VK_SPACE && host && host->onWindowAction)
+                    PostMessageW(GetParent(hwnd), WM_SYSCOMMAND, wParam, lParam);
                 return 0;
+            }
             break;
         default:
             break;
@@ -318,29 +340,15 @@ void registerWindowClass()
 
 } // namespace
 
-ImGuiHost::ImGuiHost()
-    : native_(std::make_unique<Native>()),
-      vblank_(this, [this](const double timestamp) {
-          lastVBlankMs_ = juce::Time::getMillisecondCounterHiRes();
-          vblank(timestamp);
-      })
-{
-    setOpaque(true);
-    setWantsKeyboardFocus(true);
-    addAndMakeVisible(embed_);
-    fallback_.startTimerHz(30);
-}
-
-void ImGuiHost::Fallback::timerCallback()
-{
-    const auto now = juce::Time::getMillisecondCounterHiRes();
-    if (now - host.lastVBlankMs_ > 200.0)
-        host.vblank(now * 0.001);
-}
+ImGuiHost::ImGuiHost() : native_(std::make_unique<Native>()) {}
+void ImGuiHost::create(void* parent,int width,int height){parent_=parent;bounds_={0,0,std::max(1,width),std::max(1,height)};createNativeWindow();}
+void ImGuiHost::setBounds(cydaw::base::Rectangle<int> bounds){bounds_=bounds;if(native_->hwnd)MoveWindow(native_->hwnd,bounds.getX(),bounds.getY(),bounds.getWidth(),bounds.getHeight(),TRUE);wake();}
+void* ImGuiHost::nativeHandle()const noexcept{return native_->hwnd;}
+void ImGuiHost::poll(){vblank(cydaw::base::Time::getMillisecondCounterHiRes()*.001);}
 
 ImGuiHost::~ImGuiHost()
 {
-    fallback_.stopTimer();
+    if(native_->hwnd)KillTimer(native_->hwnd,1);
     if (native_->backendsReady) {
         ImGui::SetCurrentContext(native_->imgui);
         ImGui_ImplDX11_Shutdown();
@@ -354,27 +362,27 @@ ImGuiHost::~ImGuiHost()
     }
     if (native_->hwnd != nullptr)
         SetWindowLongPtrW(native_->hwnd, GWLP_USERDATA, 0);
-    // The embed destroys the window.
-    embed_.setHWND(nullptr);
+    if(native_->hwnd && IsWindow(native_->hwnd))DestroyWindow(native_->hwnd);
+    native_->hwnd=nullptr;
 }
 
 void ImGuiHost::createNativeWindow()
 {
-    if (native_->hwnd != nullptr || getPeer() == nullptr)
+    if (native_->hwnd != nullptr)
         return;
     registerWindowClass();
     // In the background, never the active window, even before it is embedded.
     native_->hwnd = CreateWindowExW(background ? WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW : 0, windowClassName().c_str(), L"CyDAW",
-                                    WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
-                                    0, 0, std::max(1, getWidth()), std::max(1, getHeight()),
-                                    nullptr, nullptr, thisModule(), nullptr);
+                                    (parent_ ? WS_CHILD | WS_VISIBLE : WS_POPUP) | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+                                    bounds_.getX(), bounds_.getY(), bounds_.getWidth(), bounds_.getHeight(),
+                                    static_cast<HWND>(parent_), nullptr, thisModule(), nullptr);
     if (native_->hwnd == nullptr)
         return;
     SetWindowLongPtrW(native_->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
     DragAcceptFiles(native_->hwnd, TRUE);
-    embed_.setHWND(native_->hwnd);
-    embed_.setBounds(getLocalBounds());
-    embed_.updateHWNDBounds();
+    // Legacy exported test fixtures can embed this child without owning the
+    // application's polling loop. Native desktop polling supplies full pacing.
+    SetTimer(native_->hwnd,1,16,nullptr);
 
     if (!native_->createDevice()) {
         native_->destroyDevice();
@@ -392,7 +400,7 @@ void ImGuiHost::createNativeWindow()
     // screen; dragged back over the main window, it docks again. Kept inside
     // the main window when CYDAW_SINGLE_VIEWPORT is set, so a snapshot shows
     // the device windows too (tests).
-    if (ownWindows && juce::SystemStats::getEnvironmentVariable("CYDAW_SINGLE_VIEWPORT", {}).isEmpty())
+    if (ownWindows && cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_SINGLE_VIEWPORT", {}).isEmpty())
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     io.ConfigViewportsNoTaskBarIcon = true;
     io.ConfigViewportsNoDefaultParent = false;
@@ -421,30 +429,6 @@ void ImGuiHost::createNativeWindow()
     wake(30);
 }
 
-void ImGuiHost::resized()
-{
-    embed_.setBounds(getLocalBounds());
-    wake();
-}
-
-void ImGuiHost::parentHierarchyChanged()
-{
-    if (isShowing())
-        createNativeWindow();
-}
-
-void ImGuiHost::visibilityChanged()
-{
-    if (isShowing())
-        createNativeWindow();
-}
-
-void ImGuiHost::focusGained(FocusChangeType)
-{
-    if (native_->hwnd != nullptr && !background)
-        SetFocus(native_->hwnd);
-}
-
 bool ImGuiHost::isReady() const noexcept
 {
     return native_->backendsReady;
@@ -455,22 +439,35 @@ float ImGuiHost::dpiScale() const noexcept
     return native_->dpi;
 }
 
-juce::String ImGuiHost::rendererDescription() const
+cydaw::base::Text ImGuiHost::rendererDescription() const
 {
     return "Direct3D 11 — " + native_->adapter;
 }
 
 void ImGuiHost::wake(const int frames)
 {
+    if (wakeFrames_ <= 0 && !animating_ && frames > 0)
+        nextFrameSeconds_ = std::min(nextFrameSeconds_,
+            cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 + 1.0 / frameRateHz_);
     wakeFrames_ = std::max(wakeFrames_, frames);
 }
 
 void ImGuiHost::setAnimating(const bool animating)
 {
+    if (animating && !animating_)
+        nextFrameSeconds_ = std::min(nextFrameSeconds_,
+            cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 + 1.0 / frameRateHz_);
     animating_ = animating;
 }
 
-void ImGuiHost::captureNextFrame(const juce::File& target, std::function<void(bool)> done)
+void ImGuiHost::setFrameRateLimit(const int framesPerSecond) noexcept
+{
+    frameRateHz_ = framesPerSecond == 30 || framesPerSecond == 120 ? framesPerSecond : 60;
+    nextFrameSeconds_ = 0.0;
+    wake();
+}
+
+void ImGuiHost::captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done)
 {
     captureTarget_ = target;
     captureDone_ = std::move(done);
@@ -479,22 +476,17 @@ void ImGuiHost::captureNextFrame(const juce::File& target, std::function<void(bo
 
 void ImGuiHost::vblank(const double timestampSeconds)
 {
-    if (!native_->backendsReady) {
-        if (isShowing())
-            createNativeWindow();
-        return;
-    }
+    if (!native_->backendsReady) return;
     // Idle: a dozen frames a second keeps tooltips and slow changes alive.
     const auto idle = wakeFrames_ <= 0 && !animating_;
-    if (idle && timestampSeconds - lastFrameSeconds_ < 1.0 / 12.0)
+    if (!detail::frameDue(timestampSeconds, idle ? 12.0 : frameRateHz_, nextFrameSeconds_))
         return;
-    lastFrameSeconds_ = timestampSeconds;
     if (wakeFrames_ > 0)
         --wakeFrames_;
     frame();
 }
 
-unsigned long long ImGuiHost::texture(const juce::String& key, const juce::Image& image)
+unsigned long long ImGuiHost::texture(const cydaw::base::Text& key, const cydaw::base::Image& image)
 {
     auto& n = *native_;
     if (const auto found = n.textures.find(key); found != n.textures.end())
@@ -504,16 +496,6 @@ unsigned long long ImGuiHost::texture(const juce::String& key, const juce::Image
     // Straight RGBA, as the renderer blends it.
     const auto width = image.getWidth();
     const auto height = image.getHeight();
-    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
-    for (int y = 0; y < height; ++y)
-        for (int x = 0; x < width; ++x) {
-            const auto colour = image.getPixelAt(x, y);
-            auto* pixel = pixels.data() + (static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)) * 4;
-            pixel[0] = colour.getRed();
-            pixel[1] = colour.getGreen();
-            pixel[2] = colour.getBlue();
-            pixel[3] = colour.getAlpha();
-        }
     D3D11_TEXTURE2D_DESC desc {};
     desc.Width = static_cast<UINT>(width);
     desc.Height = static_cast<UINT>(height);
@@ -524,7 +506,7 @@ unsigned long long ImGuiHost::texture(const juce::String& key, const juce::Image
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     D3D11_SUBRESOURCE_DATA data {};
-    data.pSysMem = pixels.data();
+    data.pSysMem = image.data();
     data.SysMemPitch = static_cast<UINT>(width * 4);
     ID3D11Texture2D* created {};
     if (FAILED(n.device->CreateTexture2D(&desc, &data, &created)) || created == nullptr)
@@ -543,7 +525,7 @@ unsigned long long ImGuiHost::texture(const juce::String& key, const juce::Image
 }
 
 // Reuse one GPU resource for a video stream instead of caching every frame.
-unsigned long long ImGuiHost::updateTexture(const juce::String& key,const juce::Image& image)
+unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text& key,const cydaw::base::Image& image)
 {
     if(!native_||!image.isValid())return 0;
     auto& n=*native_;
@@ -555,16 +537,10 @@ unsigned long long ImGuiHost::updateTexture(const juce::String& key,const juce::
     if(desc.Width!=static_cast<UINT>(image.getWidth())||desc.Height!=static_cast<UINT>(image.getHeight())){
         resource->Release();releaseTexture(key);return texture(key,image);
     }
-    juce::Image::BitmapData bitmap(image,juce::Image::BitmapData::readOnly);
-    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(image.getWidth())*image.getHeight()*4);
-    for(int y=0;y<image.getHeight();++y)for(int x=0;x<image.getWidth();++x){
-        const auto colour=bitmap.getPixelColour(x,y);const auto i=(static_cast<std::size_t>(y)*image.getWidth()+x)*4;
-        pixels[i]=colour.getRed();pixels[i+1]=colour.getGreen();pixels[i+2]=colour.getBlue();pixels[i+3]=255;
-    }
-    n.context->UpdateSubresource(resource,0,nullptr,pixels.data(),static_cast<UINT>(image.getWidth()*4),0);
+    n.context->UpdateSubresource(resource,0,nullptr,image.data(),static_cast<UINT>(image.stride()),0);
     resource->Release();return reinterpret_cast<unsigned long long>(found->second);
 }
-void ImGuiHost::releaseTexture(const juce::String& key)
+void ImGuiHost::releaseTexture(const cydaw::base::Text& key)
 {
     if(!native_)return;
     if(auto it=native_->textures.find(key);it!=native_->textures.end()){it->second->Release();native_->textures.erase(it);}
@@ -579,9 +555,9 @@ void ImGuiHost::renderNow()
 void ImGuiHost::frame()
 {
     auto& n = *native_;
-    if (n.rendering)
+    if (n.rendering || cydaw::base::eventDispatchPaused())
         return;
-    const juce::ScopedValueSetter<bool> guard(n.rendering, true);
+    const cydaw::base::ScopedValueSetter<bool> guard(n.rendering, true);
     ImGui::SetCurrentContext(n.imgui);
 
     // The surface keeps the keyboard while the window is the active one.
@@ -620,7 +596,7 @@ void ImGuiHost::frame()
     n.context->ClearRenderTargetView(n.target, clear);
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    if (captureTarget_ != juce::File {}) {
+    if (captureTarget_ != cydaw::base::File {}) {
         auto ok = false;
         ID3D11Texture2D* back {};
         if (SUCCEEDED(n.swapChain->GetBuffer(0, IID_PPV_ARGS(&back))) && back != nullptr) {
@@ -635,28 +611,26 @@ void ImGuiHost::frame()
                 n.context->CopyResource(staging, back);
                 D3D11_MAPPED_SUBRESOURCE mapped {};
                 if (SUCCEEDED(n.context->Map(staging, 0, D3D11_MAP_READ, 0, &mapped))) {
-                    juce::Image image(juce::Image::RGB, static_cast<int>(desc.Width), static_cast<int>(desc.Height), false);
-                    juce::Image::BitmapData pixels(image, juce::Image::BitmapData::writeOnly);
+                    cydaw::base::Image image(static_cast<int>(desc.Width), static_cast<int>(desc.Height));
                     for (UINT y = 0; y < desc.Height; ++y) {
                         const auto* row = static_cast<const std::uint8_t*>(mapped.pData) + y * mapped.RowPitch;
                         for (UINT x = 0; x < desc.Width; ++x)
-                            pixels.setPixelColour(static_cast<int>(x), static_cast<int>(y),
-                                                  juce::Colour(row[x * 4], row[x * 4 + 1], row[x * 4 + 2]));
+                            image.setPixelAt(static_cast<int>(x), static_cast<int>(y),
+                                                  cydaw::base::Colour(row[x * 4], row[x * 4 + 1], row[x * 4 + 2]));
                     }
                     n.context->Unmap(staging, 0);
                     captureTarget_.getParentDirectory().createDirectory();
                     captureTarget_.deleteFile();
-                    juce::FileOutputStream stream(captureTarget_);
-                    juce::PNGImageFormat png;
-                    ok = stream.openedOk() && png.writeImageToStream(image, stream);
+                    cydaw::base::FileOutputStream stream(captureTarget_);
+                    ok = stream.openedOk() && image.writePng(stream);
                 }
                 staging->Release();
             }
             back->Release();
         }
-        captureTarget_ = juce::File {};
+        captureTarget_ = cydaw::base::File {};
         if (auto done = std::exchange(captureDone_, {}))
-            juce::MessageManager::callAsync([done, ok] { done(ok); });
+            cydaw::base::EventLoop::post([done, ok] { done(ok); });
     }
 
     n.swapChain->Present(0, 0);
@@ -666,52 +640,39 @@ void ImGuiHost::frame()
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
         // Their input does not reach this window's messages: while there are
-        // any, the interface runs at the display's rate.
+        // any, the interface keeps its selected active frame rate.
         if (ImGui::GetPlatformIO().Viewports.Size > 1)
             wake(2);
     }
 }
 
-void keepInBackground(juce::Component& window)
-{
-    auto* peer = window.getPeer();
-    if (peer == nullptr)
-        return;
-    auto* hwnd = static_cast<HWND>(peer->getNativeHandle());
-    const auto style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-    SetWindowLongPtrW(hwnd, GWL_EXSTYLE,
-                      (style | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~static_cast<LONG_PTR>(WS_EX_APPWINDOW));
-    SetWindowPos(hwnd, HWND_BOTTOM, -20'000, -20'000, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-}
-
 #else
-
-void keepInBackground(juce::Component&) {}
 
 struct ImGuiHost::Native {};
 
 ImGuiHost::ImGuiHost() : native_(std::make_unique<Native>()) {}
 ImGuiHost::~ImGuiHost() = default;
 void ImGuiHost::createNativeWindow() {}
-void ImGuiHost::resized() {}
-void ImGuiHost::parentHierarchyChanged() {}
-void ImGuiHost::visibilityChanged() {}
-void ImGuiHost::focusGained(FocusChangeType) {}
+void ImGuiHost::create(void*,int,int) {}
+void ImGuiHost::setBounds(cydaw::base::Rectangle<int>) {}
+void* ImGuiHost::nativeHandle()const noexcept{return nullptr;}
+void ImGuiHost::poll() {}
 bool ImGuiHost::isReady() const noexcept { return false; }
 float ImGuiHost::dpiScale() const noexcept { return 1.0f; }
-juce::String ImGuiHost::rendererDescription() const { return "unavailable on this platform"; }
+cydaw::base::Text ImGuiHost::rendererDescription() const { return "unavailable on this platform"; }
 void ImGuiHost::wake(int) {}
-void ImGuiHost::setAnimating(bool) {}
-void ImGuiHost::captureNextFrame(const juce::File&, std::function<void(bool)> done)
+void ImGuiHost::setAnimating(bool animating) { animating_ = animating; }
+void ImGuiHost::setFrameRateLimit(int fps) noexcept { frameRateHz_ = fps == 30 || fps == 120 ? fps : 60; }
+void ImGuiHost::captureNextFrame(const cydaw::base::File&, std::function<void(bool)> done)
 {
     if (done)
         done(false);
 }
 void ImGuiHost::vblank(double) {}
 void ImGuiHost::renderNow() {}
-unsigned long long ImGuiHost::texture(const juce::String&, const juce::Image&) { return 0; }
-unsigned long long ImGuiHost::updateTexture(const juce::String&, const juce::Image&) { return 0; }
-void ImGuiHost::releaseTexture(const juce::String&) {}
+unsigned long long ImGuiHost::texture(const cydaw::base::Text&, const cydaw::base::Image&) { return 0; }
+unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text&, const cydaw::base::Image&) { return 0; }
+void ImGuiHost::releaseTexture(const cydaw::base::Text&) {}
 void ImGuiHost::frame() {}
 
 #endif

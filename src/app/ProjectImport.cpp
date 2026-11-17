@@ -1,3 +1,11 @@
+#include <cydaw/base/Zip.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Compression.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Xml.h>
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -22,27 +30,27 @@ constexpr int kMaximumLoopRepeats = 64;
 // ---------------------------------------------------------------------------
 // Small helpers shared by the XML readers.
 
-juce::String attributeText(const juce::XmlElement* element, const juce::String& name,
-                           const juce::String& fallback = {})
+cydaw::base::Text attributeText(const cydaw::base::XmlElement* element, const cydaw::base::Text& name,
+                           const cydaw::base::Text& fallback = {})
 {
     return element != nullptr && element->hasAttribute(name)
                ? element->getStringAttribute(name)
                : fallback;
 }
 
-double attributeNumber(const juce::XmlElement* element, const juce::String& name,
+double attributeNumber(const cydaw::base::XmlElement* element, const cydaw::base::Text& name,
                        const double fallback)
 {
     if (element == nullptr || !element->hasAttribute(name))
         return fallback;
     const auto text = element->getStringAttribute(name).trim();
-    if (text.isEmpty() || !(juce::CharacterFunctions::isDigit(text[0]) || text[0] == '-'
+    if (text.isEmpty() || !(cydaw::base::CharacterFunctions::isDigit(text[0]) || text[0] == '-'
                             || text[0] == '.' || text[0] == '+'))
         return fallback;
     return text.getDoubleValue();
 }
 
-bool attributeBool(const juce::XmlElement* element, const juce::String& name,
+bool attributeBool(const cydaw::base::XmlElement* element, const cydaw::base::Text& name,
                    const bool fallback)
 {
     const auto text = attributeText(element, name).trim().toLowerCase();
@@ -53,10 +61,10 @@ bool attributeBool(const juce::XmlElement* element, const juce::String& name,
 
 // Ableton keeps its values in <Name Value="..."/> children; a slash path
 // walks down to one.
-const juce::XmlElement* childPath(const juce::XmlElement* element, const juce::String& path)
+const cydaw::base::XmlElement* childPath(const cydaw::base::XmlElement* element, const cydaw::base::Text& path)
 {
     const auto* current = element;
-    for (const auto& part : juce::StringArray::fromTokens(path, "/", {})) {
+    for (const auto& part : cydaw::base::TextList::fromTokens(path, "/", {})) {
         if (current == nullptr)
             return nullptr;
         current = current->getChildByName(part);
@@ -64,21 +72,21 @@ const juce::XmlElement* childPath(const juce::XmlElement* element, const juce::S
     return current;
 }
 
-juce::String valueAt(const juce::XmlElement* element, const juce::String& path,
-                     const juce::String& fallback = {})
+cydaw::base::Text valueAt(const cydaw::base::XmlElement* element, const cydaw::base::Text& path,
+                     const cydaw::base::Text& fallback = {})
 {
     const auto* found = childPath(element, path);
     return found != nullptr && found->hasAttribute("Value") ? found->getStringAttribute("Value")
                                                              : fallback;
 }
 
-double numberAt(const juce::XmlElement* element, const juce::String& path, const double fallback)
+double numberAt(const cydaw::base::XmlElement* element, const cydaw::base::Text& path, const double fallback)
 {
     const auto text = valueAt(element, path).trim();
     return text.isEmpty() ? fallback : text.getDoubleValue();
 }
 
-bool boolAt(const juce::XmlElement* element, const juce::String& path, const bool fallback)
+bool boolAt(const cydaw::base::XmlElement* element, const cydaw::base::Text& path, const bool fallback)
 {
     const auto text = valueAt(element, path).trim().toLowerCase();
     return text.isEmpty() ? fallback : (text == "true" || text == "1");
@@ -88,37 +96,37 @@ float linearToDb(const double gain)
 {
     if (gain <= 1.0e-4)
         return -60.0f;
-    return static_cast<float>(juce::jlimit(-60.0, 12.0, 20.0 * std::log10(gain)));
+    return static_cast<float>(cydaw::base::limit(-60.0, 12.0, 20.0 * std::log10(gain)));
 }
 
 // "#rrggbb", "#rrggbbaa", "rrggbb": an ARGB value, 0 when unreadable.
-juce::uint32 colourFromHex(juce::String text)
+std::uint32_t colourFromHex(cydaw::base::Text text)
 {
     text = text.trim().removeCharacters("#");
     if (text.length() == 6)
-        return 0xff000000u | static_cast<juce::uint32>(text.getHexValue32());
+        return 0xff000000u | static_cast<std::uint32_t>(text.getHexValue32());
     if (text.length() == 8) {
-        const auto value = static_cast<juce::uint32>(text.getHexValue64());
+        const auto value = static_cast<std::uint32_t>(text.getHexValue64());
         return (value << 24) | (value >> 8);
     }
     return 0;
 }
 
-juce::uint32 colourFromFloats(const float r, const float g, const float b, const float a)
+std::uint32_t colourFromFloats(const float r, const float g, const float b, const float a)
 {
     if (a <= 0.001f)
         return 0;
     const auto channel = [](const float v) {
-        return static_cast<juce::uint32>(juce::jlimit(0, 255, juce::roundToInt(v * 255.0f)));
+        return static_cast<std::uint32_t>(cydaw::base::limit(0, 255, cydaw::base::roundToInt(v * 255.0f)));
     };
     return (channel(a) << 24) | (channel(r) << 16) | (channel(g) << 8) | channel(b);
 }
 
 // Ableton Live's colour palette, by index, the way Live 10 and later lay it
 // out: five rows of fourteen.
-juce::uint32 abletonColour(const int index)
+std::uint32_t abletonColour(const int index)
 {
-    static constexpr juce::uint32 palette[] = {
+    static constexpr std::uint32_t palette[] = {
         0xff94a6, 0xffa529, 0xcc9927, 0xf7f47c, 0xbffb00, 0x1aff2f, 0x25ffa8,
         0x5cffe8, 0x8bc5ff, 0x5480e4, 0x92a7ff, 0xd86ce4, 0xe553a0, 0xffffff,
         0xff3636, 0xf66c03, 0x99724b, 0xfff034, 0x87ff67, 0x3dc300, 0x00bfaf,
@@ -136,25 +144,25 @@ juce::uint32 abletonColour(const int index)
     return 0xff000000u | palette[index];
 }
 
-juce::String uniqueName(std::set<juce::String>& used, juce::String name, const juce::String& fallback)
+cydaw::base::Text uniqueName(std::set<cydaw::base::Text>& used, cydaw::base::Text name, const cydaw::base::Text& fallback)
 {
     name = name.trim();
     if (name.isEmpty())
         name = fallback;
     auto candidate = name;
     for (auto suffix = 2; used.count(candidate.toLowerCase()) != 0; ++suffix)
-        candidate = name + " " + juce::String(suffix);
+        candidate = name + " " + cydaw::base::Text(suffix);
     used.insert(candidate.toLowerCase());
     return candidate;
 }
 
-juce::String fileNameOf(juce::String path)
+cydaw::base::Text fileNameOf(cydaw::base::Text path)
 {
     path = path.replaceCharacter('\\', '/');
     return path.contains("/") ? path.fromLastOccurrenceOf("/", false, false) : path;
 }
 
-bool looksLikeAudio(const juce::String& path)
+bool looksLikeAudio(const cydaw::base::Text& path)
 {
     const auto lower = path.toLowerCase();
     for (const auto* extension : { ".wav", ".aif", ".aiff", ".flac", ".mp3", ".ogg", ".wma",
@@ -238,25 +246,25 @@ void unrollContent(const double contentStart, const double contentLength,
 
 class DawProjectReader {
 public:
-    DawProjectReader(const juce::File& file, ImportedProject& out)
+    DawProjectReader(const cydaw::base::File& file, ImportedProject& out)
         : file_(file), out_(out), zip_(file), folder_(file.getParentDirectory())
     {
     }
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         if (zip_.getNumEntries() == 0)
-            return juce::Result::fail("Not a DAWproject file (no zip entries): "
+            return cydaw::base::Result::fail("Not a DAWproject file (no zip entries): "
                                       + file_.getFullPathName());
         const auto index = zip_.getIndexOfFileName("project.xml", true);
         if (index < 0)
-            return juce::Result::fail("No project.xml inside " + file_.getFileName());
-        std::unique_ptr<juce::InputStream> stream(zip_.createStreamForEntry(index));
+            return cydaw::base::Result::fail("No project.xml inside " + file_.getFileName());
+        std::unique_ptr<cydaw::base::InputStream> stream(zip_.createStreamForEntry(index));
         if (stream == nullptr)
-            return juce::Result::fail("project.xml could not be read");
-        const auto document = juce::XmlDocument::parse(shared::readBounded(*stream));
+            return cydaw::base::Result::fail("project.xml could not be read");
+        const auto document = cydaw::base::XmlDocument::parse(shared::readBounded(*stream));
         if (document == nullptr || !document->hasTagName("Project"))
-            return juce::Result::fail("project.xml is not a DAWproject document");
+            return cydaw::base::Result::fail("project.xml is not a DAWproject document");
 
         out_.format = "dawproject";
         if (const auto* application = document->getChildByName("Application"))
@@ -264,10 +272,10 @@ public:
                                 + attributeText(application, "version")).trim();
         if (const auto* transport = document->getChildByName("Transport")) {
             if (const auto* tempo = transport->getChildByName("Tempo"))
-                out_.tempo = juce::jlimit(20.0, 300.0, attributeNumber(tempo, "value", 120.0));
+                out_.tempo = cydaw::base::limit(20.0, 300.0, attributeNumber(tempo, "value", 120.0));
             if (const auto* signature = transport->getChildByName("TimeSignature")) {
-                out_.numerator = juce::jlimit(1, 32, static_cast<int>(attributeNumber(signature, "numerator", 4)));
-                out_.denominator = juce::jlimit(1, 32, static_cast<int>(attributeNumber(signature, "denominator", 4)));
+                out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(attributeNumber(signature, "numerator", 4)));
+                out_.denominator = cydaw::base::limit(1, 32, static_cast<int>(attributeNumber(signature, "denominator", 4)));
             }
         }
         if (const auto* structure = document->getChildByName("Structure"))
@@ -284,11 +292,11 @@ public:
                     readScene(scene, sceneIndex++);
         }
         settleKinds();
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
-    void readTrack(const juce::XmlElement* track, const juce::String& groupName)
+    void readTrack(const cydaw::base::XmlElement* track, const cydaw::base::Text& groupName)
     {
         if (track == nullptr || !track->hasTagName("Track"))
             return;
@@ -327,7 +335,7 @@ private:
             if (const auto* pan = channel->getChildByName("Pan")) {
                 const auto unit = attributeText(pan, "unit").toLowerCase();
                 const auto value = attributeNumber(pan, "value", 0.5);
-                imported.pan = static_cast<float>(juce::jlimit(-1.0, 1.0,
+                imported.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0,
                     unit == "normalized" ? value * 2.0 - 1.0 : value));
             }
             if (const auto* mute = channel->getChildByName("Mute"))
@@ -347,8 +355,8 @@ private:
                     const auto tag = device->getTagName();
                     entry.plugin = tag.endsWithIgnoreCase("Plugin");
                     entry.format = tag.startsWith("Vst3") ? "VST3" : tag.startsWith("Vst2") ? "VST2" : tag.startsWith("Clap") ? "CLAP"
-                                   : tag.startsWith("Au") ? "AU" : juce::String();
-                    entry.type = entry.plugin ? juce::String() : tag;
+                                   : tag.startsWith("Au") ? "AU" : cydaw::base::Text();
+                    entry.type = entry.plugin ? cydaw::base::Text() : tag;
                     const auto role = attributeText(device, "deviceRole");
                     entry.instrument = role.equalsIgnoreCase("instrument");
                     entry.noteEffect = role.equalsIgnoreCase("noteFX");
@@ -363,7 +371,7 @@ private:
             trackIndexById_[channelId] = index;
     }
 
-    static float channelGain(const juce::XmlElement* channel)
+    static float channelGain(const cydaw::base::XmlElement* channel)
     {
         const auto* volume = channel != nullptr ? channel->getChildByName("Volume") : nullptr;
         if (volume == nullptr)
@@ -371,11 +379,11 @@ private:
         const auto unit = attributeText(volume, "unit").toLowerCase();
         const auto value = attributeNumber(volume, "value", 1.0);
         if (unit == "decibel" || unit == "db")
-            return static_cast<float>(juce::jlimit(-60.0, 12.0, value));
+            return static_cast<float>(cydaw::base::limit(-60.0, 12.0, value));
         return linearToDb(value);
     }
 
-    int trackIndexFor(const juce::XmlElement* element, const int inherited) const
+    int trackIndexFor(const cydaw::base::XmlElement* element, const int inherited) const
     {
         const auto reference = attributeText(element, "track");
         if (reference.isEmpty())
@@ -384,8 +392,8 @@ private:
         return found != trackIndexById_.end() ? found->second : -2;
     }
 
-    void readLanes(const juce::XmlElement* lanes, const int inheritedTrack,
-                   const juce::String& inheritedUnit, const int scene)
+    void readLanes(const cydaw::base::XmlElement* lanes, const int inheritedTrack,
+                   const cydaw::base::Text& inheritedUnit, const int scene)
     {
         const auto track = trackIndexFor(lanes, inheritedTrack);
         const auto unit = attributeText(lanes, "timeUnit", inheritedUnit).toLowerCase();
@@ -407,7 +415,7 @@ private:
         }
     }
 
-    void readScene(const juce::XmlElement* scene, const int sceneIndex)
+    void readScene(const cydaw::base::XmlElement* scene, const int sceneIndex)
     {
         for (const auto* child : scene->getChildIterator()) {
             if (child->hasTagName("Lanes"))
@@ -421,7 +429,7 @@ private:
         }
     }
 
-    double toBeats(const double value, const juce::String& unit) const
+    double toBeats(const double value, const cydaw::base::Text& unit) const
     {
         return unit == "seconds" ? out_.secondsToBeats(value) : value;
     }
@@ -429,7 +437,7 @@ private:
     // A clip: notes, audio through warps, plain audio, or clips inside it.
     // offsetBeats places nested content; limitBeats caps it to the outer
     // clip, -1 for none.
-    void readClip(const juce::XmlElement* clip, const int track, const juce::String& unit,
+    void readClip(const cydaw::base::XmlElement* clip, const int track, const cydaw::base::Text& unit,
                   const double offsetBeats, const int scene, const double limitBeats)
     {
         if (track < 0) {
@@ -473,10 +481,10 @@ private:
                 if (!note->hasTagName("Note"))
                     continue;
                 ImportedNote parsed;
-                parsed.note = juce::jlimit(0, 127, static_cast<int>(attributeNumber(note, "key", 60)));
+                parsed.note = cydaw::base::limit(0, 127, static_cast<int>(attributeNumber(note, "key", 60)));
                 parsed.startBeats = toBeats(attributeNumber(note, "time", 0.0), noteUnit);
                 parsed.lengthBeats = std::max(0.01, toBeats(attributeNumber(note, "duration", 1.0), noteUnit));
-                parsed.velocity = static_cast<float>(juce::jlimit(0.01, 1.0, attributeNumber(note, "vel", 0.8)));
+                parsed.velocity = static_cast<float>(cydaw::base::limit(0.01, 1.0, attributeNumber(note, "vel", 0.8)));
                 source.push_back(parsed);
             }
             const auto contentStart = toBeats(playStart, contentUnit);
@@ -571,7 +579,7 @@ private:
         }
     }
 
-    juce::File resolveAudio(const juce::XmlElement* fileElement)
+    cydaw::base::File resolveAudio(const cydaw::base::XmlElement* fileElement)
     {
         if (fileElement == nullptr)
             return {};
@@ -585,17 +593,17 @@ private:
                 return found->second;
             const auto index = zip_.getIndexOfFileName(path, true);
             if (index >= 0) {
-                if (mediaFolder_ == juce::File {}) {
+                if (mediaFolder_ == cydaw::base::File {}) {
                     mediaFolder_ = folder_.getChildFile(file_.getFileNameWithoutExtension() + "-media");
                     (void) mediaFolder_.createDirectory();
                 }
                 // Entries of one name in different folders get files of their own.
                 auto target = mediaFolder_.getChildFile(fileNameOf(path));
                 for (auto n = 2; claimedMedia_.count(target.getFullPathName()) > 0; ++n)
-                    target = mediaFolder_.getChildFile(juce::File(fileNameOf(path)).getFileNameWithoutExtension() + "-"
-                                                       + juce::String(n) + juce::File(fileNameOf(path)).getFileExtension());
+                    target = mediaFolder_.getChildFile(cydaw::base::File(fileNameOf(path)).getFileNameWithoutExtension() + "-"
+                                                       + cydaw::base::Text(n) + cydaw::base::File(fileNameOf(path)).getFileExtension());
                 claimedMedia_.insert(target.getFullPathName());
-                std::unique_ptr<juce::InputStream> stream(zip_.createStreamForEntry(index));
+                std::unique_ptr<cydaw::base::InputStream> stream(zip_.createStreamForEntry(index));
                 if (stream != nullptr) {
                     // Extracted before from this very entry (same size and
                     // date): kept. A stem rendered again has another date.
@@ -606,7 +614,7 @@ private:
                     if (!same) {
                         (void) target.deleteFile();
                         {
-                            juce::FileOutputStream output(target);
+                            cydaw::base::FileOutputStream output(target);
                             if (output.openedOk())
                                 output.writeFromInputStream(*stream, -1);
                         }
@@ -621,7 +629,7 @@ private:
             }
         }
         const auto resolved = resolveProjectAudioFile(folder_, path);
-        if (resolved == juce::File {})
+        if (resolved == cydaw::base::File {})
             out_.missingFiles.addIfNotAlreadyThere(path);
         return resolved;
     }
@@ -635,14 +643,14 @@ private:
         }
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::ZipFile zip_;
-    juce::File folder_;
-    juce::File mediaFolder_;
-    std::map<juce::String, int> trackIndexById_;
-    std::map<juce::String, juce::File> extracted_;
-    std::set<juce::String> claimedMedia_;
+    cydaw::base::ZipFile zip_;
+    cydaw::base::File folder_;
+    cydaw::base::File mediaFolder_;
+    std::map<cydaw::base::Text, int> trackIndexById_;
+    std::map<cydaw::base::Text, cydaw::base::File> extracted_;
+    std::set<cydaw::base::Text> claimedMedia_;
     std::vector<bool> kindDecided_;
 };
 
@@ -651,29 +659,29 @@ private:
 
 class AbletonReader {
 public:
-    AbletonReader(const juce::File& file, ImportedProject& out)
+    AbletonReader(const cydaw::base::File& file, ImportedProject& out)
         : file_(file), out_(out), folder_(file.getParentDirectory())
     {
     }
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
-        std::unique_ptr<juce::XmlElement> document;
+        std::unique_ptr<cydaw::base::XmlElement> document;
         {
-            juce::FileInputStream input(file_);
+            cydaw::base::FileInputStream input(file_);
             if (!input.openedOk())
-                return juce::Result::fail("The file could not be opened: " + file_.getFullPathName());
-            juce::GZIPDecompressorInputStream unzipped(
-                &input, false, juce::GZIPDecompressorInputStream::gzipFormat);
-            document = juce::XmlDocument::parse(shared::readBounded(unzipped));
+                return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
+            cydaw::base::InflateStream unzipped(
+                &input, false, cydaw::base::InflateStream::gzipFormat);
+            document = cydaw::base::XmlDocument::parse(shared::readBounded(unzipped));
         }
         if (document == nullptr)
-            document = juce::XmlDocument::parse(file_);
+            document = cydaw::base::XmlDocument::parse(file_);
         if (document == nullptr || !document->hasTagName("Ableton"))
-            return juce::Result::fail("Not an Ableton Live set: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not an Ableton Live set: " + file_.getFileName());
         const auto* liveSet = document->getChildByName("LiveSet");
         if (liveSet == nullptr)
-            return juce::Result::fail("The Live set holds no LiveSet element");
+            return cydaw::base::Result::fail("The Live set holds no LiveSet element");
 
         out_.format = "ableton";
         out_.application = attributeText(document.get(), "Creator", "Ableton Live");
@@ -681,23 +689,23 @@ public:
         if (master == nullptr)
             master = liveSet->getChildByName("MainTrack");
         if (master != nullptr) {
-            out_.tempo = juce::jlimit(20.0, 300.0,
+            out_.tempo = cydaw::base::limit(20.0, 300.0,
                                       numberAt(master, "DeviceChain/Mixer/Tempo/Manual", 120.0));
             out_.masterGainDb = linearToDb(numberAt(master, "DeviceChain/Mixer/Volume/Manual", 1.0));
             const auto* signature = childPath(master, "DeviceChain/Mixer/TimeSignature/TimeSignatures/RemoteableTimeSignature");
             if (signature != nullptr) {
-                out_.numerator = juce::jlimit(1, 32, static_cast<int>(numberAt(signature, "Numerator", 4)));
-                out_.denominator = juce::jlimit(1, 32, static_cast<int>(numberAt(signature, "Denominator", 4)));
+                out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(numberAt(signature, "Numerator", 4)));
+                out_.denominator = cydaw::base::limit(1, 32, static_cast<int>(numberAt(signature, "Denominator", 4)));
             }
         }
         if (const auto* tracks = liveSet->getChildByName("Tracks"))
             for (const auto* track : tracks->getChildIterator())
                 readTrack(track);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
-    void readTrack(const juce::XmlElement* track)
+    void readTrack(const cydaw::base::XmlElement* track)
     {
         const auto tag = track->getTagName();
         auto name = valueAt(track, "Name/EffectiveName");
@@ -721,7 +729,7 @@ private:
         imported.colour = abletonColour(colourIndex);
         const auto* mixer = childPath(track, "DeviceChain/Mixer");
         imported.gainDb = linearToDb(numberAt(mixer, "Volume/Manual", 1.0));
-        imported.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, numberAt(mixer, "Pan/Manual", 0.0)));
+        imported.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, numberAt(mixer, "Pan/Manual", 0.0)));
         imported.muted = !boolAt(mixer, "Speaker/Manual", true);
         if (const auto* devices = childPath(track, "DeviceChain/DeviceChain/Devices"))
             for (const auto* device : devices->getChildIterator()) {
@@ -742,16 +750,16 @@ private:
                                : valueAt(device, "PluginDesc/VstPluginInfo/PlugName").isNotEmpty() ? "VST2"
                                : valueAt(device, "PluginDesc/ClapPluginInfo/Name").isNotEmpty()    ? "CLAP"
                                : tag == "AuPluginDevice"                                            ? "AU"
-                                                                                                    : juce::String();
+                                                                                                    : cydaw::base::Text();
                 entry.vendor = valueAt(device, "PluginDesc/Vst3PluginInfo/DeviceCreator");
-                entry.type = entry.plugin ? juce::String() : tag;
+                entry.type = entry.plugin ? cydaw::base::Text() : tag;
                 // Live's own instruments, by their tag; a plug-in on a MIDI
                 // track before any effect is its instrument.
-                static const juce::StringArray instruments { "Operator", "UltraAnalog", "Collision", "Drift", "OriginalSimpler",
+                static const cydaw::base::TextList instruments { "Operator", "UltraAnalog", "Collision", "Drift", "OriginalSimpler",
                                                               "MultiSampler", "InstrumentVector", "InstrumentMeld", "LoungeLizard",
                                                               "StringStudio", "Tension", "Electric", "InstrumentImpulse",
                                                               "DrumGroupDevice", "InstrumentGroupDevice", "Sampler", "Simpler" };
-                static const juce::StringArray noteEffects { "MidiArpeggiator", "MidiChord", "MidiNoteLength", "MidiPitcher",
+                static const cydaw::base::TextList noteEffects { "MidiArpeggiator", "MidiChord", "MidiNoteLength", "MidiPitcher",
                                                               "MidiRandom", "MidiScale", "MidiVelocity" };
                 entry.noteEffect = noteEffects.contains(tag);
                 const auto hasInstrument = std::any_of(imported.chain.begin(), imported.chain.end(),
@@ -763,8 +771,8 @@ private:
                 // Its settings: each element with a <Manual Value="…"/>, by
                 // its path in the device ("Operator.0/Envelope/AttackTime").
                 if (!entry.plugin) {
-                    std::function<void(const juce::XmlElement*, const juce::String&, int)> walk
-                        = [&](const juce::XmlElement* element, const juce::String& path, const int depth) {
+                    std::function<void(const cydaw::base::XmlElement*, const cydaw::base::Text&, int)> walk
+                        = [&](const cydaw::base::XmlElement* element, const cydaw::base::Text& path, const int depth) {
                               if (depth > 8 || entry.settings.size() > 600)
                                   return;
                               for (const auto* item : element->getChildIterator()) {
@@ -800,7 +808,7 @@ private:
         out_.tracks.push_back(std::move(imported));
     }
 
-    static const juce::XmlElement* findClip(const juce::XmlElement* element, const int depth)
+    static const cydaw::base::XmlElement* findClip(const cydaw::base::XmlElement* element, const int depth)
     {
         if (element == nullptr || depth < 0)
             return nullptr;
@@ -813,7 +821,7 @@ private:
         return nullptr;
     }
 
-    void readClip(const juce::XmlElement* clip, ImportedTrack& track, const int scene)
+    void readClip(const cydaw::base::XmlElement* clip, ImportedTrack& track, const int scene)
     {
         const auto isMidi = clip->hasTagName("MidiClip");
         const auto isAudio = clip->hasTagName("AudioClip");
@@ -843,7 +851,7 @@ private:
             std::vector<ImportedNote> source;
             if (const auto* keyTracks = childPath(clip, "Notes/KeyTracks"))
                 for (const auto* keyTrack : keyTracks->getChildIterator()) {
-                    const auto key = juce::jlimit(0, 127, static_cast<int>(numberAt(keyTrack, "MidiKey", 60)));
+                    const auto key = cydaw::base::limit(0, 127, static_cast<int>(numberAt(keyTrack, "MidiKey", 60)));
                     const auto* notes = keyTrack->getChildByName("Notes");
                     if (notes == nullptr)
                         continue;
@@ -854,7 +862,7 @@ private:
                         note.note = key;
                         note.startBeats = attributeNumber(event, "Time", 0.0);
                         note.lengthBeats = std::max(0.01, attributeNumber(event, "Duration", 0.25));
-                        note.velocity = static_cast<float>(juce::jlimit(0.01, 1.0, attributeNumber(event, "Velocity", 100.0) / 127.0));
+                        note.velocity = static_cast<float>(cydaw::base::limit(0.01, 1.0, attributeNumber(event, "Velocity", 100.0) / 127.0));
                         source.push_back(note);
                     }
                 }
@@ -880,7 +888,7 @@ private:
         const auto fileName = valueAt(fileRef, "Name");
         if (relative.isEmpty() && fileRef != nullptr)
             if (const auto* elements = fileRef->getChildByName("RelativePath")) {
-                juce::StringArray parts;
+                cydaw::base::TextList parts;
                 for (const auto* element : elements->getChildIterator())
                     if (element->hasTagName("RelativePathElement"))
                         parts.add(attributeText(element, "Dir"));
@@ -889,15 +897,15 @@ private:
                     parts.add(fileName);
                 relative = parts.joinIntoString("/");
             }
-        juce::File file;
+        cydaw::base::File file;
         if (absolute.isNotEmpty())
             file = resolveProjectAudioFile(folder_, absolute);
-        if (file == juce::File {} && relative.isNotEmpty())
+        if (file == cydaw::base::File {} && relative.isNotEmpty())
             file = resolveProjectAudioFile(folder_, relative);
-        if (file == juce::File {} && fileName.isNotEmpty())
+        if (file == cydaw::base::File {} && fileName.isNotEmpty())
             file = resolveProjectAudioFile(folder_, fileName);
         const auto original = absolute.isNotEmpty() ? absolute : relative.isNotEmpty() ? relative : fileName;
-        if (file == juce::File {}) {
+        if (file == cydaw::base::File {}) {
             out_.missingFiles.addIfNotAlreadyThere(original.isNotEmpty() ? original : name);
             return;
         }
@@ -940,9 +948,9 @@ private:
                       });
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
 };
 
 // ---------------------------------------------------------------------------
@@ -952,33 +960,33 @@ private:
 
 class StudioOneReader {
 public:
-    StudioOneReader(const juce::File& file, ImportedProject& out)
+    StudioOneReader(const cydaw::base::File& file, ImportedProject& out)
         : file_(file), out_(out), folder_(file.getParentDirectory())
     {
     }
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
-        juce::ZipFile zip(file_);
+        cydaw::base::ZipFile zip(file_);
         if (zip.getNumEntries() == 0)
-            return juce::Result::fail("Not a Studio One song (no zip entries): " + file_.getFullPathName());
-        std::vector<std::pair<juce::String, std::unique_ptr<juce::XmlElement>>> documents;
+            return cydaw::base::Result::fail("Not a Studio One song (no zip entries): " + file_.getFullPathName());
+        std::vector<std::pair<cydaw::base::Text, std::unique_ptr<cydaw::base::XmlElement>>> documents;
         for (auto index = 0; index < zip.getNumEntries(); ++index) {
             const auto* entry = zip.getEntry(index);
             if (entry == nullptr || !entry->filename.endsWithIgnoreCase(".xml"))
                 continue;
-            std::unique_ptr<juce::InputStream> stream(zip.createStreamForEntry(index));
+            std::unique_ptr<cydaw::base::InputStream> stream(zip.createStreamForEntry(index));
             if (stream == nullptr)
                 continue;
-            if (auto parsed = juce::XmlDocument::parse(shared::readBounded(*stream)))
+            if (auto parsed = cydaw::base::XmlDocument::parse(shared::readBounded(*stream)))
                 documents.emplace_back(entry->filename, std::move(parsed));
         }
         if (documents.empty())
-            return juce::Result::fail("No XML document inside " + file_.getFileName());
+            return cydaw::base::Result::fail("No XML document inside " + file_.getFileName());
 
         out_.format = "studio-one";
         out_.application = "Studio One";
-        const juce::XmlElement* song = nullptr;
+        const cydaw::base::XmlElement* song = nullptr;
         for (const auto& [name, document] : documents) {
             if (name.endsWithIgnoreCase("metainfo.xml"))
                 readMetaInfo(document.get());
@@ -996,11 +1004,11 @@ public:
                     readTracks(document.get());
         out_.warnings.add("Studio One songs are read by best effort; the DAWproject export "
                           "of Studio One is the reliable path.");
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
-    void readMetaInfo(const juce::XmlElement* document)
+    void readMetaInfo(const cydaw::base::XmlElement* document)
     {
         for (const auto* attribute : document->getChildIterator()) {
             const auto id = attributeText(attribute, "id");
@@ -1013,7 +1021,7 @@ private:
 
     // Every element with an audio path becomes a media entry, by its id and
     // by its file name.
-    void collectMedia(const juce::XmlElement* element, const juce::XmlElement* parent = nullptr)
+    void collectMedia(const cydaw::base::XmlElement* element, const cydaw::base::XmlElement* parent = nullptr)
     {
         for (const auto* attributeName : { "url", "path", "Url", "Path", "file", "File" }) {
             const auto value = attributeText(element, attributeName);
@@ -1031,7 +1039,7 @@ private:
             collectMedia(child, element);
     }
 
-    void readTempo(const juce::XmlElement* element)
+    void readTempo(const cydaw::base::XmlElement* element)
     {
         if (element == nullptr)
             return;
@@ -1051,9 +1059,9 @@ private:
             }
         }
         if (element->hasAttribute("timeSigNumerator") || element->hasAttribute("numerator")) {
-            out_.numerator = juce::jlimit(1, 32, static_cast<int>(attributeNumber(
+            out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(attributeNumber(
                 element, "timeSigNumerator", attributeNumber(element, "numerator", 4))));
-            out_.denominator = juce::jlimit(1, 32, static_cast<int>(attributeNumber(
+            out_.denominator = cydaw::base::limit(1, 32, static_cast<int>(attributeNumber(
                 element, "timeSigDenominator", attributeNumber(element, "denominator", 4))));
         }
         for (const auto* child : element->getChildIterator())
@@ -1061,7 +1069,7 @@ private:
                 readTempo(child);
     }
 
-    static bool isTrackElement(const juce::XmlElement* element)
+    static bool isTrackElement(const cydaw::base::XmlElement* element)
     {
         const auto tag = element->getTagName();
         return (tag == "MediaTrack" || tag == "AudioTrack" || tag == "MusicTrack"
@@ -1069,7 +1077,7 @@ private:
                && element->hasAttribute("name");
     }
 
-    void readTracks(const juce::XmlElement* element)
+    void readTracks(const cydaw::base::XmlElement* element)
     {
         if (element == nullptr)
             return;
@@ -1081,7 +1089,7 @@ private:
             readTracks(child);
     }
 
-    void readTrack(const juce::XmlElement* element)
+    void readTrack(const cydaw::base::XmlElement* element)
     {
         ImportedTrack track;
         track.name = attributeText(element, "name");
@@ -1095,7 +1103,7 @@ private:
         if (element->hasAttribute("volume"))
             track.gainDb = linearToDb(attributeNumber(element, "volume", 1.0));
         if (element->hasAttribute("pan"))
-            track.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, attributeNumber(element, "pan", 0.0)));
+            track.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, attributeNumber(element, "pan", 0.0)));
         readEvents(element, track);
         if (!track.midiClips.empty() && track.audioClips.empty())
             track.midi = true;
@@ -1104,7 +1112,7 @@ private:
         out_.tracks.push_back(std::move(track));
     }
 
-    void readEvents(const juce::XmlElement* element, ImportedTrack& track)
+    void readEvents(const cydaw::base::XmlElement* element, ImportedTrack& track)
     {
         for (const auto* child : element->getChildIterator()) {
             const auto tag = child->getTagName();
@@ -1118,7 +1126,7 @@ private:
         }
     }
 
-    void readAudioEvent(const juce::XmlElement* event, ImportedTrack& track)
+    void readAudioEvent(const cydaw::base::XmlElement* event, ImportedTrack& track)
     {
         ImportedAudioClip clip;
         clip.name = attributeText(event, "name");
@@ -1126,8 +1134,8 @@ private:
         clip.durationSeconds = std::max(0.01, attributeNumber(event, "length", attributeNumber(event, "duration", 1.0)));
         clip.sourceOffsetSeconds = std::max(0.0, attributeNumber(event, "offset", 0.0));
         clip.muted = attributeBool(event, "mute", false);
-        clip.gainDb = static_cast<float>(juce::jlimit(-60.0, 24.0, attributeNumber(event, "gain", 0.0)));
-        juce::String path;
+        clip.gainDb = static_cast<float>(cydaw::base::limit(-60.0, 24.0, attributeNumber(event, "gain", 0.0)));
+        cydaw::base::Text path;
         for (const auto* idName : { "clipID", "mediaID", "clip", "media", "audioClip", "file" })
             if (const auto id = attributeText(event, idName); id.isNotEmpty()) {
                 const auto found = mediaById_.find(id);
@@ -1146,15 +1154,15 @@ private:
                 }
         }
         clip.originalPath = path;
-        clip.file = path.isNotEmpty() ? resolveProjectAudioFile(folder_, path) : juce::File {};
-        if (clip.file == juce::File {}) {
+        clip.file = path.isNotEmpty() ? resolveProjectAudioFile(folder_, path) : cydaw::base::File {};
+        if (clip.file == cydaw::base::File {}) {
             out_.missingFiles.addIfNotAlreadyThere(path.isNotEmpty() ? path : clip.name);
             return;
         }
         track.audioClips.push_back(std::move(clip));
     }
 
-    void readMusicPart(const juce::XmlElement* part, ImportedTrack& track)
+    void readMusicPart(const cydaw::base::XmlElement* part, ImportedTrack& track)
     {
         ImportedMidiClip clip;
         clip.name = attributeText(part, "name");
@@ -1163,17 +1171,17 @@ private:
         clip.startBeats = out_.secondsToBeats(startSeconds);
         clip.lengthBeats = std::max(0.25, out_.secondsToBeats(lengthSeconds));
         clip.muted = attributeBool(part, "mute", false);
-        std::function<void(const juce::XmlElement*)> collect = [&](const juce::XmlElement* element) {
+        std::function<void(const cydaw::base::XmlElement*)> collect = [&](const cydaw::base::XmlElement* element) {
             for (const auto* child : element->getChildIterator()) {
                 if (child->hasTagName("Note")) {
                     ImportedNote note;
-                    note.note = juce::jlimit(0, 127, static_cast<int>(attributeNumber(child, "pitch", attributeNumber(child, "key", 60))));
+                    note.note = cydaw::base::limit(0, 127, static_cast<int>(attributeNumber(child, "pitch", attributeNumber(child, "key", 60))));
                     note.startBeats = std::max(0.0, attributeNumber(child, "start", 0.0));
                     note.lengthBeats = std::max(0.01, attributeNumber(child, "length", attributeNumber(child, "duration", 1.0)));
                     auto velocity = attributeNumber(child, "velocity", 0.8);
                     if (velocity > 1.0)
                         velocity /= 127.0;
-                    note.velocity = static_cast<float>(juce::jlimit(0.01, 1.0, velocity));
+                    note.velocity = static_cast<float>(cydaw::base::limit(0.01, 1.0, velocity));
                     if (note.startBeats < clip.lengthBeats)
                         clip.notes.push_back(note);
                 } else {
@@ -1185,11 +1193,11 @@ private:
         track.midiClips.push_back(std::move(clip));
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
-    std::map<juce::String, juce::String> mediaById_;
-    std::map<juce::String, juce::String> mediaByName_;
+    cydaw::base::File folder_;
+    std::map<cydaw::base::Text, cydaw::base::Text> mediaById_;
+    std::map<cydaw::base::Text, cydaw::base::Text> mediaByName_;
     bool tempoFound_ {};
 };
 
@@ -1208,16 +1216,16 @@ struct Value {
     enum class Kind { null, integer, number, boolean, text, object, reference, list, map,
                       route, colour, bytes, floats, strings };
     Kind kind { Kind::null };
-    juce::int64 integer {};
+    std::int64_t integer {};
     double number {};
     bool boolean {};
-    juce::String text;
+    cydaw::base::Text text;
     NodePtr object;
     int reference { -1 };
     std::vector<Value> list;
-    std::vector<std::pair<juce::String, Value>> map;
-    juce::uint32 colour {};
-    juce::StringArray strings;
+    std::vector<std::pair<cydaw::base::Text, Value>> map;
+    std::uint32_t colour {};
+    cydaw::base::TextList strings;
 };
 
 struct Field {
@@ -1241,14 +1249,14 @@ struct Node {
 
 class Parser {
 public:
-    Parser(const juce::MemoryBlock& data, juce::StringArray& warnings)
+    Parser(const cydaw::base::MemoryBlock& data, cydaw::base::TextList& warnings)
         : data_(static_cast<const std::uint8_t*>(data.getData())), size_(data.getSize()),
           warnings_(warnings)
     {
     }
 
     // Back to the start of another block of bytes, the warnings kept.
-    void reset(const juce::MemoryBlock& data)
+    void reset(const cydaw::base::MemoryBlock& data)
     {
         data_ = static_cast<const std::uint8_t*>(data.getData());
         size_ = data.getSize();
@@ -1287,10 +1295,10 @@ public:
         return static_cast<std::int32_t>(value);
     }
 
-    juce::int64 i64()
+    std::int64_t i64()
     {
-        const auto high = static_cast<juce::int64>(static_cast<std::uint32_t>(i32()));
-        const auto low = static_cast<juce::int64>(static_cast<std::uint32_t>(i32()));
+        const auto high = static_cast<std::int64_t>(static_cast<std::uint32_t>(i32()));
+        const auto low = static_cast<std::int64_t>(static_cast<std::uint32_t>(i32()));
         return (high << 32) | low;
     }
 
@@ -1310,7 +1318,7 @@ public:
         return value;
     }
 
-    juce::String string()
+    cydaw::base::Text string()
     {
         const auto raw = static_cast<std::uint32_t>(i32());
         if (!ok_ || raw == 0xffffffffu)
@@ -1321,20 +1329,20 @@ public:
                 ok_ = false;
                 return {};
             }
-            std::vector<juce::CharPointer_UTF16::CharType> buffer(count + 1, 0);
+            std::vector<char16_t> buffer(count + 1, 0);
             for (std::size_t i = 0; i < count; ++i)
-                buffer[i] = static_cast<juce::CharPointer_UTF16::CharType>(
+                buffer[i] = static_cast<char16_t>(
                     (static_cast<std::uint16_t>(data_[position_ + i * 2]) << 8)
                     | data_[position_ + i * 2 + 1]);
             position_ += count * 2;
-            return juce::String(juce::CharPointer_UTF16(buffer.data()));
+            return cydaw::base::Text::fromUTF16(buffer.data(), count);
         }
         const auto count = static_cast<std::size_t>(raw);
         if (position_ + count > size_) {
             ok_ = false;
             return {};
         }
-        const auto text = juce::String::fromUTF8(reinterpret_cast<const char*>(data_ + position_),
+        const auto text = cydaw::base::Text::fromUTF8(reinterpret_cast<const char*>(data_ + position_),
                                                  static_cast<int>(count));
         position_ += count;
         return text;
@@ -1483,8 +1491,8 @@ public:
             }
             default:
                 if (unknownReported_ < 4) {
-                    warnings_.add("Bitwig file: unknown value type 0x" + juce::String::toHexString(type)
-                                  + " at offset " + juce::String(static_cast<juce::int64>(position_ - 1))
+                    warnings_.add("Bitwig file: unknown value type 0x" + cydaw::base::Text::toHexString(type)
+                                  + " at offset " + cydaw::base::Text(static_cast<std::int64_t>(position_ - 1))
                                   + "; the rest of the file was skipped.");
                     ++unknownReported_;
                 }
@@ -1523,7 +1531,7 @@ private:
     bool ok_ { true };
     int unknownReported_ {};
     std::vector<Node*> numbered_;
-    juce::StringArray& warnings_;
+    cydaw::base::TextList& warnings_;
 };
 
 // The field ids Bitwig 4 and 5 use for what the importer reads.
@@ -1603,23 +1611,23 @@ constexpr int warpSampleTime = 166;
 
 class Reader {
 public:
-    Reader(const juce::File& file, ImportedProject& out)
+    Reader(const cydaw::base::File& file, ImportedProject& out)
         : file_(file), out_(out), folder_(file.getParentDirectory()), parser_(data_, out.warnings)
     {
     }
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         if (!file_.loadFileAsData(data_) || data_.getSize() < 48)
-            return juce::Result::fail("The file could not be read: " + file_.getFullPathName());
+            return cydaw::base::Result::fail("The file could not be read: " + file_.getFullPathName());
         parser_.reset(data_);
         const auto* bytes = static_cast<const char*>(data_.getData());
         if (std::memcmp(bytes, "BtWg", 4) != 0)
-            return juce::Result::fail("Not a Bitwig project: " + file_.getFileName());
-        const auto header = juce::String::fromUTF8(bytes, 42);
+            return cydaw::base::Result::fail("Not a Bitwig project: " + file_.getFileName());
+        const auto header = cydaw::base::Text::fromUTF8(bytes, 42);
         const auto contentOffset = static_cast<std::size_t>(header.substring(16, 24).getHexValue32());
         if (contentOffset < 42 || contentOffset >= data_.getSize())
-            return juce::Result::fail("The Bitwig file header points outside the file (packaged or"
+            return cydaw::base::Result::fail("The Bitwig file header points outside the file (packaged or"
                                       " encrypted content is not readable).");
         out_.format = "bitwig";
         out_.application = "Bitwig Studio";
@@ -1631,12 +1639,12 @@ public:
         if (parser_.ok() && !parser_.atEnd())
             roots.push_back(parser_.object(0));
         if (roots.empty() || roots.front().kind != Value::Kind::object)
-            return juce::Result::fail("The Bitwig project holds no readable object tree.");
+            return cydaw::base::Result::fail("The Bitwig project holds no readable object tree.");
         if (!parser_.ok())
             out_.warnings.add("The Bitwig file could not be read to its end; what came before is imported.");
         const auto* root = roots.front().object.get();
         readRoot(root);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -1652,7 +1660,7 @@ private:
             const auto marker = parser_.i32();
             if (marker == 0 || !parser_.ok())
                 break;
-            juce::String name;
+            cydaw::base::Text name;
             if (marker == 1)
                 name = parser_.string();
             const auto type = parser_.u8();
@@ -1685,7 +1693,7 @@ private:
         return fallback;
     }
 
-    static juce::int64 integer(const Node* node, const int fieldId, const juce::int64 fallback)
+    static std::int64_t integer(const Node* node, const int fieldId, const std::int64_t fallback)
     {
         const auto* value = node != nullptr ? node->field(fieldId) : nullptr;
         return value != nullptr && value->kind == Value::Kind::integer ? value->integer : fallback;
@@ -1697,13 +1705,13 @@ private:
         return value != nullptr && value->kind == Value::Kind::boolean ? value->boolean : fallback;
     }
 
-    static juce::String text(const Node* node, const int fieldId)
+    static cydaw::base::Text text(const Node* node, const int fieldId)
     {
         const auto* value = node != nullptr ? node->field(fieldId) : nullptr;
-        return value != nullptr && value->kind == Value::Kind::text ? value->text : juce::String();
+        return value != nullptr && value->kind == Value::Kind::text ? value->text : cydaw::base::Text();
     }
 
-    static juce::uint32 colour(const Node* node, const int fieldId)
+    static std::uint32_t colour(const Node* node, const int fieldId)
     {
         const auto* value = node != nullptr ? node->field(fieldId) : nullptr;
         return value != nullptr && value->kind == Value::Kind::colour ? value->colour : 0;
@@ -1807,7 +1815,7 @@ private:
     {
         if (value <= 1.0e-3)
             return -60.0f;
-        return static_cast<float>(juce::jlimit(-60.0, 12.0, 60.0 * std::log10(value)));
+        return static_cast<float>(cydaw::base::limit(-60.0, 12.0, 60.0 * std::log10(value)));
     }
 
     void readRoot(const Node* root)
@@ -1815,13 +1823,13 @@ private:
         out_.name = text(root, id::name);
         if (const auto* transport = child(root, id::transport)) {
             if (const auto* tempo = child(transport, id::tempo))
-                out_.tempo = juce::jlimit(20.0, 300.0, number(tempo, id::value, 120.0));
+                out_.tempo = cydaw::base::limit(20.0, 300.0, number(tempo, id::value, 120.0));
             if (const auto* signature = child(transport, id::timeSignature)) {
                 const auto numerator = integer(signature, id::signatureNumerator, 0);
                 const auto denominator = integer(signature, id::signatureDenominator, 0);
                 if (numerator > 0 && denominator > 0) {
-                    out_.numerator = static_cast<int>(juce::jlimit<juce::int64>(1, 32, numerator));
-                    out_.denominator = static_cast<int>(juce::jlimit<juce::int64>(1, 32, denominator));
+                    out_.numerator = static_cast<int>(cydaw::base::limit<std::int64_t>(1, 32, numerator));
+                    out_.denominator = static_cast<int>(cydaw::base::limit<std::int64_t>(1, 32, denominator));
                 } else if (const auto packed = integer(signature, id::packedSignature, 0); packed > 0) {
                     const auto low = static_cast<int>(packed & 0xf);
                     const auto shift = static_cast<int>((packed >> 4) & 0xf);
@@ -1870,12 +1878,12 @@ private:
         imported.name = text(track, id::title);
         imported.colour = colour(track, id::colour);
         const auto type = integer(track, id::trackType, -1);
-        juce::String instrumentName;
+        cydaw::base::Text instrumentName;
         if (const auto* mixer = child(track, id::mixer)) {
             if (const auto* volume = child(mixer, id::volume))
                 imported.gainDb = volumeToDb(number(volume, id::value, 1.0));
             if (const auto* pan = child(mixer, id::pan))
-                imported.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, number(pan, id::value, 0.0)));
+                imported.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, number(pan, id::value, 0.0)));
             if (const auto* mute = child(mixer, id::mute))
                 imported.muted = boolean(mute, id::boolValue, false);
             imported.solo = boolean(mixer, id::solo, false);
@@ -1896,8 +1904,8 @@ private:
                 ImportedDevice entry;
                 entry.name = name;
                 entry.plugin = creator.isNotEmpty() && creator != "Bitwig";
-                entry.vendor = entry.plugin ? creator : juce::String();
-                entry.type = entry.plugin ? juce::String() : name;
+                entry.vendor = entry.plugin ? creator : cydaw::base::Text();
+                entry.type = entry.plugin ? cydaw::base::Text() : name;
                 entry.instrument = deviceType != 0 && deviceType != 1;
                 entry.noteEffect = deviceType == 1;
                 // Its settings: each parameter an object with its id as text
@@ -1975,13 +1983,13 @@ private:
         if (imported.name.isEmpty()) {
             imported.name = instrumentName;
             if (imported.name.isEmpty())
-                imported.name = (type == 1 ? "Audio " : type == 2 ? "Hybrid " : imported.midi ? "Inst " : "Audio ") + juce::String(index);
+                imported.name = (type == 1 ? "Audio " : type == 2 ? "Hybrid " : imported.midi ? "Inst " : "Audio ") + cydaw::base::Text(index);
         }
         out_.tracks.push_back(std::move(imported));
     }
 
     void readClip(const Node* clip, ImportedTrack& track, const int scene, const double startBeats,
-                  const juce::int64 trackType)
+                  const std::int64_t trackType)
     {
         const auto name = text(clip, id::clipName);
         const auto clipColour = colour(clip, id::clipColour);
@@ -2031,7 +2039,7 @@ private:
                         if (boolean(event, id::isMuted, false))
                             continue;
                         ImportedNote note;
-                        note.note = juce::jlimit(0, 127, static_cast<int>(keyValue->integer));
+                        note.note = cydaw::base::limit(0, 127, static_cast<int>(keyValue->integer));
                         note.startBeats = number(event, id::time, 0.0);
                         note.lengthBeats = std::max(0.01, number(event, id::duration, 0.25));
                         auto velocity = number(event, id::noteOnVelocity, -1.0);
@@ -2051,7 +2059,7 @@ private:
                                 }
                             }
                         }
-                        note.velocity = static_cast<float>(juce::jlimit(0.01, 1.0, velocity > 0.0 ? velocity : 0.8));
+                        note.velocity = static_cast<float>(cydaw::base::limit(0.01, 1.0, velocity > 0.0 ? velocity : 0.8));
                         notes.push_back(note);
                     }
                 }
@@ -2089,7 +2097,7 @@ private:
     }
 
     void readAudioEvent(const Node* event, const double eventTime, const double eventDuration,
-                        ImportedTrack& track, const juce::String& clipName, const juce::uint32 clipColour,
+                        ImportedTrack& track, const cydaw::base::Text& clipName, const std::uint32_t clipColour,
                         const bool muted, const int scene, const double startBeats,
                         const double durationBeats, const double playStart, const bool looping,
                         const double loopStart, const double loopEnd, const double fadeIn,
@@ -2107,19 +2115,19 @@ private:
         const auto pathInProject = text(reference, id::pathInProject);
         const auto packaged = text(reference, id::packagedPath);
         const auto absolute = text(child(reference, id::initialLocation), id::absolutePath);
-        juce::File file;
+        cydaw::base::File file;
         if (pathInProject.isNotEmpty())
             file = resolveProjectAudioFile(folder_, pathInProject);
-        if (file == juce::File {} && absolute.isNotEmpty())
+        if (file == cydaw::base::File {} && absolute.isNotEmpty())
             file = resolveProjectAudioFile(folder_, absolute);
-        if (file == juce::File {} && fileName.isNotEmpty())
+        if (file == cydaw::base::File {} && fileName.isNotEmpty())
             file = resolveProjectAudioFile(folder_, fileName);
-        if (file == juce::File {} && (packaged.isNotEmpty() || fileName.isNotEmpty()))
+        if (file == cydaw::base::File {} && (packaged.isNotEmpty() || fileName.isNotEmpty()))
             file = packagedFile(fileNameOf(packaged.isNotEmpty() ? packaged : fileName));
         const auto original = pathInProject.isNotEmpty() ? pathInProject
                               : absolute.isNotEmpty() ? absolute
                               : packaged.isNotEmpty() ? packaged : fileName;
-        if (file == juce::File {}) {
+        if (file == cydaw::base::File {}) {
             out_.missingFiles.addIfNotAlreadyThere(original.isNotEmpty() ? original : clipName);
             return;
         }
@@ -2218,23 +2226,23 @@ private:
 
     // A file from Bitwig's installed packages or the user library, by
     // name; the folders are listed the first time one is needed.
-    juce::File packagedFile(const juce::String& name)
+    cydaw::base::File packagedFile(const cydaw::base::Text& name)
     {
         if (name.isEmpty())
             return {};
         if (!libraryIndexed_) {
             libraryIndexed_ = true;
-            juce::Array<juce::File> roots;
-            roots.add(juce::File::getSpecialLocation(juce::File::windowsLocalAppData)
+            cydaw::base::Array<cydaw::base::File> roots;
+            roots.add(cydaw::base::File::getSpecialLocation(cydaw::base::File::windowsLocalAppData)
                           .getChildFile("Bitwig Studio").getChildFile("installed-packages"));
-            roots.add(juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+            roots.add(cydaw::base::File::getSpecialLocation(cydaw::base::File::userDocumentsDirectory)
                           .getChildFile("Bitwig Studio").getChildFile("Library"));
-            roots.add(juce::File::getSpecialLocation(juce::File::userHomeDirectory)
+            roots.add(cydaw::base::File::getSpecialLocation(cydaw::base::File::userHomeDirectory)
                           .getChildFile("Bitwig Studio").getChildFile("Library"));
             for (const auto& root : roots) {
                 if (!root.isDirectory())
                     continue;
-                for (const auto& entry : juce::RangedDirectoryIterator(root, true, "*", juce::File::findFiles)) {
+                for (const auto& entry : cydaw::base::RangedDirectoryIterator(root, true, "*", cydaw::base::File::findFiles)) {
                     const auto& candidate = entry.getFile();
                     if (looksLikeAudio(candidate.getFileName()))
                         library_.emplace(candidate.getFileName().toLowerCase(), candidate);
@@ -2242,16 +2250,16 @@ private:
             }
         }
         const auto found = library_.find(name.toLowerCase());
-        return found != library_.end() ? found->second : juce::File {};
+        return found != library_.end() ? found->second : cydaw::base::File {};
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
-    juce::MemoryBlock data_;
+    cydaw::base::File folder_;
+    cydaw::base::MemoryBlock data_;
     Parser parser_;
     bool libraryIndexed_ {};
-    std::map<juce::String, juce::File> library_;
+    std::map<cydaw::base::Text, cydaw::base::File> library_;
 };
 
 } // namespace bitwig
@@ -2260,16 +2268,16 @@ private:
 
 // ---------------------------------------------------------------------------
 
-juce::StringArray supportedProjectExtensions()
+cydaw::base::TextList supportedProjectExtensions()
 {
     // (A MIDI file is a project only when chosen as one: dropped, it is
     // notes for a track.)
     return { ".dawproject", ".als", ".song", ".bwproject", ".rpp", ".flp", ".ardour", ".mmp", ".mmpz", ".aaf", ".zpj" };
 }
 
-juce::String supportedProjectWildcard()
+cydaw::base::Text supportedProjectWildcard()
 {
-    juce::StringArray patterns;
+    cydaw::base::TextList patterns;
     for (const auto& extension : supportedProjectExtensions())
         patterns.add("*" + extension);
     patterns.add("*.mid");
@@ -2277,21 +2285,21 @@ juce::String supportedProjectWildcard()
     return patterns.joinIntoString(";");
 }
 
-juce::File resolveProjectAudioFile(const juce::File& projectFolder, const juce::String& rawPath)
+cydaw::base::File resolveProjectAudioFile(const cydaw::base::File& projectFolder, const cydaw::base::Text& rawPath)
 {
     auto path = rawPath.trim();
     if (path.isEmpty())
         return {};
     if (path.startsWithIgnoreCase("file://")) {
-        path = juce::URL::removeEscapeChars(path.fromFirstOccurrenceOf("file://", false, true));
+        path = cydaw::base::Url::removeEscapeChars(path.fromFirstOccurrenceOf("file://", false, true));
         while (path.startsWith("/") && path.length() > 2 && path[2] == ':')
             path = path.substring(1);
     }
-#if ! JUCE_WINDOWS
+#if !defined(_WIN32)
     path = path.replaceCharacter('\\', '/');
 #endif
-    if (juce::File::isAbsolutePath(path)) {
-        const juce::File absolute(path);
+    if (cydaw::base::File::isAbsolutePath(path)) {
+        const cydaw::base::File absolute(path);
         if (absolute.existsAsFile())
             return absolute;
     }
@@ -2301,8 +2309,8 @@ juce::File resolveProjectAudioFile(const juce::File& projectFolder, const juce::
             return relative;
         const auto name = fileNameOf(path);
         if (name.isNotEmpty()) {
-            juce::Array<juce::File> matches;
-            projectFolder.findChildFiles(matches, juce::File::findFiles, true, name);
+            cydaw::base::Array<cydaw::base::File> matches;
+            projectFolder.findChildFiles(matches, cydaw::base::File::findFiles, true, name);
             if (!matches.isEmpty()) {
                 matches.sort();
                 return matches[0];
@@ -2312,40 +2320,40 @@ juce::File resolveProjectAudioFile(const juce::File& projectFolder, const juce::
     return {};
 }
 
-juce::Result importDawProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importDawProject(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     DawProjectReader reader(file, out);
     return reader.read();
 }
 
-juce::Result importAbletonLiveSet(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importAbletonLiveSet(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     AbletonReader reader(file, out);
     return reader.read();
 }
 
-juce::Result importStudioOneSong(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importStudioOneSong(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     StudioOneReader reader(file, out);
     return reader.read();
 }
 
-juce::Result importBitwigProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importBitwigProject(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     bitwig::Reader reader(file, out);
     return reader.read();
 }
 
-juce::Result importProjectFile(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importProjectFile(const cydaw::base::File& file, ImportedProject& out)
 {
     if (!file.existsAsFile())
-        return juce::Result::fail("No file at " + file.getFullPathName());
+        return cydaw::base::Result::fail("No file at " + file.getFullPathName());
     const auto extension = file.getFileExtension().toLowerCase();
-    auto result = juce::Result::fail("Unsupported project format \"" + extension + "\"; CyDAW reads "
+    auto result = cydaw::base::Result::fail("Unsupported project format \"" + extension + "\"; CyDAW reads "
                                      + supportedProjectExtensions().joinIntoString(", "));
     if (extension == ".dawproject")
         result = importDawProject(file, out);
@@ -2374,20 +2382,20 @@ juce::Result importProjectFile(const juce::File& file, ImportedProject& out)
     if (out.name.isEmpty())
         out.name = file.getFileNameWithoutExtension();
     // Names are what the person recognises tracks by: keep them apart.
-    std::set<juce::String> used;
+    std::set<cydaw::base::Text> used;
     auto index = 0;
     for (auto& track : out.tracks)
-        track.name = uniqueName(used, track.name, (track.midi ? "Inst " : "Audio ") + juce::String(++index));
-    return juce::Result::ok();
+        track.name = uniqueName(used, track.name, (track.midi ? "Inst " : "Audio ") + cydaw::base::Text(++index));
+    return cydaw::base::Result::ok();
 }
 
-juce::String describeImportedProject(const ImportedProject& project)
+cydaw::base::Text describeImportedProject(const ImportedProject& project)
 {
-    juce::StringArray lines;
+    cydaw::base::TextList lines;
     lines.add(project.name + " (" + project.format
-              + (project.application.isNotEmpty() ? ", " + project.application : juce::String()) + ")");
-    lines.add(juce::String(project.tempo, 2) + " BPM, " + juce::String(project.numerator) + "/"
-              + juce::String(project.denominator));
+              + (project.application.isNotEmpty() ? ", " + project.application : cydaw::base::Text()) + ")");
+    lines.add(cydaw::base::Text(project.tempo, 2) + " BPM, " + cydaw::base::Text(project.numerator) + "/"
+              + cydaw::base::Text(project.denominator));
     auto notes = 0;
     auto clips = 0;
     for (const auto& track : project.tracks) {
@@ -2397,16 +2405,16 @@ juce::String describeImportedProject(const ImportedProject& project)
         const auto trackClips = static_cast<int>(track.midiClips.size() + track.audioClips.size());
         notes += trackNotes;
         clips += trackClips;
-        auto line = "  " + track.name + (track.midi ? " [MIDI] " : " [audio] ") + juce::String(trackClips)
+        auto line = "  " + track.name + (track.midi ? " [MIDI] " : " [audio] ") + cydaw::base::Text(trackClips)
                     + " clip(s)";
         if (trackNotes > 0)
-            line += ", " + juce::String(trackNotes) + " note(s)";
+            line += ", " + cydaw::base::Text(trackNotes) + " note(s)";
         if (!track.devices.isEmpty())
             line += "; devices: " + track.devices.joinIntoString(", ");
         lines.add(line);
     }
-    lines.insert(2, juce::String(static_cast<int>(project.tracks.size())) + " track(s), "
-                        + juce::String(clips) + " clip(s), " + juce::String(notes) + " note(s)");
+    lines.insert(2, cydaw::base::Text(static_cast<int>(project.tracks.size())) + " track(s), "
+                        + cydaw::base::Text(clips) + " clip(s), " + cydaw::base::Text(notes) + " note(s)");
     if (!project.missingFiles.isEmpty()) {
         lines.add("Missing audio files:");
         for (const auto& missing : project.missingFiles)

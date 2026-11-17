@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/File.h>
 #include "BatterieView.h"
 
 #include "InstrumentEffects.h"
@@ -52,16 +54,16 @@ constexpr std::array<Place, 11> places { {
 
 constexpr float cymbalFlat = 0.3f;
 
-juce::String nameOf(const Piece piece)
+cydaw::base::Text nameOf(const Piece piece)
 {
-    return juce::String::fromUTF8(drum::pieceName(piece, ui::french()).c_str());
+    return cydaw::base::Text::fromUTF8(drum::pieceName(piece, ui::french()).c_str());
 }
 
 // "C1 (36)": a key as a person reads it.
-juce::String keyName(const int note)
+cydaw::base::Text keyName(const int note)
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    return juce::String(names[note % 12]) + juce::String(note / 12 - 1) + " (" + juce::String(note) + ")";
+    return cydaw::base::Text(names[note % 12]) + cydaw::base::Text(note / 12 - 1) + " (" + cydaw::base::Text(note) + ")";
 }
 
 } // namespace
@@ -73,7 +75,7 @@ float BatterieView::paneWidth()
     return dp(360.0f);
 }
 
-bool BatterieView::bind(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+bool BatterieView::bind(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     const auto values = graph.editorDrumValues(nodeId);
     if (!values)
@@ -98,7 +100,7 @@ void BatterieView::set(const int index, const float newValue)
     if (clamped == value(index))
         return;
     card_.values[static_cast<std::size_t>(index)] = clamped;
-    const auto binding = "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".batterie." + juce::String(drum::parameter(index).key);
+    const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".batterie." + cydaw::base::Text(drum::parameter(index).key);
     (void) card_.graph->editorSetParameter(binding, clamped);
     state_.focused = Panel::devices;
 }
@@ -121,22 +123,22 @@ bool BatterieView::knob(const int index, const char* label, const float diameter
     const auto origin = ImGui::GetCursorScreenPos();
     bool changed {};
     {
-        const ui::LearnParameterScope learn("node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".batterie."
-                                                + juce::String(parameter.key),
-                                            juce::String::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
+        const ui::LearnParameterScope learn("node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".batterie."
+                                                + cydaw::base::Text(parameter.key),
+                                            cydaw::base::Text::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
         changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
     }
     const auto hovered = ImGui::IsItemHovered();
     const auto active = ImGui::IsItemActive();
     if (changed)
         set(index, parameter.minimum + normalised * range);
-    const auto name = juce::String::fromUTF8((ui::french() ? parameter.french : parameter.english).c_str());
+    const auto name = cydaw::base::Text::fromUTF8((ui::french() ? parameter.french : parameter.english).c_str());
     const auto shown = drum::displayValue(index, value(index), ui::french());
     if (ImGui::BeginPopupContextItem("##knobMenu")) {
         ImGui::TextDisabled("%s", name.toRawUTF8());
         if (ImGui::MenuItem(L("Valeur par défaut", "Default value")))
             set(index, parameter.defaultValue);
-        const auto binding = "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".batterie." + juce::String(parameter.key);
+        const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".batterie." + cydaw::base::Text(parameter.key);
         if (studio_.isValid(card_.track) && studio_.canAutomate(card_.track, binding)) {
             const auto automated = !studio_.lanePoints(card_.track, binding).empty();
             if (ImGui::MenuItem(automated ? L("Afficher l'automation", "Show the automation")
@@ -155,7 +157,7 @@ bool BatterieView::knob(const int index, const char* label, const float diameter
         ImGui::SetTooltip("%s : %s\n%s", name.toRawUTF8(), shown.c_str(),
                           L("Double-clic : valeur de départ · clic droit : automatiser", "Double click: default · right click: automate"));
     const auto width = dp(diameter + 14.0f);
-    const auto text = hovered || active ? juce::String::fromUTF8(shown.c_str()) : juce::String::fromUTF8(label != nullptr ? label : "");
+    const auto text = hovered || active ? cydaw::base::Text::fromUTF8(shown.c_str()) : cydaw::base::Text::fromUTF8(label != nullptr ? label : "");
     auto* list = ImGui::GetWindowDrawList();
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
     const auto textHeight = ImGui::GetFontSize();
@@ -196,7 +198,7 @@ void BatterieView::kitChoice(const float width)
         for (int at = 0; at < static_cast<int>(drum::kits.size()); ++at) {
             const auto& kit = drum::kits[static_cast<std::size_t>(at)];
             if (ImGui::Selectable(L(kit.french, kit.english), at == current) && at != current) {
-                juce::String error;
+                cydaw::base::Text error;
                 if (!studio_.setBatterieKit(card_.track, card_.nodeId, at, error))
                     grooveReport_ = error;
                 else
@@ -311,7 +313,7 @@ void BatterieView::drawPiecePanel()
     toggle(drum::index(selected_, drum::fieldSolo), "Solo", ImVec2(dp(64.0f), 0.0f));
     ImGui::EndGroup();
     // The keys that play it.
-    juce::StringArray keys;
+    cydaw::base::TextList keys;
     for (int note = 21; note < 96; ++note)
         if (drum::pieceForNote(note) == selected_ && selected_ != Piece::percussion && selected_ != Piece::other)
             keys.add(keyName(note));
@@ -355,7 +357,7 @@ void BatterieView::drawConsoleTab()
         const auto piece = static_cast<Piece>(std::min(at, drum::pieceCount - 1));
         ImGui::PushID(at);
         ImGui::BeginChild("##strip", ImVec2(stripWidth, stripHeight), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
-        const auto name = kit ? juce::String(L("KIT", "KIT")) : nameOf(piece);
+        const auto name = kit ? cydaw::base::Text(L("KIT", "KIT")) : nameOf(piece);
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.85f);
         ui::clippedText(ImGui::GetWindowDrawList(), ImGui::GetCursorScreenPos(), stripWidth - dp(10.0f),
                         !kit && piece == selected_ ? batterieGold : p.text, name.toRawUTF8());
@@ -407,7 +409,7 @@ void BatterieView::drawGroovesTab()
                 ImGui::SameLine(0.0f, dp(4.0f));
             first = false;
             auto chosen = groove_ == at;
-            const auto label = juce::String::fromUTF8((ui::french() ? list[static_cast<std::size_t>(at)].french : list[static_cast<std::size_t>(at)].english).c_str());
+            const auto label = cydaw::base::Text::fromUTF8((ui::french() ? list[static_cast<std::size_t>(at)].french : list[static_cast<std::size_t>(at)].english).c_str());
             ImGui::PushID(at);
             if (ui::toggle(label.toRawUTF8(), &chosen, batterieGold, ImVec2(0.0f, 0.0f)))
                 groove_ = at;
@@ -430,7 +432,7 @@ void BatterieView::drawGroovesTab()
     for (std::size_t lane = 0; lane < lanes.size(); ++lane) {
         const auto y = origin.y + static_cast<float>(lane) * laneHeight;
         const auto piece = drum::pieceForNote(lanes[lane]);
-        draw->AddText(ImVec2(origin.x, y + dp(2.0f)), p.textDim, (nameOf(piece) + " \xc2\xb7 " + juce::String(lanes[lane])).toRawUTF8());
+        draw->AddText(ImVec2(origin.x, y + dp(2.0f)), p.textDim, (nameOf(piece) + " \xc2\xb7 " + cydaw::base::Text(lanes[lane])).toRawUTF8());
         draw->AddRectFilled(ImVec2(origin.x + nameWidth, y + dp(1.0f)), ImVec2(origin.x + nameWidth + gridWidth, y + laneHeight - dp(1.0f)),
                             p.bg0, dp(2.0f));
         for (int beat = 1; beat < 4; ++beat) {
@@ -451,7 +453,7 @@ void BatterieView::drawGroovesTab()
     for (const auto count : { 1, 2, 4, 8 }) {
         auto chosen = bars_ == count;
         ImGui::PushID(count + 1'000);
-        if (ui::toggle(juce::String(count).toRawUTF8(), &chosen, batterieGold, ImVec2(dp(30.0f), 0.0f)))
+        if (ui::toggle(cydaw::base::Text(count).toRawUTF8(), &chosen, batterieGold, ImVec2(dp(30.0f), 0.0f)))
             bars_ = count;
         ImGui::PopID();
         ImGui::SameLine(0.0f, dp(2.0f));
@@ -460,8 +462,8 @@ void BatterieView::drawGroovesTab()
     ImGui::TextUnformatted(L("Fin", "Ending"));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(dp(230.0f));
-    const auto fillName = fill_ < 0 ? juce::String(L("Sans roulement", "No fill"))
-                                     : juce::String::fromUTF8((ui::french() ? list[static_cast<std::size_t>(fill_)].french
+    const auto fillName = fill_ < 0 ? cydaw::base::Text(L("Sans roulement", "No fill"))
+                                     : cydaw::base::Text::fromUTF8((ui::french() ? list[static_cast<std::size_t>(fill_)].french
                                                                             : list[static_cast<std::size_t>(fill_)].english).c_str());
     if (ImGui::BeginCombo("##fill", fillName.toRawUTF8())) {
         if (ImGui::Selectable(L("Sans roulement", "No fill"), fill_ < 0))
@@ -475,17 +477,17 @@ void BatterieView::drawGroovesTab()
     }
     ImGui::SameLine(0.0f, dp(16.0f));
     if (ui::primaryButton(L("Mettre sur la piste", "Put on the track"))) {
-        juce::String error;
+        cydaw::base::Text error;
         const auto clip = studio_.addGrooveClip(card_.track, groove_, bars_, groove.fill ? -1 : fill_, -1.0, error);
-        grooveReport_ = clip != 0 ? (ui::Ls("Clip ajouté : ", "Clip added: ") + juce::String::fromUTF8((ui::french() ? groove.french : groove.english).c_str())
-                                     + " \xc3\x97 " + juce::String(bars_))
+        grooveReport_ = clip != 0 ? (ui::Ls("Clip ajouté : ", "Clip added: ") + cydaw::base::Text::fromUTF8((ui::french() ? groove.french : groove.english).c_str())
+                                     + " \xc3\x97 " + cydaw::base::Text(bars_))
                                   : error;
     }
     if (grooveReport_.isNotEmpty())
         ImGui::TextDisabled("%s", grooveReport_.toRawUTF8());
 }
 
-void BatterieView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
+void BatterieView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 origin,
                             const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.
@@ -558,7 +560,7 @@ bool BatterieView::drawEditorWindow(const bool focus)
     if (focus)
         ImGui::SetNextWindowFocus();
     auto open = true;
-    const auto title = juce::String::fromUTF8("Batterie \xe2\x80\x94 ") + studio_.trackName(target.track) + juce::String(windowId_);
+    const auto title = cydaw::base::Text::fromUTF8("Batterie \xe2\x80\x94 ") + studio_.trackName(target.track) + cydaw::base::Text(windowId_);
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, theme::mix(batterieGold, p.bg2 | 0xff000000u, 0.65f));
     const auto visible = ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor();
@@ -577,7 +579,7 @@ bool BatterieView::drawEditorWindow(const bool focus)
             const auto track = target.track;
             const auto nodeId = target.nodeId;
             presets_.bar("batteriePresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                         [this, track, nodeId](const juce::var& preset, juce::String& error) {
+                         [this, track, nodeId](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                              return studio_.applyDevicePreset(track, nodeId, preset, error);
                          },
                          dp(300.0f));

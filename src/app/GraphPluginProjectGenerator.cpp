@@ -1,3 +1,5 @@
+#include <cydaw/base/Character.h>
+#include <cydaw/base/File.h>
 #include "GraphPluginProjectGenerator.h"
 #include "SamplerMapFile.h"
 #include "SoundModelFile.h"
@@ -13,14 +15,14 @@ namespace cydaw::app
 namespace
 {
 
-juce::String cppString(juce::String value)
+cydaw::base::Text cppString(cydaw::base::Text value)
 {
     value = value.replace("\\", "\\\\").replace("\"", "\\\"");
     value = value.replace("\r", "\\r").replace("\n", "\\n");
     return "\"" + value + "\"";
 }
 
-juce::String cmakeString(juce::String value)
+cydaw::base::Text cmakeString(cydaw::base::Text value)
 {
     // In a quoted argument "\$" is a dollar sign (a bare one could expand a
     // variable), and a semicolon has no escape that stays one character: it
@@ -30,19 +32,19 @@ juce::String cmakeString(juce::String value)
     return "\"" + value + "\"";
 }
 
-juce::String slug(juce::String value)
+cydaw::base::Text slug(cydaw::base::Text value)
 {
     value = value.toLowerCase();
-    juce::String result;
+    cydaw::base::Text result;
     for (const auto character : value)
-        if (juce::CharacterFunctions::isLetterOrDigit(character))
+        if (cydaw::base::CharacterFunctions::isLetterOrDigit(character))
             result << character;
         else if (result.isNotEmpty() && !result.endsWithChar('-'))
             result << '-';
     return result.trimCharactersAtEnd("-").substring(0, 48);
 }
 
-bool writeText(const juce::File &file, const juce::String &text)
+bool writeText(const cydaw::base::File &file, const cydaw::base::Text &text)
 {
     return file.replaceWithText(text, false, false, "\n");
 }
@@ -54,7 +56,7 @@ constexpr auto voiceAssetsName = "Voice.cyvoice";
 // the sampler's zones with every sample whole (one held only in part, or
 // not decoded yet, is decoded again from its file), the sound model.
 // Nothing to write: ok, `written` false.
-juce::Result writeVoiceAssetsFile(const juce::File &file, const juce::var &editor,
+cydaw::base::Result writeVoiceAssetsFile(const cydaw::base::File &file, const cydaw::base::Value &editor,
                                   const cydaw::engine::PolyOscillatorWaveform waveform, bool &written)
 {
     using cydaw::engine::PolyOscillatorWaveform;
@@ -63,56 +65,56 @@ juce::Result writeVoiceAssetsFile(const juce::File &file, const juce::var &edito
     const auto sampler = waveform == PolyOscillatorWaveform::sampler;
     const auto model = waveform == PolyOscillatorWaveform::soundModel;
     if (!sampler && !model)
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     const auto assets = voiceAssetsFromGraphState(editor);
     if (sampler && (assets.sampler == nullptr || assets.sampler->zones.empty()))
-        return juce::Result::fail("The sampler has no zone to export");
+        return cydaw::base::Result::fail("The sampler has no zone to export");
     if (model && assets.soundModel == nullptr)
-        return juce::Result::fail("The sound model card has no model to export");
+        return cydaw::base::Result::fail("The sound model card has no model to export");
     const auto whole = [](const cydaw::engine::SampleDataRef &sample) -> cydaw::engine::SampleDataRef {
         if (sample->playable() && !sample->streamed &&
             sample->pcm.size() == static_cast<std::size_t>(sample->frames) * static_cast<std::size_t>(sample->channels))
             return sample;
         auto decoded = std::make_shared<cydaw::engine::SampleData>();
-        juce::String error;
-        if (!decodeSampleFile(juce::File(juce::String::fromUTF8(sample->path.c_str())), *decoded, error))
+        cydaw::base::Text error;
+        if (!decodeSampleFile(cydaw::base::File(cydaw::base::Text::fromUTF8(sample->path.c_str())), *decoded, error))
             return {};
         return decoded;
     };
     std::string error;
     {
-        std::ofstream out(std::filesystem::path(file.getFullPathName().toWideCharPointer()), std::ios::binary);
+        std::ofstream out(std::filesystem::path(file.getFullPathName().toWideString()), std::ios::binary);
         if (!cydaw::engine::writeVoiceAssets(out, sampler ? assets.sampler.get() : nullptr, whole,
                                              model ? assets.soundModel.get() : nullptr, error))
         {
             out.close();
             (void)file.deleteFile();
-            return juce::Result::fail("The instrument's voice data cannot be exported: " + juce::String(error));
+            return cydaw::base::Result::fail("The instrument's voice data cannot be exported: " + cydaw::base::Text(error));
         }
     }
     written = true;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 } // namespace
 
-juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw::graph::PluginExportPlan &plan,
-                                      const juce::var &manifest, const juce::var &runtimeState, const juce::String& format)
+cydaw::base::Result generateGraphVst3Project(const cydaw::base::File &destination, const cydaw::graph::PluginExportPlan &plan,
+                                      const cydaw::base::Value &manifest, const cydaw::base::Value &runtimeState, const cydaw::base::Text& format)
 {
-    if (format != "VST3" && format != "CLAP" && format != "LV2") return juce::Result::fail("Unknown export format");
-    if (destination == juce::File{} || !runtimeState.isObject())
-        return juce::Result::fail("The native export state or destination is missing");
+    if (format != "VST3" && format != "CLAP" && format != "LV2") return cydaw::base::Result::fail("Unknown export format");
+    if (destination == cydaw::base::File{} || !runtimeState.isObject())
+        return cydaw::base::Result::fail("The native export state or destination is missing");
     const auto native = runtimeState.getProperty("native", {}), poly = runtimeState.getProperty("polySynth", {});
     const auto editor = runtimeState.getProperty("editor", {}), presentation = editor.getProperty("presentation", {});
     const auto *nodes = native.getProperty("nodes", {}).getArray();
     if (!nodes)
-        return juce::Result::fail("The native audio plan is missing");
+        return cydaw::base::Result::fail("The native audio plan is missing");
     const auto waveform =
         static_cast<cydaw::engine::PolyOscillatorWaveform>(static_cast<int>(poly.getProperty("waveform", 0)));
     const auto instrument = static_cast<bool>(poly.getProperty("enabled", false));
     // A rack's pads are instruments of the track, outside the device.
     if (instrument && waveform == cydaw::engine::PolyOscillatorWaveform::rack)
-        return juce::Result::fail("Pad racks are excluded from native export: their pads are instruments of the track");
+        return cydaw::base::Result::fail("Pad racks are excluded from native export: their pads are instruments of the track");
     int outputs = 0, inputs = 0;
     for (const auto &b : plan.buses)
         if (b.mediaType == cydaw::graph::PluginBusMediaType::audio)
@@ -123,7 +125,7 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
                 ++outputs;
         }
     if (outputs != 1 || inputs > 4)
-        return juce::Result::fail("Native export requires one audio output and up to four audio inputs");
+        return cydaw::base::Result::fail("Native export requires one audio output and up to four audio inputs");
     // Samples and recorded models travel in the bundle's voice data; a
     // rack's pads cannot.
     if (const auto *list = editor.getProperty("nodes", {}).getArray())
@@ -131,17 +133,17 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
         {
             const auto type = n.getProperty("type", {}).toString();
             if (type == "drum-rack" || type == "instrument-layer" || type == "instrument-selector")
-                return juce::Result::fail("Instrument containers (Drum Machine, Instrument Layer, Instrument Selector) are "
+                return cydaw::base::Result::fail("Instrument containers (Drum Machine, Instrument Layer, Instrument Selector) are "
                                           "excluded from native export: their pads and layers are instruments of the track");
             if (n.hasProperty("prismTables") || n.hasProperty("wavetableShape") || n.hasProperty("impulse"))
-                return juce::Result::fail(
+                return cydaw::base::Result::fail(
                     "Imported wavetable/impulse assets must be embedded before this device can use native export");
         }
     if (destination.createDirectory().failed())
-        return juce::Result::fail("Cannot create the project directory");
+        return cydaw::base::Result::fail("Cannot create the project directory");
     const auto generated = destination.getChildFile("generated");
     if (generated.createDirectory().failed())
-        return juce::Result::fail("Cannot create the generated source directory");
+        return cydaw::base::Result::fail("Cannot create the generated source directory");
     auto voiceAssets = false;
     if (const auto voice = writeVoiceAssetsFile(generated.getChildFile(voiceAssetsName), editor,
                                             instrument ? waveform : cydaw::engine::PolyOscillatorWaveform::sine,
@@ -151,49 +153,49 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     // Each Replacer's instrument (Containers.h): its plan, and its voice data
     // in a file of its own ("Voice1.cyvoice"...), beside the instrument's.
     struct ReplacerExport {
-        juce::int64 node {};
-        juce::var poly;
-        juce::String assets;
+        cydaw::base::int64 node {};
+        cydaw::base::Value poly;
+        cydaw::base::Text assets;
     };
     std::vector<ReplacerExport> replacers;
     if (const auto *list = runtimeState.getProperty("replacers", {}).getArray())
         for (const auto &entry : *list)
         {
             ReplacerExport made;
-            made.node = static_cast<juce::int64>(entry.getProperty("node", 0));
+            made.node = static_cast<cydaw::base::int64>(entry.getProperty("node", 0));
             made.poly = entry.getProperty("polySynth", {});
             const auto replacerWaveform =
                 static_cast<cydaw::engine::PolyOscillatorWaveform>(static_cast<int>(made.poly.getProperty("waveform", 0)));
             if (replacerWaveform == cydaw::engine::PolyOscillatorWaveform::rack)
-                return juce::Result::fail("A Replacer playing a pad rack cannot be exported");
-            const auto name = "Voice" + juce::String(static_cast<int>(replacers.size()) + 1) + ".cyvoice";
+                return cydaw::base::Result::fail("A Replacer playing a pad rack cannot be exported");
+            const auto name = "Voice" + cydaw::base::Text(static_cast<int>(replacers.size()) + 1) + ".cyvoice";
             auto written = false;
             if (const auto voice = writeVoiceAssetsFile(generated.getChildFile(name), entry.getProperty("editor", {}),
                                                         replacerWaveform, written);
                 voice.failed())
-                return juce::Result::fail("A Replacer's instrument: " + voice.getErrorMessage());
+                return cydaw::base::Result::fail("A Replacer's instrument: " + voice.getErrorMessage());
             if (written)
                 made.assets = name;
             replacers.push_back(std::move(made));
         }
-    const auto prop = [](const juce::var &v, const char *key) { return v.getProperty(key, {}); };
-    const auto number = [](const juce::var &value) { return juce::String(static_cast<double>(value), 12); };
-    const auto integer = [](const juce::var &value) { return juce::String(static_cast<juce::int64>(value)); };
-    const auto quote = [&](const juce::var &v, const char *key) { return cppString(prop(v, key).toString()); };
-    juce::String cpp = "#include \"PluginDefinition.h\"\n#include <cydaw/engine/MidiEffects.h>\n";
-    juce::String customDeclarations, customSources;
+    const auto prop = [](const cydaw::base::Value &v, const char *key) { return v.getProperty(key, {}); };
+    const auto number = [](const cydaw::base::Value &value) { return cydaw::base::Text(static_cast<double>(value), 12); };
+    const auto integer = [](const cydaw::base::Value &value) { return cydaw::base::Text(static_cast<cydaw::base::int64>(value)); };
+    const auto quote = [&](const cydaw::base::Value &v, const char *key) { return cppString(prop(v, key).toString()); };
+    cydaw::base::Text cpp = "#include \"PluginDefinition.h\"\n#include <cydaw/engine/MidiEffects.h>\n";
+    cydaw::base::Text customDeclarations, customSources;
     if (const auto *controls = prop(presentation, "controls").getArray())
         for (const auto &c : *controls)
             if (prop(c, "kind").toString() == "custom")
             {
                 const auto source = prop(prop(c, "design"), "customSource").toString();
                 if (source.trim().isEmpty())
-                    return juce::Result::fail("A custom C++ control has no source");
+                    return cydaw::base::Result::fail("A custom C++ control has no source");
                 const auto suffix = integer(prop(c, "id")), symbol = "cydawCustom_" + suffix,
                            filename = "Custom_" + suffix + ".cpp";
                 if (!writeText(generated.getChildFile(filename),
                                "#define cydawDrawInterfaceV1 " + symbol + "\n" + source))
-                    return juce::Result::fail("Cannot write custom component source");
+                    return cydaw::base::Result::fail("Cannot write custom component source");
                 customDeclarations += "extern \"C\" void " + symbol + "(const CyInterfaceContext*);\n";
                 customSources += "  \"${CMAKE_CURRENT_SOURCE_DIR}/generated/" + filename + "\"\n";
             }
@@ -201,38 +203,38 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     cpp += "d.name=" + cppString(plan.identity.productName) + ";d.vendor=" + cppString(plan.identity.companyName) +
            ";d.version=" + cppString(plan.identity.version.toString()) + ";d.category=" + cppString(plan.vst3Category) +
            ";\n";
-    cpp += "d.synth=" + juce::String(plan.isSynth ? "true" : "false") +
+    cpp += "d.synth=" + cydaw::base::Text(plan.isSynth ? "true" : "false") +
            ";d.acceptsMidi=" + (plan.acceptsMidi ? "true" : "false") +
            ";d.producesMidi=" + (plan.producesMidi ? "true" : "false") + ";\n";
     if (voiceAssets)
         cpp += "d.voiceAssets=" + cppString(voiceAssetsName) + ";\n";
     for (const auto &replacer : replacers)
         if (replacer.assets.isNotEmpty())
-            cpp += "d.replacerVoices.push_back({" + juce::String(replacer.node) + "ull," + cppString(replacer.assets) + "});\n";
+            cpp += "d.replacerVoices.push_back({" + cydaw::base::Text(replacer.node) + "ull," + cppString(replacer.assets) + "});\n";
     cpp += "d.width=" + integer(presentation.getProperty("windowWidth", 720)) +
            ";d.height=" + integer(presentation.getProperty("windowHeight", 420)) + ";\n";
     const auto surface=prop(presentation,"windowDesign");
     for(const auto* key:{"background","accent","text"})if(surface.hasProperty(key))
-        cpp += "d."+juce::String(key)+"=0x"+juce::String::toHexString(prop(surface,key).toString().getHexValue64())+"u;\n";
+        cpp += "d."+cydaw::base::Text(key)+"=0x"+cydaw::base::Text::toHexString(prop(surface,key).toString().getHexValue64())+"u;\n";
     for (const auto &b : plan.buses)
         if (b.mediaType == cydaw::graph::PluginBusMediaType::audio)
-            cpp += "d.buses.push_back({" + cppString(b.displayName) + "," + juce::String(b.channels) + "," +
+            cpp += "d.buses.push_back({" + cppString(b.displayName) + "," + cydaw::base::Text(b.channels) + "," +
                    (b.direction == cydaw::graph::PortDirection::input ? "true" : "false") + "});\n";
-    auto metadata = juce::DynamicObject::Ptr(new juce::DynamicObject());
-    metadata->setProperty("name", juce::String(plan.identity.productName));
-    metadata->setProperty("vendor", juce::String(plan.identity.companyName));
+    auto metadata = cydaw::base::Object::Ptr(new cydaw::base::Object());
+    metadata->setProperty("name", cydaw::base::Text(plan.identity.productName));
+    metadata->setProperty("vendor", cydaw::base::Text(plan.identity.companyName));
     metadata->setProperty("synth", plan.isSynth);
     metadata->setProperty("acceptsMidi", plan.acceptsMidi);
     metadata->setProperty("producesMidi", plan.producesMidi);
     metadata->setProperty("programs", prop(runtimeState, "programs"));
-    juce::Array<juce::var> metadataBuses, metadataParameters;
+    cydaw::base::Array<cydaw::base::Value> metadataBuses, metadataParameters;
     for (const auto& b : plan.buses)
         if (b.mediaType == cydaw::graph::PluginBusMediaType::audio) {
-            auto bus = juce::DynamicObject::Ptr(new juce::DynamicObject());
-            bus->setProperty("name", juce::String(b.displayName));
+            auto bus = cydaw::base::Object::Ptr(new cydaw::base::Object());
+            bus->setProperty("name", cydaw::base::Text(b.displayName));
             bus->setProperty("channels", static_cast<int>(b.channels));
             bus->setProperty("input", b.direction == cydaw::graph::PortDirection::input);
-            metadataBuses.add(juce::var(bus.get()));
+            metadataBuses.add(cydaw::base::Value(bus.get()));
         }
     metadata->setProperty("buses", metadataBuses);
     const auto parameters =
@@ -257,7 +259,7 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
             metadataParameters.add(parameter);
             cpp += "p.minimum=" + number(prop(p, "minimum")) + ";p.maximum=" + number(prop(p, "maximum")) +
                    ";p.initial=" + number(initial) + ";p.host=" +
-                   juce::String(static_cast<bool>(p.getProperty("exportedToHost", true)) ? "true" : "false") +
+                   cydaw::base::Text(static_cast<bool>(p.getProperty("exportedToHost", true)) ? "true" : "false") +
                    ";d.parameters.push_back(std::move(p));}\n";
         }
     if (const auto *controls = prop(presentation, "controls").getArray())
@@ -266,31 +268,31 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
             const auto design = prop(c, "design");
             cpp += "{ControlDefinition c;c.accent=d.accent;c.background=d.background;c.text=d.text;c.id=" + integer(prop(c, "id")) + "ull;";
             for(const auto* key:{"instrumentType","instrumentPanel"})
-                if(design.hasProperty(key))cpp += "c."+juce::String(key)+"="+quote(design,key)+";";
-            cpp += "c.instrumentCompact="+juce::String(static_cast<bool>(prop(design,"instrumentCompact"))?"true":"false")+";";
+                if(design.hasProperty(key))cpp += "c."+cydaw::base::Text(key)+"="+quote(design,key)+";";
+            cpp += "c.instrumentCompact="+cydaw::base::Text(static_cast<bool>(prop(design,"instrumentCompact"))?"true":"false")+";";
             if(const auto* keys=prop(design,"instrumentKeys").getArray())for(const auto& key:*keys)
                 cpp += "c.instrumentKeys.push_back("+cppString(key.toString())+");";
             for (const auto *key : {"kind", "label"})
-                cpp += "c." + juce::String(key) + "=" + quote(c, key) + ";";
+                cpp += "c." + cydaw::base::Text(key) + "=" + quote(c, key) + ";";
             for (const auto &pair :
                  {std::pair{"primary", "binding"}, std::pair{"secondary", "secondaryBinding"},
                   std::pair{"tertiary", "tertiaryBinding"}, std::pair{"quaternary", "quaternaryBinding"}})
-                cpp += "c." + juce::String(pair.first) + "=" + quote(c, pair.second) + ";";
+                cpp += "c." + cydaw::base::Text(pair.first) + "=" + quote(c, pair.second) + ";";
             for (const auto *key : {"x", "y", "width", "height"})
-                cpp += "c." + juce::String(key) + "=" + number(prop(c, key)) + "f;";
+                cpp += "c." + cydaw::base::Text(key) + "=" + number(prop(c, key)) + "f;";
             for (const auto *key : {"accent", "background", "text"})
                 if (design.hasProperty(key))
-                    cpp += "c." + juce::String(key) + "=0x" +
-                           juce::String::toHexString(design.getProperty(key, {}).toString().getHexValue64()) + "u;";
+                    cpp += "c." + cydaw::base::Text(key) + "=0x" +
+                           cydaw::base::Text::toHexString(design.getProperty(key, {}).toString().getHexValue64()) + "u;";
             for (const auto *key : {"fontScale", "rounding"})
                 if (design.hasProperty(key))
-                    cpp += "c." + juce::String(key) + "=" + number(prop(design, key)) + "f;";
+                    cpp += "c." + cydaw::base::Text(key) + "=" + number(prop(design, key)) + "f;";
             for (const auto *key : {"pane", "variant"})
                 if (design.hasProperty(key))
-                    cpp += "c." + juce::String(key) + "=" + integer(prop(design, key)) + ";";
+                    cpp += "c." + cydaw::base::Text(key) + "=" + integer(prop(design, key)) + ";";
             for (const auto *key : {"hidden", "large", "showValue"})
-                cpp += "c." + juce::String(key) + "=" +
-                       juce::String(static_cast<bool>(prop(design, key)) ? "true" : "false") + ";";
+                cpp += "c." + cydaw::base::Text(key) + "=" +
+                       cydaw::base::Text(static_cast<bool>(prop(design, key)) ? "true" : "false") + ";";
             cpp += "c.page=" + quote(design, "page") + ";";
             if (const auto *a = prop(c, "extraBindings").getArray())
                 for (const auto &b : *a)
@@ -319,52 +321,52 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
             cpp += "d.voiceModulations.push_back({" + integer(prop(route, "source")) +
                    "ull,static_cast<engine::PolyVoiceTarget>(" + integer(prop(route, "target")) + ")," +
                    number(prop(route, "depth")) + "f," + integer(prop(route, "index")) + "," +
-                   number(prop(route, "minimum")) + "f," + number(prop(route, "maximum").isVoid() ? juce::var(1.0) : prop(route, "maximum")) + "f," +
+                   number(prop(route, "minimum")) + "f," + number(prop(route, "maximum").isVoid() ? cydaw::base::Value(1.0) : prop(route, "maximum")) + "f," +
                    (static_cast<bool>(prop(route, "logarithmic")) ? "true" : "false") + "});\n";
     // An instrument's plan as a function of the source: the track's, each
     // Replacer's.
-    const auto emitPlan = [&](const juce::var &poly, const juce::String &function) {
-        juce::String out = "engine::PolySynthGraphPlan " + function + "(){engine::PolySynthGraphPlan p;\n";
+    const auto emitPlan = [&](const cydaw::base::Value &poly, const cydaw::base::Text &function) {
+        cydaw::base::Text out = "engine::PolySynthGraphPlan " + function + "(){engine::PolySynthGraphPlan p;\n";
         for (const auto *key :
              {"graphNodeCount", "voiceCount", "voiceMode", "transposeSemitones", "minimumMidiNote", "maximumMidiNote"})
-            out += "p." + juce::String(key) + "=" + integer(prop(poly, key)) + ";\n";
-        out += "p.enabled=" + juce::String(static_cast<bool>(prop(poly, "enabled")) ? "true" : "false") +
+            out += "p." + cydaw::base::Text(key) + "=" + integer(prop(poly, key)) + ";\n";
+        out += "p.enabled=" + cydaw::base::Text(static_cast<bool>(prop(poly, "enabled")) ? "true" : "false") +
                ";p.waveform=static_cast<engine::PolyOscillatorWaveform>(" + integer(prop(poly, "waveform")) + ");\n";
         for (const auto *key :
              {"glideSeconds", "wavetablePosition", "stringDamping", "oscillatorLevel", "attackSeconds", "decaySeconds",
               "sustainLevel", "releaseSeconds", "filterCutoffHz", "filterResonance", "velocityScale"})
-            out += "p." + juce::String(key) + "=" + number(prop(poly, key)) + "f;\n";
+            out += "p." + cydaw::base::Text(key) + "=" + number(prop(poly, key)) + "f;\n";
         out += "p.wavetableDetuneCents=" + number(prop(poly, "wavetableDetune")) +
                "f;p.stringDecaySeconds=" + number(prop(poly, "stringDecay")) + "f;\n";
         out += "p.synthModel=static_cast<engine::synth::Model>(" + integer(prop(poly, "synthModel")) + ");\n";
         for (const auto *key : {"prismValues", "kickValues", "synthValues", "samplerValues", "soundModelValues"})
             if (const auto *a = prop(poly, key).getArray())
                 for (int i = 0; i < a->size(); ++i)
-                    out += "p." + juce::String(key) + "[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
+                    out += "p." + cydaw::base::Text(key) + "[" + cydaw::base::Text(i) + "]=" + number((*a)[i]) + "f;\n";
         // A sampler's card controllers (those it sets), a Batterie's mix.
         if (const auto *controllers = prop(poly, "samplerControllers").getDynamicObject())
             for (const auto &controller : controllers->getProperties())
                 if (const auto number_ = controller.name.toString().getIntValue(); number_ >= 0 && number_ < 128)
-                    out += "p.samplerControllers[" + juce::String(number_) + "]=" + number(controller.value) + "f;\n";
+                    out += "p.samplerControllers[" + cydaw::base::Text(number_) + "]=" + number(controller.value) + "f;\n";
         if (static_cast<bool>(prop(poly, "drumKit")))
         {
             out += "p.drumKit=true;\n";
             if (const auto *a = prop(poly, "drumValues").getArray())
                 for (int i = 0; i < a->size(); ++i)
-                    out += "p.drumValues[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
+                    out += "p.drumValues[" + cydaw::base::Text(i) + "]=" + number((*a)[i]) + "f;\n";
         }
         if (const auto *effects = prop(poly, "midiEffects").getArray())
         {
             out += "{auto effects=std::make_shared<engine::MidiEffectsPlan>();effects->count=" +
-                   juce::String(effects->size()) + ";\n";
+                   cydaw::base::Text(effects->size()) + ";\n";
             for (int i = 0; i < effects->size(); ++i)
             {
                 const auto &e = (*effects)[i];
-                const auto target = "effects->effects[" + juce::String(i) + "]";
+                const auto target = "effects->effects[" + cydaw::base::Text(i) + "]";
                 out += target + ".kind=static_cast<engine::NativeDspNodeKind>(" + integer(prop(e, "kind")) + ");\n";
                 if (const auto *a = prop(e, "values").getArray())
                     for (int j = 0; j < a->size(); ++j)
-                        out += target + ".values[" + juce::String(j) + "]=" + number((*a)[j]) + "f;\n";
+                        out += target + ".values[" + cydaw::base::Text(j) + "]=" + number((*a)[j]) + "f;\n";
             }
             out += "p.midiEffects=effects;}\n";
         }
@@ -374,10 +376,10 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     };
     cpp += "return d;}\n";
     for (std::size_t index = 0; index < replacers.size(); ++index)
-        cpp += "static " + emitPlan(replacers[index].poly, "makeReplacerPlan" + juce::String(static_cast<int>(index) + 1));
+        cpp += "static " + emitPlan(replacers[index].poly, "makeReplacerPlan" + cydaw::base::Text(static_cast<int>(index) + 1));
     cpp += "engine::NativeDspGraph makeAudioGraph(){engine::NativeDspGraph g;g.outputNodeId=" +
            integer(prop(native, "outputNodeId")) + "ull;\n";
-    const juce::StringArray scalarFields{"driveDb",
+    const cydaw::base::TextList scalarFields{"driveDb",
                                          "gainDb",
                                          "cutoffHz",
                                          "resonance",
@@ -450,12 +452,12 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
             if (const auto *a = prop(values, key).getArray())
                 for (int i = 0; i < a->size(); ++i)
                     cpp +=
-                        "n.parameters." + juce::String(key) + "[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
+                        "n.parameters." + cydaw::base::Text(key) + "[" + cydaw::base::Text(i) + "]=" + number((*a)[i]) + "f;\n";
         // A Replacer's instrument.
         for (std::size_t index = 0; index < replacers.size(); ++index)
-            if (replacers[index].node == static_cast<juce::int64>(prop(n, "id")))
+            if (replacers[index].node == static_cast<cydaw::base::int64>(prop(n, "id")))
                 cpp += "n.instrument=std::make_shared<const engine::PolySynthGraphPlan>(makeReplacerPlan" +
-                       juce::String(static_cast<int>(index) + 1) + "());\n";
+                       cydaw::base::Text(static_cast<int>(index) + 1) + "());\n";
         cpp += "g.nodes.push_back(std::move(n));}\n";
     }
     if (const auto *a = prop(native, "connections").getArray())
@@ -474,13 +476,13 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
             cpp += "g.bypasses.push_back({" + integer(prop(b, "node")) + "ull," + integer(prop(b, "from")) + "ull});\n";
     cpp += "return g;}\n" + emitPlan(poly, "makeInstrumentPlan") + "}\n";
     const auto code = [](const std::string &s) {
-        juce::uint32 result = 0;
+        cydaw::base::uint32 result = 0;
         for (auto c : s)
             result = (result << 8) | static_cast<unsigned char>(c);
-        return "0x" + juce::String::toHexString(result);
+        return "0x" + cydaw::base::Text::toHexString(result);
     };
-    juce::String cmake = "cmake_minimum_required(VERSION 3.25)\nproject(CyDAWNativeExport VERSION " +
-                         juce::String(plan.identity.version.toString()) +
+    cydaw::base::Text cmake = "cmake_minimum_required(VERSION 3.25)\nproject(CyDAWNativeExport VERSION " +
+                         cydaw::base::Text(plan.identity.version.toString()) +
                          " LANGUAGES C CXX)\nset(CYDAW_SOURCE_ROOT \"\" CACHE PATH \"CyDAW source tree\")\nif(NOT "
                          "EXISTS \"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")\n message(FATAL_ERROR "
                          "\"Set CYDAW_SOURCE_ROOT to CyDAW sources with native VST3 export\")\nendif()\n";
@@ -488,34 +490,34 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
              cmakeString(plan.identity.companyName) + ")\nset(CYDAW_CATEGORY " + cmakeString(plan.vst3Category) +
              ")\nset(CYDAW_VENDOR_ID " + code(plan.identity.manufacturerCode) + ")\nset(CYDAW_PRODUCT_ID " +
              code(plan.identity.pluginCode) + ")\nset(CYDAW_CUSTOM_SOURCES\n" + customSources + ")\n" +
-             (voiceAssets ? "set(CYDAW_VOICE_ASSETS \"${CMAKE_CURRENT_SOURCE_DIR}/generated/" + juce::String(voiceAssetsName) +
+             (voiceAssets ? "set(CYDAW_VOICE_ASSETS \"${CMAKE_CURRENT_SOURCE_DIR}/generated/" + cydaw::base::Text(voiceAssetsName) +
                                 "\")\n"
-                          : juce::String()) +
+                          : cydaw::base::Text()) +
              [&replacers] {
                  // The Replacers' voice data, each copied by its own name.
-                 juce::String files;
+                 cydaw::base::Text files;
                  for (const auto &replacer : replacers)
                      if (replacer.assets.isNotEmpty())
                          files += " \"${CMAKE_CURRENT_SOURCE_DIR}/generated/" + replacer.assets + "\"";
-                 return files.isNotEmpty() ? "set(CYDAW_EXTRA_VOICE_ASSETS" + files + ")\n" : juce::String();
+                 return files.isNotEmpty() ? "set(CYDAW_EXTRA_VOICE_ASSETS" + files + ")\n" : cydaw::base::Text();
              }() +
              "include(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")\n";
     cmake = cmake.replace("include(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")", "set(CYDAW_EXPORT_FORMAT " + format + " CACHE STRING \"VST3, CLAP or LV2\")\ninclude(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")");
-    const auto sdkLicense = format == "VST3" ? juce::String("VST3 SDK (MIT)") : format == "CLAP" ? juce::String("CLAP SDK (MIT)") : juce::String("LV2 headers (ISC)");
-    const auto readme = "# " + juce::String(plan.identity.productName) +
+    const auto sdkLicense = format == "VST3" ? cydaw::base::Text("VST3 SDK (MIT)") : format == "CLAP" ? cydaw::base::Text("CLAP SDK (MIT)") : cydaw::base::Text("LV2 headers (ISC)");
+    const auto readme = "# " + cydaw::base::Text(plan.identity.productName) +
                         "\n\nNative " + format + " generated by CyDAW. The compiled plug-in contains the fixed DSP topology and "
                         "its Dear ImGui interface; no graph editor or JUCE is linked.\n\ncmake -S . -B build "
                         "-DCYDAW_SOURCE_ROOT=PATH_TO_CYDAW [-DCYDAW_VST3_SDK_DIR=PATH_TO_VST3_SDK]\ncmake --build "
                         "build --config Release --target CyDAWGeneratedGraphPlugin_" + format + "\n\nFormat dependency: " + sdkLicense + ". Dear ImGui is MIT. The license of the embedded CyDAW engine and custom "
                         "code must also be respected. This generation does not relicense those sources.\n";
     metadata->setProperty("parameters", metadataParameters);
-    if (!writeText(generated.getChildFile("Metadata.json"), juce::JSON::toString(juce::var(metadata.get()), true)) ||
+    if (!writeText(generated.getChildFile("Metadata.json"), cydaw::base::JSON::toString(cydaw::base::Value(metadata.get()), true)) ||
         !writeText(generated.getChildFile("Definition.cpp"), cpp) ||
         !writeText(destination.getChildFile("CMakeLists.txt"), cmake) ||
         !writeText(destination.getChildFile("README.md"), readme) ||
-        !writeText(destination.getChildFile("GraphManifest.cydawvst3.json"), juce::JSON::toString(manifest, true)))
-        return juce::Result::fail("Cannot write native VST3 project files");
-    return juce::Result::ok();
+        !writeText(destination.getChildFile("GraphManifest.cydawvst3.json"), cydaw::base::JSON::toString(manifest, true)))
+        return cydaw::base::Result::fail("Cannot write native VST3 project files");
+    return cydaw::base::Result::ok();
 }
 
 } // namespace cydaw::app

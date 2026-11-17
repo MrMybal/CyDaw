@@ -1,33 +1,30 @@
+#include <cydaw/base/Properties.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
-#include <juce_data_structures/juce_data_structures.h>
-#include <juce_events/juce_events.h>
+#include <shared_mutex>
 
 #include <unordered_map>
 #include <vector>
 
 namespace cydaw::app {
 
-// One for the program, made on first use and deleted when JUCE shuts down
-// (not when the module is unloaded: a plug-in's would then be destroyed
-// after JUCE, under the loader's lock, and its host would hang).
-class Localization final : public juce::ChangeBroadcaster, private juce::DeletedAtShutdown {
+// Shared language data has no GUI lifecycle dependency.
+class Localization final {
 public:
     static Localization& instance();
-    ~Localization() override;
-    JUCE_DECLARE_SINGLETON(Localization, false)
+    ~Localization() = default;
 
-    [[nodiscard]] juce::String text(juce::StringRef key) const;
+    [[nodiscard]] cydaw::base::Text text(cydaw::base::Text key) const;
     // The same in English, whatever the language (what a module shows).
-    [[nodiscard]] juce::String englishText(juce::StringRef key) const;
-    [[nodiscard]] juce::String languageCode() const;
-    [[nodiscard]] bool setLanguage(const juce::String& languageCode);
+    [[nodiscard]] cydaw::base::Text englishText(cydaw::base::Text key) const;
+    [[nodiscard]] cydaw::base::Text languageCode() const;
+    [[nodiscard]] bool setLanguage(const cydaw::base::Text& languageCode);
     // The languages there are: English and French built in, then every
     // i18n/<code>.json beside the program (its "language.name" names it).
     struct Language {
-        juce::String code;
-        juce::String name;
+        cydaw::base::Text code;
+        cydaw::base::Text name;
     };
     [[nodiscard]] static std::vector<Language> availableLanguages();
 
@@ -36,19 +33,19 @@ private:
     // of cards is rebuilt, and a linear, case-folding scan of every string
     // in the language (what StringPairArray does) was a visible part of
     // every change of view.
-    using Mappings = std::unordered_map<juce::String, juce::String>;
+    using Mappings = std::unordered_map<cydaw::base::Text, cydaw::base::Text>;
     Localization();
-    [[nodiscard]] Mappings loadLanguage(const juce::String& languageCode) const;
-    [[nodiscard]] static Mappings parseJson(const juce::String& json);
+    [[nodiscard]] Mappings loadLanguage(const cydaw::base::Text& languageCode) const;
+    [[nodiscard]] static Mappings parseJson(const cydaw::base::Text& json);
 
-    juce::String languageCode_ { "en" };
+    cydaw::base::Text languageCode_ { "en" };
     Mappings english_;
     Mappings current_;
-    juce::ApplicationProperties properties_;
-    mutable juce::ReadWriteLock mappingsLock_;
+    cydaw::base::ApplicationProperties properties_;
+    mutable std::shared_mutex mappingsLock_;
 };
 
-[[nodiscard]] juce::String tr(juce::StringRef key);
-[[nodiscard]] juce::String tr(juce::StringRef key, juce::StringRef token, const juce::String& value);
+[[nodiscard]] cydaw::base::Text tr(cydaw::base::Text key);
+[[nodiscard]] cydaw::base::Text tr(cydaw::base::Text key, cydaw::base::Text token, const cydaw::base::Text& value);
 
 } // namespace cydaw::app

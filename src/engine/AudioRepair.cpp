@@ -1,4 +1,7 @@
 #include <cydaw/engine/AudioRepair.h>
+#include <cydsp/processors/Biquad.h>
+#include <cydsp/processors/ComplexFft.h>
+#include <stdexcept>
 
 #include <algorithm>
 #include <cmath>
@@ -18,45 +21,17 @@ std::int64_t lengthOf(const Channels& channels)
 // In place, radix 2 (size a power of two).
 void transform(std::vector<std::complex<double>>& data, const bool inverse)
 {
-    const auto n = data.size();
-    for (std::size_t i = 1, j = 0; i < n; ++i) {
-        auto bit = n >> 1;
-        for (; j & bit; bit >>= 1)
-            j ^= bit;
-        j ^= bit;
-        if (i < j)
-            std::swap(data[i], data[j]);
-    }
-    for (std::size_t length = 2; length <= n; length <<= 1) {
-        const auto angle = (inverse ? 1.0 : -1.0) * twoPi / static_cast<double>(length);
-        const std::complex<double> step(std::cos(angle), std::sin(angle));
-        for (std::size_t i = 0; i < n; i += length) {
-            std::complex<double> w(1.0, 0.0);
-            for (std::size_t k = 0; k < length / 2; ++k) {
-                const auto u = data[i + k];
-                const auto v = data[i + k + length / 2] * w;
-                data[i + k] = u + v;
-                data[i + k + length / 2] = u - v;
-                w *= step;
-            }
-        }
-    }
-    if (inverse)
-        for (auto& value : data)
-            value /= static_cast<double>(n);
+    // These transforms build assets / run offline restoration, outside audio.
+    // Retain one SDK plan per worker rather than rebuilding twiddles per frame.
+    thread_local cydsp::ComplexFft<double> plan;
+    if (plan.size() != data.size() && plan.prepare(data.size()) != cydsp::Status::ok)
+        throw std::runtime_error("FFT preparation");
+    if (plan.process(data, data, inverse ? cydsp::FftDirection::inverse : cydsp::FftDirection::forward) != cydsp::Status::ok)
+        throw std::runtime_error("FFT transform");
 }
 
 struct Biquad {
     double b0 { 1.0 }, b1 {}, b2 {}, a1 {}, a2 {};
-    double z1 {}, z2 {};
-    double process(const double x) noexcept
-    {
-        const auto y = b0 * x + z1;
-        z1 = b1 * x - a1 * y + z2;
-        z2 = b2 * x - a2 * y;
-        return y;
-    }
-    void reset() noexcept { z1 = z2 = 0.0; }
 };
 
 Biquad notch(const double rate, const double frequency, const double q)
@@ -110,14 +85,36 @@ double powerAt(const std::vector<float>& signal, const double rate, const double
 
 void filterAll(Channels& channels, const std::vector<Biquad>& filters, const bool zeroPhase)
 {
-    for (auto& channel : channels) {
-        for (auto filter : filters) {
-            for (auto& sample : channel)
-                sample = static_cast<float>(filter.process(sample));
-            if (zeroPhase) {
-                filter.reset();
-                for (auto it = channel.rbegin(); it != channel.rend(); ++it)
-                    *it = static_cast<float>(filter.process(*it));
+    for (auto& channel : channels)
+    {
+        if (channel.empty())
+            continue;
+        std::vector<double> samples(channel.size());
+        cydsp::Biquad<double> processor;
+        if (processor.prepare({48000, channel.size(), 1}) != cydsp::Status::ok)
+            throw std::bad_alloc();
+        const auto run = [&]
+        {
+            double* pointer = samples.data();
+            const auto block = cydsp::AudioBlock<double>(&pointer, 1, samples.size());
+            if (processor.process(block, block) != cydsp::Status::ok)
+                throw std::runtime_error("Repair filter");
+        };
+        for (const auto& filter : filters)
+        {
+            const cydsp::BiquadCoefficients c{filter.b0, filter.b1, filter.b2, filter.a1, filter.a2};
+            if (processor.setCoefficients(c) != cydsp::Status::ok)
+                throw std::runtime_error("Repair coefficients");
+            processor.reset();
+            std::copy(channel.begin(), channel.end(), samples.begin());
+            run();
+            std::transform(samples.begin(), samples.end(), channel.begin(), [](double x) { return float(x); });
+            if (zeroPhase)
+            {
+                processor.reset();
+                std::copy(channel.rbegin(), channel.rend(), samples.begin());
+                run();
+                std::transform(samples.begin(), samples.end(), channel.rbegin(), [](double x) { return float(x); });
             }
         }
     }

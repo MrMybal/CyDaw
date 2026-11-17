@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -12,15 +13,15 @@
 
 namespace cydaw::v2::node_tree {
 
-using Type = app::NodeGraphComponent::EditorNodeType;
+using Type = app::GraphDocument::EditorNodeType;
 
 // Where a node type sits, outermost first, in the language shown.
-[[nodiscard]] std::vector<juce::String> pathOf(const Type& type);
+[[nodiscard]] std::vector<cydaw::base::Text> pathOf(const Type& type);
 // The same, as one line: "Audio › Effets › Modulation".
-[[nodiscard]] juce::String pathText(const Type& type);
+[[nodiscard]] cydaw::base::Text pathText(const Type& type);
 
 struct Branch {
-    juce::String name;
+    cydaw::base::Text name;
     std::vector<Branch> children;
     std::vector<const Type*> leaves;
     int count {}; // the leaves below, at every level

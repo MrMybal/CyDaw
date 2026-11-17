@@ -1,3 +1,12 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
+#include <cydaw/base/Process.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/EventLoop.h>
+#include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "HelpDocumentation.h"
 #include "AppUi.h"
@@ -61,13 +70,13 @@ namespace cydaw::v2 {
 
 using ui::dp;
 using ui::L;
-juce::var AppUi::jsfx(const juce::var& request){return jsfx_->command(request);}
-juce::var AppUi::manual(const juce::var& request){return help_->command(request, studio_.keepsSettings());}
-void AppUi::openManual(const juce::String& topic, const juce::String& section){
-    auto* request = new juce::DynamicObject();
+cydaw::base::Value AppUi::jsfx(const cydaw::base::Value& request){return jsfx_->command(request);}
+cydaw::base::Value AppUi::manual(const cydaw::base::Value& request){return help_->command(request, studio_.keepsSettings());}
+void AppUi::openManual(const cydaw::base::Text& topic, const cydaw::base::Text& section){
+    auto* request = new cydaw::base::Object();
     request->setProperty("action", "open"); request->setProperty("topic", topic); request->setProperty("section", section);
     request->setProperty("language", studio_.settings().getValue("manualLanguage", "en"));
-    const auto result = help_->command(juce::var(request), studio_.keepsSettings());
+    const auto result = help_->command(cydaw::base::Value(request), studio_.keepsSettings());
     if (result.isString()) notify(result.toString(), true);
 }
 
@@ -115,7 +124,7 @@ int viewOf(const Panel panel)
 // Raised when the default layout changes, so that it reaches saved layouts once.
 constexpr int kLayoutVersion = 4;
 
-juce::File layoutVersionFile(const juce::File& layout)
+cydaw::base::File layoutVersionFile(const cydaw::base::File& layout)
 {
     return layout.withFileExtension("version");
 }
@@ -130,11 +139,12 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
     computerKeyboard_ = std::make_unique<ComputerKeyboard>(studio_);
     themes_ = std::make_unique<ThemesView>(studio_, state_);
     themes_->applySaved();
+    host_.setFrameRateLimit(studio_.settings().getIntValue("uiFrameRate", 60));
     state_.manyInstrumentWindows = studio_.settings().getBoolValue("manyInstrumentWindows", true);
     inspectorVisible_ = studio_.settings().getBoolValue("inspectorPanelVisible", true);
     browserVisible_ = studio_.settings().getBoolValue("browserPanelVisible", true);
     for (int i = 0; i < 5; ++i)
-        state_.bottomPanelsVisible[i] = studio_.settings().getBoolValue("bottomPanelVisible" + juce::String(i), true);
+        state_.bottomPanelsVisible[i] = studio_.settings().getBoolValue("bottomPanelVisible" + cydaw::base::Text(i), true);
     {
         // The displays' taps: the track's chain in the engine (or the simulator's).
         auto* session = &studio_;
@@ -246,7 +256,7 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
             }
             host_.wake();
         });
-    controllers_ = std::make_unique<Controllers>(studio_, state_, host_, studio_.keepsSettings());
+    controllers_ = std::make_unique<Controllers>(studio_, state_, host_, studio_.keepsSettings(), computerKeyboard_.get());
     pluginWindows_ = std::make_unique<PluginWindows>(studio_, state_);
     jsfx_ = std::make_unique<JsfxView>(studio_, state_);
     clipEditor_ = std::make_unique<ClipEditorView>(studio_, state_, waveforms_, host_);
@@ -263,7 +273,7 @@ AppUi::~AppUi()
     transportSync_.reset();
     if (studio_.keepsSettings()) {
         for (int i = 0; i < 5; ++i)
-            studio_.settings().setValue("bottomPanelVisible" + juce::String(i), state_.bottomPanelsVisible[i]);
+            studio_.settings().setValue("bottomPanelVisible" + cydaw::base::Text(i), state_.bottomPanelsVisible[i]);
         studio_.settings().setValue("inspectorPanelVisible", inspectorVisible_);
         studio_.settings().setValue("browserPanelVisible", browserVisible_);
     }
@@ -275,14 +285,14 @@ AppUi::~AppUi()
             const auto file = layoutFile();
             file.getParentDirectory().createDirectory();
             file.replaceWithData(data, size);
-            (void) layoutVersionFile(file).replaceWithText(juce::String(kLayoutVersion));
+            (void) layoutVersionFile(file).replaceWithText(cydaw::base::Text(kLayoutVersion));
         }
     }
 }
 
-juce::File AppUi::layoutFile() const
+cydaw::base::File AppUi::layoutFile() const
 {
-    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory)
         .getChildFile("CyDAW")
         .getChildFile("CyDAW2.layout.ini");
 }
@@ -302,57 +312,57 @@ void AppUi::resetLayout()
     resetLayoutRequested_ = true;
 }
 
-juce::File AppUi::layoutsFolder() const
+cydaw::base::File AppUi::layoutsFolder() const
 {
     return layoutFile().getParentDirectory().getChildFile("Layouts");
 }
 
-juce::File AppUi::namedLayoutFile(const juce::String& name) const
+cydaw::base::File AppUi::namedLayoutFile(const cydaw::base::Text& name) const
 {
-    const auto cleaned = juce::File::createLegalFileName(name.trim()).substring(0, 64).trim();
-    return cleaned.isEmpty() ? juce::File() : layoutsFolder().getChildFile(cleaned + ".ini");
+    const auto cleaned = cydaw::base::File::createLegalFileName(name.trim()).substring(0, 64).trim();
+    return cleaned.isEmpty() ? cydaw::base::File() : layoutsFolder().getChildFile(cleaned + ".ini");
 }
 
-juce::StringArray AppUi::layoutNames() const
+cydaw::base::TextList AppUi::layoutNames() const
 {
-    juce::StringArray names;
-    for (const auto& file : layoutsFolder().findChildFiles(juce::File::findFiles, false, "*.ini"))
+    cydaw::base::TextList names;
+    for (const auto& file : layoutsFolder().findChildFiles(cydaw::base::File::findFiles, false, "*.ini"))
         names.add(file.getFileNameWithoutExtension());
     names.sortNatural();
     return names;
 }
 
-juce::Result AppUi::saveLayoutAs(const juce::String& name)
+cydaw::base::Result AppUi::saveLayoutAs(const cydaw::base::Text& name)
 {
     const auto file = namedLayoutFile(name);
-    if (file == juce::File())
-        return juce::Result::fail(ui::Ls("Donnez un nom à la disposition", "Give the layout a name"));
+    if (file == cydaw::base::File())
+        return cydaw::base::Result::fail(ui::Ls("Donnez un nom à la disposition", "Give the layout a name"));
     if (ImGui::GetCurrentContext() == nullptr)
-        return juce::Result::fail("no interface");
+        return cydaw::base::Result::fail("no interface");
     size_t size = 0;
     const auto* data = ImGui::SaveIniSettingsToMemory(&size);
     if (size == 0 || !file.getParentDirectory().createDirectory() || !file.replaceWithData(data, size))
-        return juce::Result::fail(ui::Ls("La disposition n'a pas pu être écrite : ", "The layout could not be written: ")
+        return cydaw::base::Result::fail(ui::Ls("La disposition n'a pas pu être écrite : ", "The layout could not be written: ")
                                   + file.getFullPathName());
     notify(ui::Ls("Disposition enregistrée : ", "Layout saved: ") + file.getFileNameWithoutExtension());
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AppUi::loadLayout(const juce::String& name)
+cydaw::base::Result AppUi::loadLayout(const cydaw::base::Text& name)
 {
     const auto file = namedLayoutFile(name);
     if (!file.existsAsFile())
-        return juce::Result::fail(ui::Ls("Aucune disposition « ", "No layout \"") + name
+        return cydaw::base::Result::fail(ui::Ls("Aucune disposition « ", "No layout \"") + name
                                   + ui::Ls(" »", "\""));
     pendingLayout_ = file.loadFileAsString();
     if (pendingLayout_.isEmpty())
-        return juce::Result::fail(ui::Ls("Cette disposition est vide", "This layout is empty"));
+        return cydaw::base::Result::fail(ui::Ls("Cette disposition est vide", "This layout is empty"));
     notify(ui::Ls("Disposition : ", "Layout: ") + file.getFileNameWithoutExtension());
     host_.wake();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-bool AppUi::deleteLayout(const juce::String& name)
+bool AppUi::deleteLayout(const cydaw::base::Text& name)
 {
     const auto file = namedLayoutFile(name);
     // To the recycle bin rather than gone.
@@ -362,7 +372,7 @@ bool AppUi::deleteLayout(const juce::String& name)
 void AppUi::beforeNewFrame()
 {
     if (pendingLayout_.isNotEmpty() && ImGui::GetCurrentContext() != nullptr) {
-        const auto text = std::exchange(pendingLayout_, juce::String());
+        const auto text = std::exchange(pendingLayout_, cydaw::base::Text());
         ImGui::LoadIniSettingsFromMemory(text.toRawUTF8(), text.getNumBytesAsUTF8());
         // The focused panel would take its tab back from the layout.
         ImGui::SetWindowFocus(nullptr);
@@ -392,7 +402,7 @@ void AppUi::drawLayoutNamePrompt()
     ImGui::SetNextItemWidth(dp(320.0f));
     const auto entered = ImGui::InputTextWithHint("##name", L("Nom (Mixage, Deux écrans…)", "Name (Mixing, Two screens…)"),
                                                   layoutName_, sizeof(layoutName_), ImGuiInputTextFlags_EnterReturnsTrue);
-    const auto name = juce::String::fromUTF8(layoutName_).trim();
+    const auto name = cydaw::base::Text::fromUTF8(layoutName_).trim();
     const auto exists = name.isNotEmpty() && namedLayoutFile(name).existsAsFile();
     if (exists)
         ImGui::TextColored(theme::vec(theme::palette().record), "%s",
@@ -413,17 +423,17 @@ void AppUi::drawLayoutNamePrompt()
     ImGui::EndPopup();
 }
 
-void AppUi::chooseSoundToRecreate(const juce::String& kind)
+void AppUi::chooseSoundToRecreate(const cydaw::base::Text& kind)
 {
     const auto synth = kind == "synth";
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         synth ? L("La note dont chercher le patch (une note isolée)", "The note to find a patch for (one isolated note)")
               : L("Les notes à recréer (une note isolée par fichier, ou un enregistrement de plusieurs notes)",
                   "The notes to recreate (one isolated note per file, or a recording of several notes)"),
-        juce::File {}, synth ? "*.wav;*.aif;*.aiff;*.flac" : "*.wav");
-    const auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                       | (synth ? 0 : juce::FileBrowserComponent::canSelectMultipleItems);
-    chooser_->launchAsync(flags, [this, kind, synth](const juce::FileChooser& chooser) {
+        cydaw::base::File {}, synth ? "*.wav;*.aif;*.aiff;*.flac" : "*.wav");
+    const auto flags = cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                       | (synth ? 0 : cydaw::base::FileDialogFlags::canSelectMultipleItems);
+    chooser_->launchAsync(flags, [this, kind, synth](const cydaw::base::FileDialog& chooser) {
         const auto files = chooser.getResults();
         if (files.isEmpty())
             return;
@@ -434,7 +444,7 @@ void AppUi::chooseSoundToRecreate(const juce::String& kind)
                 notify(ui::Ls("Recherche d'un patch de synthé…", "Searching a synth patch…"));
             return;
         }
-        juce::StringArray options;
+        cydaw::base::TextList options;
         if (kind != "auto")
             options.addArray({ "--kind", kind });
         if (const auto started = studio_.recreateSound(files, {}, refineRecreated_, options); started.failed())
@@ -486,7 +496,7 @@ bool AppUi::openSynthEditor(const engine::synth::Model model)
 {
     if (!state_.selectedTrack)
         return false;
-    const auto typeKey = juce::String(engine::synth::info(model).typeKey);
+    const auto typeKey = cydaw::base::Text(engine::synth::info(model).typeKey);
     if (auto* slot = studio_.graphFor(*state_.selectedTrack))
         for (const auto& node : slot->graph().editorNodes())
             if (node.typeKey == typeKey) {
@@ -511,7 +521,7 @@ bool AppUi::openBatterieEditor(const bool mics)
 
 void AppUi::newBatterieTrack()
 {
-    juce::String error;
+    cydaw::base::Text error;
     const auto track = studio_.addBatterieTrack(0, error);
     if (!track) {
         notify(error.isNotEmpty() ? error : ui::Ls("Batterie n'a pas pu être créée", "Batterie could not be made"), true);
@@ -529,17 +539,17 @@ void AppUi::newBatterieTrack()
 void AppUi::newSynthTrack(const engine::synth::Model model)
 {
     const auto& info = engine::synth::info(model);
-    const auto name = juce::String::fromUTF8(info.french.c_str());
-    const auto track = studio_.addMidiTrack(name, juce::String(info.instrument));
+    const auto name = cydaw::base::Text::fromUTF8(info.french.c_str());
+    const auto track = studio_.addMidiTrack(name, cydaw::base::Text(info.instrument));
     if (!track) {
-        notify(ui::french() ? name + juce::String::fromUTF8(" n'a pas pu être créé") : name + " could not be made", true);
+        notify(ui::french() ? name + cydaw::base::Text::fromUTF8(" n'a pas pu être créé") : name + " could not be made", true);
         return;
     }
     state_.selectTrack(*track);
     // Its window opens on it.
     if (auto* slot = studio_.graphFor(*track))
         for (const auto& node : slot->graph().editorNodes())
-            if (node.typeKey == juce::String(info.typeKey)) {
+            if (node.typeKey == cydaw::base::Text(info.typeKey)) {
                 synth_->openEditor(*track, node.id);
                 break;
             }
@@ -580,15 +590,15 @@ void AppUi::newPrismTrack()
 
 void AppUi::chooseSamplerFiles()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Les échantillons du sampler", "The sampler's samples"), juce::File {},
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
                                                    "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::canSelectMultipleItems,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto files = chooser.getResults();
                               if (files.isEmpty())
                                   return;
-                              juce::String error;
+                              cydaw::base::Text error;
                               if (const auto track = studio_.newSamplerTrack(files, error)) {
                                   state_.selectTrack(*track);
                                   state_.bringToFront = Panel::devices;
@@ -601,14 +611,14 @@ void AppUi::chooseSamplerFiles()
 
 void AppUi::chooseSamplerInstrument()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Un instrument SFZ ou une carte .cysampler", "An SFZ instrument or a .cysampler map"),
-                                                   juce::File {}, "*.sfz;*.cysampler");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un instrument SFZ ou une carte .cysampler", "An SFZ instrument or a .cysampler map"),
+                                                   cydaw::base::File {}, "*.sfz;*.cysampler");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
-                              if (file == juce::File())
+                              if (file == cydaw::base::File())
                                   return;
-                              juce::String error;
+                              cydaw::base::Text error;
                               if (const auto track = studio_.loadSamplerFile(file, std::nullopt, error)) {
                                   state_.selectTrack(*track);
                                   state_.bringToFront = Panel::devices;
@@ -619,9 +629,9 @@ void AppUi::chooseSamplerInstrument()
                           });
 }
 
-void AppUi::addFactoryInstrument(const juce::String& key, const bool model)
+void AppUi::addFactoryInstrument(const cydaw::base::Text& key, const bool model)
 {
-    juce::String error;
+    cydaw::base::Text error;
     if (const auto track = studio_.addFactoryInstrument(key, error, model)) {
         state_.selectTrack(*track);
         notify(studio_.trackName(*track));
@@ -640,7 +650,7 @@ void AppUi::drawFactoryInstrumentsMenu()
         return;
     }
     // By category, as the catalogue lists them.
-    juce::StringArray categories;
+    cydaw::base::TextList categories;
     for (const auto& instrument : instruments)
         categories.addIfNotAlreadyThere(instrument.category);
     for (const auto& category : categories) {
@@ -657,7 +667,7 @@ void AppUi::drawFactoryInstrumentsMenu()
             // model (brightness, inharmonicity, formants…).
             auto models = false;
             for (const auto& instrument : instruments)
-                if (instrument.category == category && instrument.model != juce::File()) {
+                if (instrument.category == category && instrument.model != cydaw::base::File()) {
                     if (!models) {
                         ImGui::Separator();
                         ImGui::TextDisabled("%s", L("Modèles de son", "Sound models"));
@@ -678,20 +688,20 @@ void AppUi::drawFactoryInstrumentsMenu()
 
 void AppUi::chooseSoundModel()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Un modèle de son", "A sound model"), Studio::soundModelFolder(),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un modèle de son", "A sound model"), Studio::soundModelFolder(),
                                                    "*.cysound");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
-                              if (file == juce::File())
+                              if (file == cydaw::base::File())
                                   return;
                               loadSoundModelFile(file);
                           });
 }
 
-void AppUi::loadSoundModelFile(const juce::File& file)
+void AppUi::loadSoundModelFile(const cydaw::base::File& file)
 {
-    juce::String error;
+    cydaw::base::Text error;
     if (const auto track = studio_.loadSoundModel(file, std::nullopt, error)) {
         state_.selectTrack(*track);
         notify(ui::Ls("Modèle de son : ", "Sound model: ") + studio_.soundMatching().description);
@@ -721,7 +731,7 @@ void AppUi::followSoundMatching()
     // A synth patch found: how close it came (0: the very sound).
     if (const auto* zones = matching.zones.getArray();
         zones != nullptr && zones->size() == 1 && zones->getFirst().hasProperty("synth")) {
-        line << ui::Ls(" — écart ", " — distance ") << juce::String(static_cast<double>(zones->getFirst().getProperty("loss", 0.0)), 2);
+        line << ui::Ls(" — écart ", " — distance ") << cydaw::base::Text(static_cast<double>(zones->getFirst().getProperty("loss", 0.0)), 2);
         notify(line);
         return;
     }
@@ -729,12 +739,12 @@ void AppUi::followSoundMatching()
         auto error = 0.0;
         for (const auto& zone : *zones)
             error += static_cast<double>(zone.getProperty("bandErrorDb", 0.0));
-        line << ui::Ls(" — écart moyen ", " — mean difference ") << juce::String(error / zones->size(), 1) << " dB";
+        line << ui::Ls(" — écart moyen ", " — mean difference ") << cydaw::base::Text(error / zones->size(), 1) << " dB";
     }
     notify(line);
 }
 
-void AppUi::notify(const juce::String& message, const bool error)
+void AppUi::notify(const cydaw::base::Text& message, const bool error)
 {
     if (ImGui::GetCurrentContext())
         cyui::notify(message.toRawUTF8(), error ? cyui::Tone::error : cyui::Tone::success);
@@ -790,7 +800,7 @@ void AppUi::saveLayoutIfNeeded()
     const auto file = layoutFile();
     file.getParentDirectory().createDirectory();
     file.replaceWithData(data, size);
-    (void) layoutVersionFile(file).replaceWithText(juce::String(kLayoutVersion));
+    (void) layoutVersionFile(file).replaceWithText(cydaw::base::Text(kLayoutVersion));
     io.WantSaveIniSettings = false;
     lastLayoutSave_ = now;
 }
@@ -805,19 +815,19 @@ void AppUi::newProject()
     notify(ui::Ls("Nouveau projet", "New project"));
 }
 
-void AppUi::openProject(const juce::File& file)
+void AppUi::openProject(const cydaw::base::File& file)
 {
     // In steps: the interface keeps drawing, a bar says how far it is.
     if (!openProjectInSteps(file))
         notify(ui::Ls("Impossible d'ouvrir ", "Could not open ") + file.getFullPathName(), true);
 }
 
-void AppUi::openProjectNow(const juce::File& file)
+void AppUi::openProjectNow(const cydaw::base::File& file)
 {
     projectOpened(file, studio_.loadProject(file));
 }
 
-bool AppUi::openProjectInSteps(const juce::File& file)
+bool AppUi::openProjectInSteps(const cydaw::base::File& file)
 {
     if (studio_.openingProject() || !studio_.startOpeningProject(file))
         return false;
@@ -835,7 +845,7 @@ void AppUi::continueOpening()
             return;
         }
         // An import: its summary, what it could not bring.
-        const auto file = std::exchange(opening_, juce::File {});
+        const auto file = std::exchange(opening_, cydaw::base::File {});
         resetUiState();
         waveforms_.clear();
         if (result->failed()) {
@@ -845,13 +855,13 @@ void AppUi::continueOpening()
         if (const auto tracks = studio_.tracks(); !tracks.empty())
             state_.selectedTrack = tracks.front();
         dialogTitle_ = ui::Ls("Projet importé", "Project imported");
-        dialogLines_ = juce::StringArray::fromLines(studio_.importSummary());
+        dialogLines_ = cydaw::base::TextList::fromLines(studio_.importSummary());
         showWarnings_ = true;
         notify(ui::Ls("Importé : ", "Imported: ") + file.getFileName());
     }
 }
 
-bool AppUi::importProjectInSteps(const juce::File& file)
+bool AppUi::importProjectInSteps(const cydaw::base::File& file)
 {
     if (studio_.openingProject() || !studio_.startImportingProject(file)) {
         notify(ui::Ls("Impossible d'importer ", "Could not import ") + file.getFullPathName(), true);
@@ -863,9 +873,9 @@ bool AppUi::importProjectInSteps(const juce::File& file)
     return true;
 }
 
-void AppUi::projectOpened(const juce::File& file, const juce::Result& result)
+void AppUi::projectOpened(const cydaw::base::File& file, const cydaw::base::Result& result)
 {
-    opening_ = juce::File {};
+    opening_ = cydaw::base::File {};
     const auto selectedBefore = state_.pixelsPerSecond;
     resetUiState();
     state_.pixelsPerSecond = selectedBefore;
@@ -887,10 +897,10 @@ void AppUi::projectOpened(const juce::File& file, const juce::Result& result)
 
 void AppUi::chooseOpenProject()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Ouvrir un projet CyDAW", "Open a CyDAW project"), juce::File {},
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Ouvrir un projet CyDAW", "Open a CyDAW project"), cydaw::base::File {},
                                                    "*.cydaw");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file.existsAsFile())
                                   openProject(file);
@@ -899,7 +909,7 @@ void AppUi::chooseOpenProject()
 
 void AppUi::save()
 {
-    if (studio_.projectFile() == juce::File {}) {
+    if (studio_.projectFile() == cydaw::base::File {}) {
         chooseSaveAs();
         return;
     }
@@ -916,13 +926,13 @@ void AppUi::chooseSaveAs()
 
 void AppUi::chooseSaveAsThen(std::function<void()> then)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Enregistrer le projet", "Save the project"), studio_.projectFile(),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Enregistrer le projet", "Save the project"), studio_.projectFile(),
                                                    "*.cydaw");
-    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this, then = std::move(then)](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                          [this, then = std::move(then)](const cydaw::base::FileDialog& chooser) {
                               auto file = chooser.getResult();
-                              if (file == juce::File {})
+                              if (file == cydaw::base::File {})
                                   return;
                               file = file.withFileExtension(".cydaw");
                               const auto result = studio_.saveProject(file);
@@ -936,12 +946,12 @@ void AppUi::chooseSaveAsThen(std::function<void()> then)
 
 void AppUi::chooseImportProject()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         L("Importer un projet (Live, Bitwig, Studio One, Reaper, FL Studio, Ardour, LMMS, Zrythm, DAWproject, AAF, MIDI et pistes audio)",
           "Import a project (Live, Bitwig, Studio One, Reaper, FL Studio, Ardour, LMMS, Zrythm, DAWproject, AAF, MIDI and stems)"),
-        juce::File {}, app::project_import::supportedProjectWildcard());
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+        cydaw::base::File {}, app::project_import::supportedProjectWildcard());
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file.existsAsFile())
                                   importProjectInSteps(file);
@@ -950,15 +960,15 @@ void AppUi::chooseImportProject()
 
 void AppUi::chooseExportMix()
 {
-    const auto suggested = studio_.projectFile() != juce::File {} ? studio_.projectFile().withFileExtension(".wav")
-                                                                  : juce::File::getSpecialLocation(juce::File::userMusicDirectory)
+    const auto suggested = studio_.projectFile() != cydaw::base::File {} ? studio_.projectFile().withFileExtension(".wav")
+                                                                  : cydaw::base::File::getSpecialLocation(cydaw::base::File::userMusicDirectory)
                                                                         .getChildFile("CyDAW mix.wav");
-    chooser_ = std::make_unique<juce::FileChooser>(L("Exporter le mix", "Export the mix"), suggested, "*.wav");
-    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Exporter le mix", "Export the mix"), suggested, "*.wav");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
-                              if (file == juce::File {})
+                              if (file == cydaw::base::File {})
                                   return;
                               // Rendered in real time through the master, with two seconds of tail.
                               const auto started = studio_.engine().startMasterExport(file.withFileExtension(".wav"));
@@ -969,9 +979,9 @@ void AppUi::chooseExportMix()
 
 void AppUi::chooseImportMidi()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Importer un fichier MIDI", "Import a MIDI file"), juce::File {}, "*.mid;*.midi");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Importer un fichier MIDI", "Import a MIDI file"), cydaw::base::File {}, "*.mid;*.midi");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (!file.existsAsFile())
                                   return;
@@ -987,11 +997,11 @@ void AppUi::chooseImportMidi()
                                   (void) studio_.insertDevice(TrackRef { true, 0, id }, "opale-instrument");
                               }
                               studio_.markDirty();
-                              notify(juce::String(static_cast<int>(summary.noteCount)) + ui::Ls(" notes importées", " notes imported"));
+                              notify(cydaw::base::Text(static_cast<int>(summary.noteCount)) + ui::Ls(" notes importées", " notes imported"));
                           });
 }
 
-void AppUi::filesDropped(const juce::StringArray& files, const float x, const float y)
+void AppUi::filesDropped(const cydaw::base::TextList& files, const float x, const float y)
 {
     // A project opening step by step: a track added now would land between
     // its tracks and shift their routing.
@@ -1012,14 +1022,14 @@ void AppUi::filesDropped(const juce::StringArray& files, const float x, const fl
         return;
     }
     for (const auto& path : files) {
-        const juce::File file(path);
+        const cydaw::base::File file(path);
         if (file.hasFileExtension("jsfx")) {state_.jsfxFileToOpen=file;state_.showJsfx=true;return;}
         if (file.hasFileExtension(".cysound")) {
             loadSoundModelFile(file);
             return;
         }
         if (file.hasFileExtension("sfz;cysampler")) {
-            juce::String error;
+            cydaw::base::Text error;
             if (const auto track = studio_.loadSamplerFile(file, std::nullopt, error))
                 state_.selectTrack(*track);
             else
@@ -1041,7 +1051,7 @@ void AppUi::filesDropped(const juce::StringArray& files, const float x, const fl
     if (launcher_->dropFiles(files, ImVec2(x, y)))
         return;
     if (!arrangement_->dropFiles(files, ImVec2(x, y)))
-        if (const auto track = studio_.addAudioTrack(juce::File(files[0])))
+        if (const auto track = studio_.addAudioTrack(cydaw::base::File(files[0])))
             state_.selectedTrack = track;
 }
 
@@ -1194,7 +1204,7 @@ void AppUi::frame()
     }
     {
         const auto name = studio_.projectName().isNotEmpty() ? studio_.projectName() : ui::Ls("Sans titre", "Untitled");
-        const auto title = name + (studio_.isDirty() ? " *" : "") + " - CyDAW 2";
+        const auto title = name + (studio_.isDirty() ? " *" : "") + " - CyDAW";
         if (title != title_) {
             title_ = title;
             if (onTitle)
@@ -1210,26 +1220,6 @@ void AppUi::frame()
     // (the graph, the workshop).
     computerKeyboard_->update(state_.selectedTrack && state_.selectedTrack->midi && state_.mode == AppMode::studio
                               && state_.focused != Panel::graph);
-    // A MIDI keyboard plugged in for the first time plays at once, as in
-    // Bitwig; one switched off in the MIDI inputs stays off.
-    if (ImGui::GetTime() - midiDevicesTime_ > 2.0) {
-        midiDevicesTime_ = ImGui::GetTime();
-        midiDevices_ = juce::MidiInput::getAvailableDevices();
-        auto& settings = studio_.settings();
-        auto known = juce::StringArray::fromLines(settings.getValue("knownMidiInputs"));
-        auto changed = false;
-        // An automated session leaves the person's devices as they are.
-        for (const auto& device : midiDevices_)
-            if (studio_.keepsSettings() && !known.contains(device.identifier)) {
-                known.add(device.identifier);
-                studio_.engine().deviceManager().setMidiInputDeviceEnabled(device.identifier, true);
-                changed = true;
-            }
-        if (changed) {
-            settings.setValue("knownMidiInputs", known.joinIntoString(juce::newLine));
-            studio_.saveAudioSetup();
-        }
-    }
     cinema_->tickCinemaVideo();
     handleShortcuts();
     drawMenuBar();
@@ -1267,8 +1257,8 @@ unsigned long long AppUi::logo(const float pixels)
     auto size = 32;
     while (size < 512 && static_cast<float>(size) < pixels)
         size *= 2;
-    const auto key = "logo-" + juce::String(size);
-    static const auto source = juce::ImageCache::getFromMemory(cydaw::branding::cydawlogo512_png,
+    const auto key = "logo-" + cydaw::base::Text(size);
+    static const auto source = cydaw::base::Image::decode(cydaw::branding::cydawlogo512_png,
                                                                cydaw::branding::cydawlogo512_pngSize);
     if (!source.isValid())
         return 0;
@@ -1278,7 +1268,7 @@ unsigned long long AppUi::logo(const float pixels)
     if (const auto cached = host_.texture(key, {}); cached != 0)
         return cached;
     return host_.texture(key, size == source.getWidth() ? source
-                                                        : source.rescaled(size, size, juce::Graphics::highResamplingQuality));
+                                                        : source.rescaled(size, size));
 }
 
 void AppUi::drawOpening()
@@ -1357,34 +1347,34 @@ void AppUi::resolveMode()
     }
 }
 
-juce::var AppUi::controllers(const juce::var& request)
+cydaw::base::Value AppUi::controllers(const cydaw::base::Value& request)
 {
     if (request.getProperty("action", "").toString() == "show" || static_cast<bool>(request.getProperty("show", false)))
         showControllers_ = true;
     return controllers_->command(request);
 }
 
-juce::var AppUi::transportSync(const juce::var& request)
+cydaw::base::Value AppUi::transportSync(const cydaw::base::Value& request)
 {
     if(static_cast<bool>(request.getProperty("show",false)))showTransportSync_=true;
     return transportSync_->command(request);
 }
 
-juce::var AppUi::dj(const juce::var& request)
+cydaw::base::Value AppUi::dj(const cydaw::base::Value& request)
 {
     if (static_cast<bool>(request.getProperty("show", false)))
         state_.mode = AppMode::dj;
     return dj_->command(request);
 }
 
-juce::var AppUi::foundry(const juce::var& request)
+cydaw::base::Value AppUi::foundry(const cydaw::base::Value& request)
 {
     if (static_cast<bool>(request.getProperty("show", false)))
         state_.mode = AppMode::foundry;
     return foundry_->command(request);
 }
 
-juce::var AppUi::processing(const juce::var& request)
+cydaw::base::Value AppUi::processing(const cydaw::base::Value& request)
 {
     return processing_->command(request);
 }
@@ -1395,13 +1385,53 @@ bool AppUi::openProcessing(const TrackRef& track, const std::uint64_t clipId)
     return true;
 }
 
-juce::var AppUi::cinema(const juce::var& request)
+cydaw::base::Value AppUi::cinema(const cydaw::base::Value& request)
 {
     if(static_cast<bool>(request.getProperty("show",false)))state_.mode=AppMode::cinema;
     return cinema_->command(request);
 }
 
-juce::String AppUi::appMode(const juce::String& mode)
+cydaw::base::Array<cydaw::base::File> AppUi::modeTemplateFiles() const
+{
+    if (state_.mode != AppMode::foundry && state_.mode != AppMode::cinema && state_.mode != AppMode::dj)
+        return studio_.templates();
+    const auto mode = state_.mode == AppMode::foundry ? "foundry" : state_.mode == AppMode::cinema ? "cinema" : "dj";
+    const auto pattern = state_.mode == AppMode::foundry ? "*.cyfoundry" : state_.mode == AppMode::cinema ? "*.cycinema" : "*.cydjtemplate";
+    cydaw::base::Array<cydaw::base::File> files;
+    cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
+        .getSiblingFile("templates").getChildFile(mode)
+        .findChildFiles(files, cydaw::base::File::findFiles, false, pattern);
+    files.sort();
+    return files;
+}
+
+cydaw::base::Text AppUi::loadModeTemplate(const cydaw::base::File& file)
+{
+    if (file.hasFileExtension("cyfoundry;cycinema")) {
+        const auto cinema = file.hasFileExtension("cycinema");
+        auto* view = cinema ? cinema_.get() : foundry_.get();
+        if (!view->open(file, true))
+            return state_.status;
+        (void) appMode(cinema ? "cinema" : "foundry");
+        return {};
+    }
+    if (file.hasFileExtension("cydjtemplate")) {
+        const auto result = dj_->loadTemplate(file);
+        if (result.failed())
+            return result.getErrorMessage();
+        (void) appMode("dj");
+        return {};
+    }
+    if (studio_.isRecording())
+        (void) studio_.stopRecording(false);
+    const auto loaded = studio_.loadProject(file);
+    if (loaded.failed())
+        return loaded.getErrorMessage();
+    sessionReplaced();
+    return {};
+}
+
+cydaw::base::Text AppUi::appMode(const cydaw::base::Text& mode)
 {
     static constexpr std::pair<const char*, AppMode> modes[] { { "studio", AppMode::studio },
                                                                 { "dj", AppMode::dj },
@@ -1643,7 +1673,6 @@ void AppUi::drawAudioSettings()
         showAudioSettings_ = false;
         selectSoundCardTab_ = showSoundCard_;
         showSoundCard_ = false;
-        selectMidiTabNow_ = std::exchange(selectMidiTab_, false);
     }
     // Large: the card's inputs and outputs are tables of their own.
     const auto* viewport = ImGui::GetMainViewport();
@@ -1680,14 +1709,6 @@ void AppUi::drawAudioSettings()
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
-        // Asked for (the Options menu, the keyboard's right click): in front.
-        const auto midiTab = std::exchange(selectMidiTabNow_, false) ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-        if (ImGui::BeginTabItem(ui::labelId(L("Entrées MIDI", "MIDI inputs"), "audioMidi").c_str(), nullptr, midiTab)) {
-            ImGui::BeginChild("##midi", ImVec2(0.0f, -footer));
-            drawMidiInputs();
-            ImGui::EndChild();
-            ImGui::EndTabItem();
-        }
         ImGui::EndTabBar();
     }
     ImGui::Spacing();
@@ -1699,131 +1720,43 @@ void AppUi::drawAudioSettings()
         studio_.saveAudioSetup();
         ImGui::CloseCurrentPopup();
     }
+    ImGui::SameLine();
+    if (ImGui::Button(L("Contrôleurs et entrées…", "Controllers and inputs…"))) {
+        studio_.saveAudioSetup();
+        ImGui::CloseCurrentPopup();
+        openControllerInputs();
+    }
     ImGui::EndPopup();
 }
 
-void AppUi::drawMidiInputs()
+void AppUi::openControllerInputs(const bool keyboard)
 {
-    const auto& p = theme::palette();
-    auto& manager = studio_.engine().deviceManager();
-    auto& keyboard = *computerKeyboard_;
-    ui::sectionTitle(L("Claviers et contrôleurs MIDI", "MIDI keyboards and controllers"));
-    if (midiDevices_.isEmpty())
-        ImGui::TextColored(theme::vec(p.textFaint), "%s",
-                           L("Aucun appareil MIDI branché (ils apparaissent ici dès qu'ils le sont).",
-                             "No MIDI device plugged in (they show here as soon as they are)."));
-    for (const auto& device : midiDevices_) {
-        auto on = manager.isMidiInputDeviceEnabled(device.identifier);
-        if (ImGui::Checkbox(ui::labelId(device.name.toRawUTF8(), device.identifier.toRawUTF8()).c_str(), &on)) {
-            manager.setMidiInputDeviceEnabled(device.identifier, on);
-            if (studio_.keepsSettings())
-                studio_.saveAudioSetup();
-        }
-    }
-    ImGui::TextColored(theme::vec(p.textDim), "%s",
-                       L("Ils jouent la piste instrument choisie (ou les pistes armées).",
-                         "They play the picked instrument track (or the armed tracks)."));
-    ImGui::Spacing();
-    ImGui::Spacing();
-
-    ui::sectionTitle(L("Clavier de l'ordinateur", "Computer keyboard"));
-    auto enabled = keyboard.enabled();
-    if (ImGui::Checkbox(L("Jouer des notes avec le clavier de l'ordinateur (Ctrl+K)", "Play notes with the computer keyboard (Ctrl+K)"),
-                        &enabled))
-        keyboard.setEnabled(enabled);
-    ImGui::BeginDisabled(!enabled);
-    auto octave = keyboard.octave();
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Octave", "Octave"));
-    ImGui::SameLine(dp(110.0f));
-    ImGui::SetNextItemWidth(dp(140.0f));
-    if (ImGui::SliderInt("##keyboardOctave", &octave, -1, 8))
-        keyboard.setOctave(octave);
-    auto velocity = keyboard.velocity();
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Vélocité", "Velocity"));
-    ImGui::SameLine(dp(110.0f));
-    ImGui::SetNextItemWidth(dp(140.0f));
-    if (ImGui::SliderInt("##keyboardVelocity", &velocity, 1, 127))
-        keyboard.setVelocity(velocity);
-
-    // Its keys drawn as a piano: what each one plays, as this keyboard has it.
-    ImGui::Spacing();
-    const auto origin = ImGui::GetCursorScreenPos();
-    auto* list = ImGui::GetWindowDrawList();
-    const auto white = dp(40.0f);
-    const auto height = dp(84.0f);
-    const auto blackHeight = dp(50.0f);
-    static constexpr int whiteOf[] = { 0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6 };
-    const auto held = keyboard.heldNotes();
-    const auto base = (keyboard.octave() + 1) * 12;
-    const auto isHeld = [&held, base](const int semitone) { return std::find(held.begin(), held.end(), base + semitone) != held.end(); };
-    const auto whiteIndex = [](const int semitone) { return (semitone / 12) * 7 + whiteOf[semitone % 12]; };
-    for (const auto& key : keyboard.keys()) {
-        if (key.semitone < 0 || whiteOf[key.semitone % 12] < 0)
-            continue;
-        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone)) * white;
-        const ImVec2 min(x, origin.y);
-        const ImVec2 max(x + white - dp(2.0f), origin.y + height);
-        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : theme::mix(p.text, p.bg3, 0.12f), dp(3.0f));
-        char name[16];
-        const auto note = base + key.semitone;
-        static const char* namesFr[] = { "Do", "Do#", "Ré", "Ré#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si" };
-        static const char* namesEn[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-        std::snprintf(name, sizeof(name), "%s%d", (ui::french() ? namesFr : namesEn)[note % 12], note / 12 - 1);
-        ui::centredText(list, ImVec2(min.x, max.y - dp(34.0f)), ImVec2(max.x, max.y - dp(18.0f)), p.bg0, key.label.c_str());
-        ui::centredText(list, ImVec2(min.x, max.y - dp(18.0f)), ImVec2(max.x, max.y - dp(2.0f)), theme::mix(p.bg0, p.text, 0.4f), name);
-    }
-    for (const auto& key : keyboard.keys()) {
-        if (key.semitone < 0 || whiteOf[key.semitone % 12] >= 0)
-            continue;
-        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone - 1) + 1) * white - white * 0.32f;
-        const ImVec2 min(x, origin.y);
-        const ImVec2 max(x + white * 0.62f, origin.y + blackHeight);
-        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : p.bg0, dp(3.0f));
-        list->AddRect(min, max, p.line, dp(3.0f));
-        ui::centredText(list, ImVec2(min.x, max.y - dp(20.0f)), ImVec2(max.x, max.y - dp(4.0f)), p.text, key.label.c_str());
-    }
-    ImGui::Dummy(ImVec2(white * 11.0f, height + dp(6.0f)));
-    std::string octaveKeys, velocityKeys;
-    for (const auto& key : keyboard.keys()) {
-        if (key.semitone == -1 || key.semitone == -2)
-            octaveKeys += (octaveKeys.empty() ? "" : " / ") + key.label;
-        if (key.semitone == -3 || key.semitone == -4)
-            velocityKeys += (velocityKeys.empty() ? "" : " / ") + key.label;
-    }
-    ImGui::TextColored(theme::vec(p.textDim), "%s %s    %s %s", L("Octave − / + :", "Octave − / +:"), octaveKeys.c_str(),
-                       L("Vélocité − / + :", "Velocity − / +:"), velocityKeys.c_str());
-    ImGui::EndDisabled();
-    ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextColored(theme::vec(p.textFaint), "%s",
-                       L("Il joue la piste instrument choisie, comme un clavier MIDI. Ses touches passent avant les raccourcis "
-                         "d'une seule lettre (S, L…) tant qu'une piste instrument est choisie ; Ctrl et Alt gardent les leurs. "
-                         "Dans le graphe et l'atelier, les lettres restent des raccourcis.",
-                         "It plays the picked instrument track, as a MIDI keyboard does. Its keys come before the one-letter "
-                         "shortcuts (S, L…) while an instrument track is picked; Ctrl and Alt keep theirs. In the graph and "
-                         "the workshop, letters stay shortcuts."));
-    ImGui::PopTextWrapPos();
+    showControllers_ = true;
+    auto* request = new cydaw::base::Object();
+    request->setProperty("action", "show");
+    request->setProperty("tab", keyboard ? "keyboard" : "hardware");
+    request->setProperty("center", true);
+    controllers_->command(cydaw::base::Value(request));
 }
 
-juce::var AppUi::themes(const juce::var& request)
+cydaw::base::Value AppUi::themes(const cydaw::base::Value& request)
 {
     if (request.hasProperty("create")) {
         const auto from = request.getProperty("from", themes_->currentKey()).toString();
-        const auto key = themes_->createFrom(from, request.getProperty("create", juce::var()).toString());
+        const auto key = themes_->createFrom(from, request.getProperty("create", cydaw::base::Value()).toString());
         if (key.isEmpty())
-            return juce::var("no theme \"" + from + "\" to make one from");
+            return cydaw::base::Value("no theme \"" + from + "\" to make one from");
         (void) themes_->choose(key);
     }
     for (const auto* field : { "key", "name" })
         if (request.hasProperty(field) && !request.hasProperty("colours")) {
-            const auto wanted = request.getProperty(field, juce::var()).toString();
+            const auto wanted = request.getProperty(field, cydaw::base::Value()).toString();
             auto found = false;
             for (const auto& entry : themes_->themes())
                 if (entry.key == wanted || entry.name == wanted)
                     found = themes_->choose(entry.key);
             if (!found)
-                return juce::var("no theme \"" + wanted + "\"");
+                return cydaw::base::Value("no theme \"" + wanted + "\"");
         }
     if (request.hasProperty("colours")) {
         const auto key = request.getProperty("key", themes_->currentKey()).toString();
@@ -1832,34 +1765,34 @@ juce::var AppUi::themes(const juce::var& request)
             if (entry.key == key)
                 target = &entry;
         if (target == nullptr || target->builtIn)
-            return juce::var("only a theme of one's own changes its colours");
-        const auto palette = theme::paletteFromJson(request.getProperty("colours", juce::var()), target->palette);
+            return cydaw::base::Value("only a theme of one's own changes its colours");
+        const auto palette = theme::paletteFromJson(request.getProperty("colours", cydaw::base::Value()), target->palette);
         if (!themes_->save(key, target->name, palette))
-            return juce::var("the theme could not be written");
+            return cydaw::base::Value("the theme could not be written");
         (void) themes_->choose(key);
     }
-    auto* result = new juce::DynamicObject();
+    auto* result = new cydaw::base::Object();
     result->setProperty("current", themes_->currentKey());
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& entry : themes_->themes()) {
-        auto* item = new juce::DynamicObject();
+        auto* item = new cydaw::base::Object();
         item->setProperty("key", entry.key);
         item->setProperty("name", entry.name);
         item->setProperty("builtIn", entry.builtIn);
         if (entry.key == themes_->currentKey())
             item->setProperty("colours", theme::paletteToJson(entry.palette));
-        list.add(juce::var(item));
+        list.add(cydaw::base::Value(item));
     }
     result->setProperty("themes", list);
     result->setProperty("folder", ThemesView::folder().getFullPathName());
-    return juce::var(result);
+    return cydaw::base::Value(result);
 }
 
-juce::var AppUi::midiInputs(const juce::String& command, const juce::var& request)
+cydaw::base::Value AppUi::midiInputs(const cydaw::base::Text& command, const cydaw::base::Value& request)
 {
     auto& keyboard = *computerKeyboard_;
     auto& manager = studio_.engine().deviceManager();
-    auto* result = new juce::DynamicObject();
+    auto* result = new cydaw::base::Object();
     if (command == "computer_keyboard") {
         if (request.hasProperty("enabled"))
             keyboard.setEnabled(static_cast<bool>(request.getProperty("enabled", true)));
@@ -1871,45 +1804,43 @@ juce::var AppUi::midiInputs(const juce::String& command, const juce::var& reques
         result->setProperty("active", keyboard.active());
         result->setProperty("octave", keyboard.octave());
         result->setProperty("velocity", keyboard.velocity());
-        juce::Array<juce::var> held;
+        cydaw::base::Array<cydaw::base::Value> held;
         for (const auto note : keyboard.heldNotes())
             held.add(note);
         result->setProperty("held", held);
-        juce::Array<juce::var> keys;
+        cydaw::base::Array<cydaw::base::Value> keys;
         for (const auto& key : keyboard.keys()) {
-            auto* entry = new juce::DynamicObject();
-            entry->setProperty("label", juce::String(key.label));
+            auto* entry = new cydaw::base::Object();
+            entry->setProperty("label", cydaw::base::Text(key.label));
             entry->setProperty("semitone", key.semitone);
-            keys.add(juce::var(entry));
+            keys.add(cydaw::base::Value(entry));
         }
         result->setProperty("keys", keys);
-        return juce::var(result);
+        return cydaw::base::Value(result);
     }
-    const auto devices = juce::MidiInput::getAvailableDevices();
+    const auto devices = cydaw::midi::Input::getAvailableDevices();
     if (request.hasProperty("device")) {
-        const auto wanted = request.getProperty("device", juce::var()).toString();
+        const auto wanted = request.getProperty("device", cydaw::base::Value()).toString();
         auto found = false;
         for (const auto& device : devices)
             if (device.identifier == wanted || device.name == wanted) {
-                manager.setMidiInputDeviceEnabled(device.identifier, static_cast<bool>(request.getProperty("enabled", true)));
-                if (studio_.keepsSettings())
-                    studio_.saveAudioSetup();
+                controllers_->setMidiInputEnabled(device.identifier, static_cast<bool>(request.getProperty("enabled", true)));
                 found = true;
             }
         if (!found)
-            return juce::var("no MIDI device \"" + wanted + "\"");
+            return cydaw::base::Value("no MIDI device \"" + wanted + "\"");
     }
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& device : devices) {
-        auto* entry = new juce::DynamicObject();
+        auto* entry = new cydaw::base::Object();
         entry->setProperty("name", device.name);
         entry->setProperty("identifier", device.identifier);
         entry->setProperty("enabled", manager.isMidiInputDeviceEnabled(device.identifier));
-        list.add(juce::var(entry));
+        list.add(cydaw::base::Value(entry));
     }
     result->setProperty("devices", list);
     result->setProperty("computerKeyboard", keyboard.enabled());
-    return juce::var(result);
+    return cydaw::base::Value(result);
 }
 
 void AppUi::drawAudioDevice()
@@ -1921,7 +1852,7 @@ void AppUi::drawAudioDevice()
         ImGui::SameLine(dp(130.0f));
         ImGui::SetNextItemWidth(-1.0f);
     };
-    auto changed = juce::String();
+    auto changed = cydaw::base::Text();
     // Driver type.
     const auto& types = manager.getAvailableDeviceTypes();
     auto currentType = 0;
@@ -1939,7 +1870,7 @@ void AppUi::drawAudioDevice()
         manager.setCurrentAudioDeviceType(types[currentType]->getTypeName(), true);
     auto* type = manager.getCurrentDeviceTypeObject();
     auto setup = manager.getAudioDeviceSetup();
-    const auto deviceCombo = [&](const char* label, const char* id, const bool input, juce::String& name) {
+    const auto deviceCombo = [&](const char* label, const char* id, const bool input, auto& name) {
         if (type == nullptr)
             return false;
         type->scanForDevices();
@@ -1956,7 +1887,7 @@ void AppUi::drawAudioDevice()
             pointers.push_back(item.c_str());
         row(label);
         if (ImGui::Combo(id, &current, pointers.data(), static_cast<int>(pointers.size()))) {
-            name = current == 0 ? juce::String() : names[current - 1];
+            name = current == 0 ? cydaw::base::Text() : cydaw::base::Text(names[current - 1]);
             return true;
         }
         return false;
@@ -1969,7 +1900,7 @@ void AppUi::drawAudioDevice()
         std::vector<std::string> rateNames;
         auto currentRate = 0;
         for (auto index = 0; index < rates.size(); ++index) {
-            rateNames.push_back(juce::String(juce::roundToInt(rates[index])).toStdString() + " Hz");
+            rateNames.push_back(cydaw::base::Text(cydaw::base::roundToInt(rates[index])).toStdString() + " Hz");
             if (std::abs(rates[index] - device->getCurrentSampleRate()) < 1.0)
                 currentRate = index;
         }
@@ -1986,7 +1917,7 @@ void AppUi::drawAudioDevice()
         auto currentSize = 0;
         for (auto index = 0; index < sizes.size(); ++index) {
             const auto ms = sizes[index] * 1000.0 / std::max(1.0, device->getCurrentSampleRate());
-            sizeNames.push_back(juce::String(sizes[index]).toStdString() + " (" + juce::String(ms, 1).toStdString() + " ms)");
+            sizeNames.push_back(cydaw::base::Text(sizes[index]).toStdString() + " (" + cydaw::base::Text(ms, 1).toStdString() + " ms)");
             if (sizes[index] == device->getCurrentBufferSizeSamples())
                 currentSize = index;
         }
@@ -2030,9 +1961,9 @@ void AppUi::drawCompanionWindow()
         python.copyToUTF8(companionPython_, sizeof(companionPython_));
         // An NVIDIA card makes the CUDA build worth its size.
         nvidiaGpu_.clear();
-        juce::ChildProcess smi;
-        if (smi.start(juce::StringArray { "nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader" },
-                      juce::ChildProcess::wantStdOut)) {
+        cydaw::base::ChildProcess smi;
+        if (smi.start(cydaw::base::TextList { "nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader" },
+                      cydaw::base::ChildProcess::wantStdOut)) {
             const auto output = smi.readAllProcessOutput().trim();
             if (smi.waitForProcessToFinish(3'000) && smi.getExitCode() == 0)
                 nvidiaGpu_ = output.upToFirstOccurrenceOf("\n", false, false).trim();
@@ -2073,15 +2004,15 @@ void AppUi::drawCompanionWindow()
     ImGui::InputText("##python", companionPython_, sizeof(companionPython_));
     ImGui::SameLine();
     if (ImGui::Button(L("Utiliser", "Use"))) {
-        companion.setPythonCommand(juce::String::fromUTF8(companionPython_));
+        companion.setPythonCommand(cydaw::base::Text::fromUTF8(companionPython_));
         companionInfoAsked_ = false;
     }
     ui::tooltip(L("Vide : son propre environnement s'il existe, sinon « python » du PATH.",
                   "Empty: its own environment when made, else \"python\" from the PATH."));
     // What the last check said.
     const auto& job = studio_.companionJob();
-    const auto info = job && job->command == "info" && !job->failed ? job->result : juce::var();
-    const auto setupInfo = job && job->command == "setup" && !job->failed ? job->result.getProperty("info", {}) : juce::var();
+    const auto info = job && job->command == "info" && !job->failed ? job->result : cydaw::base::Value();
+    const auto setupInfo = job && job->command == "setup" && !job->failed ? job->result.getProperty("info", {}) : cydaw::base::Value();
     const auto shown = info.isObject() ? info : setupInfo;
     row("Python");
     if (shown.isObject())
@@ -2092,7 +2023,7 @@ void AppUi::drawCompanionWindow()
         ImGui::TextDisabled("%s", L("vérification…", "checking…"));
     const auto field = [&](const char* label, const char* key, const char* missing) {
         row(label);
-        const auto value = shown.isObject() ? shown.getProperty(key, {}) : juce::var();
+        const auto value = shown.isObject() ? shown.getProperty(key, {}) : cydaw::base::Value();
         if (value.isVoid() || value.toString().isEmpty() || value.toString() == "null")
             ImGui::TextColored(theme::vec(p.textFaint), "%s", missing);
         else
@@ -2127,7 +2058,7 @@ void AppUi::drawCompanionWindow()
                   "Options › Locations: everything installed here (and its temporary files) stays in this folder."));
     const auto catalogue = Companion::componentCatalogue();
     const auto french = ui::french();
-    const auto text = [french](const juce::var& value) {
+    const auto text = [french](const cydaw::base::Value& value) {
         return value.isObject() ? value.getProperty(french ? "fr" : "en", {}).toString() : value.toString();
     };
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + dp(620.0f));
@@ -2150,7 +2081,7 @@ void AppUi::drawCompanionWindow()
                 ImGui::TextColored(theme::vec(p.textFaint), "%s", L("absent", "missing"));
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + dp(620.0f));
             ImGui::TextColored(theme::vec(p.textDim), "%s", text(item.getProperty("description", {})).toRawUTF8());
-            juce::StringArray sources;
+            cydaw::base::TextList sources;
             if (const auto* list = item.getProperty("sources", {}).getArray())
                 for (const auto& source : *list)
                     sources.add(source.toString());
@@ -2162,7 +2093,7 @@ void AppUi::drawCompanionWindow()
             // Its licences: every package it brings, each with its text.
             const auto* packages = item.getProperty("packages", {}).getArray();
             const auto count = packages != nullptr ? packages->size() : 0;
-            if (ImGui::TreeNode((ui::Ls("Licences (", "Licences (") + juce::String(count) + ")").toRawUTF8())) {
+            if (ImGui::TreeNode((ui::Ls("Licences (", "Licences (") + cydaw::base::Text(count) + ")").toRawUTF8())) {
                 for (int index = 0; index < count; ++index) {
                     const auto& package = packages->getReference(index);
                     ImGui::PushID(index);
@@ -2172,7 +2103,7 @@ void AppUi::drawCompanionWindow()
                     ImGui::SameLine();
                     const auto url = package.getProperty("url", {}).toString();
                     if (ImGui::SmallButton(L("Lire", "Read")))
-                        (void) juce::URL(url).launchInDefaultBrowser();
+                        (void) cydaw::base::Url(url).launchInDefaultBrowser();
                     ui::tooltip(url.toRawUTF8());
                     ImGui::PopID();
                 }
@@ -2193,7 +2124,7 @@ void AppUi::drawCompanionWindow()
             const auto needsTorch = item.getProperty("requires", {}).toString() == "torch" && !hasTorch;
             ImGui::BeginDisabled(status.running || needsGpu || needsTorch || (asks && !companionAccepted_.contains(id)));
             if (ImGui::Button(Companion::componentInstalled(id, shown) ? L("Réinstaller", "Reinstall") : L("Installer", "Install"))) {
-                juce::String error;
+                cydaw::base::Text error;
                 if (!companion.install(id, companionAccepted_.contains(id), error))
                     notify(error, true);
             }
@@ -2211,7 +2142,7 @@ void AppUi::drawCompanionWindow()
         companionInfoAsked_ = false;
     ImGui::EndDisabled();
     if (ImGui::SmallButton(L("Pas de Python ? python.org", "No Python? python.org")))
-        (void) juce::URL("https://www.python.org/downloads/windows/").launchInDefaultBrowser();
+        (void) cydaw::base::Url("https://www.python.org/downloads/windows/").launchInDefaultBrowser();
     ui::tooltip(L("Installez Python 3.10 ou plus récent, puis « Installer » sur la base.", "Install Python 3.10 or newer, then \"Install\" the base."));
 
     // What it is doing.
@@ -2224,7 +2155,7 @@ void AppUi::drawCompanionWindow()
             companion.cancel();
         host_.wake(2);
     }
-    const auto& log = status.running ? status.log : (job ? job->log : juce::StringArray());
+    const auto& log = status.running ? status.log : (job ? job->log : cydaw::base::TextList());
     if (!log.isEmpty() && (status.running || (job && job->command == "setup"))) {
         ImGui::BeginChild("##companionLog", ImVec2(dp(540.0f), dp(120.0f)), ImGuiChildFlags_Borders);
         ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.8f);
@@ -2426,7 +2357,7 @@ void AppUi::drawUnsavedPrompt()
         auto action = std::move(pendingAction_);
         pendingAction_ = {};
         ImGui::CloseCurrentPopup();
-        if (studio_.projectFile() == juce::File {}) {
+        if (studio_.projectFile() == cydaw::base::File {}) {
             chooseSaveAsThen(std::move(action));
         } else {
             const auto result = studio_.saveProject(studio_.projectFile());
@@ -2477,7 +2408,7 @@ void AppUi::showView(const int view)
     host_.wake();
 }
 
-juce::String AppUi::injectInput(const juce::var& events)
+cydaw::base::Text AppUi::injectInput(const cydaw::base::Value& events)
 {
     const auto* list = events.getArray();
     if (list == nullptr)
@@ -2485,16 +2416,16 @@ juce::String AppUi::injectInput(const juce::var& events)
     if (!host_.isReady())
         return "the window is not ready";
     for (const auto& event : *list) {
-        const auto type = event.getProperty("type", juce::var()).toString();
+        const auto type = event.getProperty("type", cydaw::base::Value()).toString();
         if (type != "move" && type != "down" && type != "up" && type != "wheel" && type != "wait" && type != "release"
             && type != "text" && type != "key" && type != "file_drop")
             return "unknown event type \"" + type + "\"";
     }
     for (const auto& event : *list) {
-        const auto type = event.getProperty("type", juce::var()).toString();
+        const auto type = event.getProperty("type", cydaw::base::Value()).toString();
         if(type=="file_drop") {
             host_.renderNow();
-            juce::StringArray files;
+            cydaw::base::TextList files;
             if(const auto* paths=event.getProperty("files",{}).getArray())for(const auto& path:*paths)files.add(path.toString());
             if(files.isEmpty())return "file_drop requires files";
             const auto* viewport=ImGui::GetMainViewport();
@@ -2510,11 +2441,11 @@ juce::String AppUi::injectInput(const juce::var& events)
         }
         scriptedMouse_ = true;
         scriptedEvent_ = event;
-        const auto frames = type == "wait" ? juce::jlimit(1, 600, static_cast<int>(event.getProperty("frames", 1))) : 1;
+        const auto frames = type == "wait" ? cydaw::base::limit(1, 600, static_cast<int>(event.getProperty("frames", 1))) : 1;
         for (auto frame = 0; frame < frames; ++frame)
             host_.renderNow();
     }
-    scriptedEvent_ = juce::var();
+    scriptedEvent_ = cydaw::base::Value();
     return {};
 }
 
@@ -2525,7 +2456,7 @@ void AppUi::applyScriptedInput()
     if (!scriptedMouse_)
         return;
     auto& io = ImGui::GetIO();
-    const auto event = std::exchange(scriptedEvent_, juce::var());
+    const auto event = std::exchange(scriptedEvent_, cydaw::base::Value());
     if (const auto* object = event.getDynamicObject()) {
         if (object->hasProperty("x") && object->hasProperty("y")) {
             scriptedX_ = static_cast<float>(static_cast<double>(object->getProperty("x")));
@@ -2542,8 +2473,8 @@ void AppUi::applyScriptedInput()
     const auto* viewport = ImGui::GetMainViewport();
     io.AddMousePosEvent(viewport->Pos.x + scriptedX_, viewport->Pos.y + scriptedY_);
     io.AddMouseViewportEvent(viewport->ID);
-    const auto type = event.getProperty("type", juce::var()).toString();
-    const auto button = juce::jlimit(0, 2, static_cast<int>(event.getProperty("button", 0)));
+    const auto type = event.getProperty("type", cydaw::base::Value()).toString();
+    const auto button = cydaw::base::limit(0, 2, static_cast<int>(event.getProperty("button", 0)));
     if (type == "down")
         io.AddMouseButtonEvent(button, true);
     else if (type == "up")
@@ -2556,9 +2487,9 @@ void AppUi::applyScriptedInput()
     // space, the arrows up, down, left, right, a letter or a digit; ctrl,
     // shift, alt down with "down": true, up with false).
     else if (type == "text")
-        io.AddInputCharactersUTF8(event.getProperty("text", juce::var()).toString().toRawUTF8());
+        io.AddInputCharactersUTF8(event.getProperty("text", cydaw::base::Value()).toString().toRawUTF8());
     else if (type == "key") {
-        const auto name = event.getProperty("key", juce::var()).toString().toLowerCase();
+        const auto name = event.getProperty("key", cydaw::base::Value()).toString().toLowerCase();
         const auto key = name == "enter"       ? ImGuiKey_Enter
                          : name == "escape"    ? ImGuiKey_Escape
                          : name == "tab"       ? ImGuiKey_Tab
@@ -2610,7 +2541,7 @@ bool AppUi::showDeviceEditor(const std::uint64_t nodeId, const int pane, const b
     return true;
 }
 
-bool AppUi::snapshot(const juce::File& png)
+bool AppUi::snapshot(const cydaw::base::File& png)
 {
     if (!host_.isReady())
         return false;
@@ -2650,13 +2581,10 @@ void AppUi::tracksChanged()
 void AppUi::requestQuit()
 {
     // After the answer has gone out.
-    juce::Timer::callAfterDelay(300, [] {
-        if (juce::JUCEApplicationBase::getInstance() != nullptr)
-            juce::JUCEApplicationBase::quit();
-    });
+    cydaw::base::Timer::callAfterDelay(300, [callback = onQuitNow] { if (callback) callback(); });
 }
 
-void AppUi::selectSample(const juce::File& file)
+void AppUi::selectSample(const cydaw::base::File& file)
 {
     state_.bringToFront = Panel::browser;
     focusFrames_ = 0;
@@ -2664,7 +2592,7 @@ void AppUi::selectSample(const juce::File& file)
     browser_->selectSample(file);
 }
 
-juce::var AppUi::library(const juce::String& command, const juce::var& request)
+cydaw::base::Value AppUi::library(const cydaw::base::Text& command, const cydaw::base::Value& request)
 {
     static const char* facets[] = { "category", "group", "source", "type", "key", "tempo", "length" };
     static const std::pair<const char*, int> columns[] = {
@@ -2673,18 +2601,18 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
         { "length", SampleCatalog::colLength },       { "bpm", SampleCatalog::colBpm },       { "key", SampleCatalog::colKey },
         { "channels", SampleCatalog::colChannels },   { "rate", SampleCatalog::colRate },     { "score", SampleCatalog::colScore },
     };
-    auto* result = new juce::DynamicObject();
-    juce::var answer(result);
+    auto* result = new cydaw::base::Object();
+    cydaw::base::Value answer(result);
     if (command == "library_perf") {
         // The catalog built over as many sounds as asked, then queried the
         // ways the window does.
-        const auto count = juce::jlimit(1, 1'000'000, static_cast<int>(request.getProperty("items", 50'000)));
-        const auto started = juce::Time::getMillisecondCounterHiRes();
+        const auto count = cydaw::base::limit(1, 1'000'000, static_cast<int>(request.getProperty("items", 50'000)));
+        const auto started = cydaw::base::Time::getMillisecondCounterHiRes();
         const auto data = catalog_->synthetic(count);
         result->setProperty("items", static_cast<int>(data->items.size()));
         result->setProperty("buildMs", data->buildMs);
-        result->setProperty("syntheticMs", juce::Time::getMillisecondCounterHiRes() - started);
-        auto* queries = new juce::DynamicObject();
+        result->setProperty("syntheticMs", cydaw::base::Time::getMillisecondCounterHiRes() - started);
+        auto* queries = new cydaw::base::Object();
         const auto time = [&](const char* name, const SampleCatalog::Query& query) {
             // The slowest of three.
             auto slowest = 0.0;
@@ -2694,10 +2622,10 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
                 slowest = std::max(slowest, answered.ms);
                 rows = answered.matched;
             }
-            auto* entry = new juce::DynamicObject();
+            auto* entry = new cydaw::base::Object();
             entry->setProperty("ms", slowest);
             entry->setProperty("rows", rows);
-            queries->setProperty(name, juce::var(entry));
+            queries->setProperty(name, cydaw::base::Value(entry));
         };
         SampleCatalog::Query all;
         time("all", all);
@@ -2720,7 +2648,7 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
         SampleCatalog::Query byCategory;
         byCategory.sortColumn = SampleCatalog::colCategory;
         time("sortCategory", byCategory);
-        result->setProperty("queries", juce::var(queries));
+        result->setProperty("queries", cydaw::base::Value(queries));
         return answer;
     }
     // library_window
@@ -2734,12 +2662,15 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
     }
     if (request.hasProperty("detached"))
         ui::setDetached("###library", static_cast<bool>(request.getProperty("detached", false)));
-    if (request.hasProperty("query") || request.hasProperty("filters") || request.hasProperty("sort")) {
-        std::vector<std::pair<int, juce::StringArray>> chosen;
+    if (state_.libraryTab != 0 && (request.hasProperty("content") || request.hasProperty("role") || request.hasProperty("query"))) {
+        const auto query = request.getProperty("query", {}).toString();
+        library_->setDeviceQuery(static_cast<int>(request.getProperty("content", -1)), static_cast<int>(request.getProperty("role", -1)), request.hasProperty("query") ? &query : nullptr);
+    } else if (state_.libraryTab == 0 && (request.hasProperty("query") || request.hasProperty("filters") || request.hasProperty("sort"))) {
+        std::vector<std::pair<int, cydaw::base::TextList>> chosen;
         if (const auto* filters = request.getProperty("filters", {}).getDynamicObject())
             for (auto facet = 0; facet < SampleCatalog::facetCount; ++facet)
                 if (const auto* keys = filters->getProperty(facets[facet]).getArray()) {
-                    juce::StringArray list;
+                    cydaw::base::TextList list;
                     for (const auto& key : *keys)
                         list.add(key.toString());
                     chosen.emplace_back(facet, list);
@@ -2762,23 +2693,24 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
     result->setProperty("buildMs", probe.buildMs);
     result->setProperty("extractMs", probe.extractMs);
     result->setProperty("frameMs", probe.frameMs);
-    auto* facetCounts = new juce::DynamicObject();
+    auto* facetCounts = new cydaw::base::Object();
     for (const auto& [name, values] : probe.facets) {
-        auto* counts = new juce::DynamicObject();
+        auto* counts = new cydaw::base::Object();
         for (const auto& [key, count] : values)
             counts->setProperty(key, count);
-        facetCounts->setProperty(name, juce::var(counts));
+        facetCounts->setProperty(name, cydaw::base::Value(counts));
     }
-    result->setProperty("facets", juce::var(facetCounts));
-    juce::Array<juce::var> names;
+    result->setProperty("facets", cydaw::base::Value(facetCounts));
+    cydaw::base::Array<cydaw::base::Value> names;
     for (const auto& name : probe.names)
         names.add(name);
     result->setProperty("names", names);
+    result->setProperty("entries", probe.entries);
     return answer;
 }
 
-void AppUi::browseSamples(const juce::String& query, const bool semantic, const juce::String& family, const juce::String& category,
-                          const juce::String& source)
+void AppUi::browseSamples(const cydaw::base::Text& query, const bool semantic, const cydaw::base::Text& family, const cydaw::base::Text& category,
+                          const cydaw::base::Text& source)
 {
     state_.bringToFront = Panel::browser;
     focusFrames_ = 0;
@@ -2913,8 +2845,12 @@ void AppUi::openContextHelp()
 
 void AppUi::drawMenuBar()
 {
-    if (!ImGui::BeginMainMenuBar())
+    const auto integrated=static_cast<bool>(host_.onWindowAction);
+    if(integrated)ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(dp(6),std::max(0.0f,(dp(30)-ImGui::GetFontSize())*.5f)));
+    if (!ImGui::BeginMainMenuBar()) {
+        if(integrated)ImGui::PopStyleVar();
         return;
+    }
     {
         const auto height = ImGui::GetFrameHeight() * 0.86f;
         if (const auto texture = logo(height * ImGui::GetIO().DisplayFramebufferScale.x)) {
@@ -2938,10 +2874,13 @@ void AppUi::drawMenuBar()
             if(fileView)fileView->chooseOpen();else whenSaved([this] { chooseOpenProject(); });
         }
         if (ImGui::BeginMenu(L("Modèles", "Templates"))) {
-            const auto templates = studio_.templates();
+            const auto templates = modeTemplateFiles();
             for (const auto& file : templates)
                 if (ImGui::MenuItem(file.getFileNameWithoutExtension().toRawUTF8()))
-                    whenSaved([this, file] { openProject(file); });
+                    if (file.hasFileExtension("cydaw"))
+                        whenSaved([this, file] { openProject(file); });
+                    else if (const auto error = loadModeTemplate(file); error.isNotEmpty())
+                        notify(error, true);
             if (templates.isEmpty())
                 ImGui::TextDisabled("%s", L("Aucun modèle à côté de l'application", "No templates next to the application"));
             ImGui::EndMenu();
@@ -3060,8 +2999,8 @@ void AppUi::drawMenuBar()
             const auto& info = engine::synth::info(model);
             if (info.parameters.empty())
                 continue;
-            const auto label = juce::String::fromUTF8(ui::french() ? "Nouveau " : "New ")
-                               + juce::String::fromUTF8((ui::french() ? info.french : info.english).c_str());
+            const auto label = cydaw::base::Text::fromUTF8(ui::french() ? "Nouveau " : "New ")
+                               + cydaw::base::Text::fromUTF8((ui::french() ? info.french : info.english).c_str());
             if (ImGui::MenuItem(label.toRawUTF8()))
                 newSynthTrack(model);
             ui::tooltip((ui::french() ? info.frenchHint : info.englishHint).c_str());
@@ -3178,23 +3117,38 @@ void AppUi::drawMenuBar()
         ImGui::MenuItem(L("Démo Dear ImGui", "Dear ImGui demo"), nullptr, &showDemo_);
         ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu(ui::labelId(L("Options", "Options"), "menuOptions").c_str())) {
+    const auto optionsMenuOpen = ImGui::BeginMenu(ui::labelId(L("Options", "Options"), "menuOptions").c_str());
+    ui::recordSpot("menu:options");
+    if (optionsMenuOpen) {
+        const auto frameRateMenuOpen = ImGui::BeginMenu(L("Fréquence d'affichage", "Frame rate"));
+        ui::recordSpot("menu:frame-rate");
+        if (frameRateMenuOpen) {
+            for (const auto fps : { 30, 60, 120 }) {
+                const auto label = std::to_string(fps) + " FPS";
+                if (ImGui::MenuItem(label.c_str(), nullptr, host_.frameRateLimit() == fps)) {
+                    host_.setFrameRateLimit(fps);
+                    if (studio_.keepsSettings()) {
+                        studio_.settings().setValue("uiFrameRate", fps);
+                        (void) studio_.settings().saveIfNeeded();
+                    }
+                }
+                ui::recordSpot("display-fps:" + std::to_string(fps));
+            }
+            ImGui::EndMenu();
+        }
+
         if (ImGui::MenuItem(L("Réglages audio…", "Audio settings…")))
             showAudioSettings_ = true;
         if (ImGui::MenuItem(L("Entrées et sorties de la carte son…", "Sound card inputs and outputs…")))
             showAudioSettings_ = showSoundCard_ = true;
         if (ImGui::MenuItem(L("Synchronisation du transport…", "Transport synchronization…")))
             showTransportSync_ = true;
-        if (ImGui::MenuItem(L("Contrôleurs MIDI / OSC…", "MIDI / OSC controllers…")))
-            showControllers_ = true;
+        if (ImGui::MenuItem(L("Contrôleurs et entrées…", "Controllers and inputs…")))
+            openControllerInputs();
         ui::tooltip(L("Appareils MIDI, OSC et plug-ins d'application ; appareils virtuels ; assignations et apprentissage.",
                       "MIDI, OSC and application plug-in devices; virtual devices; assignments and learning."));
         if (ImGui::MenuItem(L("Apprendre une assignation", "Learn an assignment"), "Ctrl+M", controllers_->learning()))
             controllers_->setLearning(!controllers_->learning());
-        if (ImGui::MenuItem(L("Entrées MIDI…", "MIDI inputs…")))
-            openMidiInputs();
-        ui::tooltip(L("Les claviers et contrôleurs MIDI branchés, et le clavier de l'ordinateur comme clavier MIDI.",
-                      "The MIDI keyboards and controllers plugged in, and the computer's keyboard as a MIDI keyboard."));
         if (ImGui::MenuItem(L("Clavier de l'ordinateur (MIDI)", "Computer keyboard (MIDI)"), "Ctrl+K", computerKeyboard_->enabled()))
             computerKeyboard_->setEnabled(!computerKeyboard_->enabled());
         ui::tooltip(L("Les canaux ouverts de la carte, les bus d'entrée que les pistes enregistrent et les bus de sortie "
@@ -3275,13 +3229,57 @@ void AppUi::drawMenuBar()
             showAbout_ = true;
         ImGui::EndMenu();
     }
-    // The project's name, centred.
+    // One integrated caption: menus stay client controls; only the unused
+    // title region is handed to Windows for dragging/double-click/system menu.
     const auto name = studio_.projectName().isNotEmpty() ? studio_.projectName() : ui::Ls("Sans titre", "Untitled");
     const auto title = name + (studio_.isDirty() ? " *" : "");
     const auto width = ImGui::CalcTextSize(title.toRawUTF8()).x;
-    ImGui::SameLine((ImGui::GetWindowWidth() - width) * 0.5f);
-    ImGui::TextColored(theme::vec(theme::palette().textDim), "%s", title.toRawUTF8());
+    if(integrated) {
+        const auto& p=theme::palette();
+        const auto at=ImGui::GetWindowPos();
+        const auto size=ImGui::GetWindowSize();
+        const auto buttons=at.x+size.x-dp(44)*3;
+        const auto left=ImGui::GetItemRectMax().x+dp(12);
+        const auto right=buttons-dp(8);
+        auto* draw=ImGui::GetWindowDrawList();
+        if(right>left) {
+            draw->PushClipRect(ImVec2(left,at.y),ImVec2(right,at.y+size.y),true);
+            draw->AddText(ImVec2(std::max(left,at.x+(size.x-width)*.5f),at.y+(size.y-ImGui::GetFontSize())*.5f),p.textDim,title.toRawUTF8());
+            draw->PopClipRect();
+        }
+        const auto viewport=ImGui::GetMainViewport()->Pos;
+        host_.windowDragRegion=ImGui::IsPopupOpen(nullptr,ImGuiPopupFlags_AnyPopup)?cydaw::base::Rectangle<int>{}:
+            cydaw::base::Rectangle<int>{int(left-viewport.x),int(at.y-viewport.y),std::max(0,int(right-left)),int(size.y)};
+        const auto maximized=host_.windowMaximized && host_.windowMaximized();
+        const char* ids[]={"##windowMinimize","##windowMaximize","##windowClose"};
+        const char* tips[]={L("Réduire","Minimize"),maximized?L("Restaurer","Restore"):L("Agrandir","Maximize"),L("Fermer","Close")};
+        for(int i=0;i<3;++i) {
+            const ImVec2 pos(buttons+dp(44)*i,at.y);
+            ImGui::SetCursorScreenPos(pos);
+            const auto clicked=ImGui::InvisibleButton(ids[i],ImVec2(dp(44),size.y));
+            const auto hovered=ImGui::IsItemHovered();
+            if(hovered)draw->AddRectFilled(pos,ImVec2(pos.x+dp(44),pos.y+size.y),i==2?p.record:p.bg3);
+            const ImVec2 centre(pos.x+dp(22),pos.y+size.y*.5f);
+            const auto colour=hovered&&i==2?IM_COL32_WHITE:p.text;
+            const auto r=dp(4.5f),line=dp(1.0f);
+            if(i==0)draw->AddLine(ImVec2(centre.x-r,centre.y),ImVec2(centre.x+r,centre.y),colour,line);
+            else if(i==2) {
+                draw->AddLine(ImVec2(centre.x-r,centre.y-r),ImVec2(centre.x+r,centre.y+r),colour,line);
+                draw->AddLine(ImVec2(centre.x-r,centre.y+r),ImVec2(centre.x+r,centre.y-r),colour,line);
+            } else {
+                if(maximized)draw->AddRect(ImVec2(centre.x-r+dp(2),centre.y-r-dp(2)),ImVec2(centre.x+r+dp(2),centre.y+r-dp(2)),colour,0,0,line);
+                if(maximized)draw->AddRectFilled(ImVec2(centre.x-r,centre.y-r),ImVec2(centre.x+r,centre.y+r),hovered?p.bg3:ImGui::GetColorU32(ImGuiCol_MenuBarBg));
+                draw->AddRect(ImVec2(centre.x-r,centre.y-r),ImVec2(centre.x+r,centre.y+r),colour,0,0,line);
+            }
+            ui::tooltip(tips[i]);
+            if(clicked)host_.onWindowAction(static_cast<ImGuiHost::WindowAction>(i));
+        }
+    } else {
+        ImGui::SameLine((ImGui::GetWindowWidth() - width) * 0.5f);
+        ImGui::TextColored(theme::vec(theme::palette().textDim), "%s", title.toRawUTF8());
+    }
     ImGui::EndMainMenuBar();
+    if(integrated)ImGui::PopStyleVar();
 }
 
 void AppUi::drawTransportBar()
@@ -3436,22 +3434,22 @@ void AppUi::drawTransportBar()
             }
 
             // The computer's keys as a MIDI keyboard: on or off, its octave; a
-            // right click opens the MIDI inputs.
+            // right click opens the unified controllers window.
             {
                 ui::toolbarSeparator();
                 auto& keyboard = *computerKeyboard_;
                 const auto& p = theme::palette();
                 if (ui::iconButton(icon::keyboard,
                                    keyboard.enabled() ? L("Clavier de l'ordinateur : il joue la piste instrument choisie (Ctrl+K). "
-                                                          "Clic droit : les entrées MIDI.",
+                                                          "Clic droit : les contrôleurs et le clavier musical.",
                                                           "Computer keyboard: it plays the picked instrument track (Ctrl+K). "
-                                                          "Right click: the MIDI inputs.")
-                                                      : L("Clavier de l'ordinateur éteint (Ctrl+K). Clic droit : les entrées MIDI.",
-                                                          "Computer keyboard off (Ctrl+K). Right click: the MIDI inputs."),
+                                                          "Right click: controllers and musical keyboard.")
+                                                      : L("Clavier de l'ordinateur éteint (Ctrl+K). Clic droit : les contrôleurs et le clavier musical.",
+                                                          "Computer keyboard off (Ctrl+K). Right click: controllers and musical keyboard."),
                                    keyboard.enabled(), p.accent))
                     keyboard.setEnabled(!keyboard.enabled());
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-                    openMidiInputs();
+                    openControllerInputs(true);
                 if (keyboard.enabled()) {
                     ImGui::SameLine(0.0f, dp(4.0f));
                     ImGui::AlignTextToFramePadding();
@@ -3523,7 +3521,7 @@ void AppUi::drawSystemStatus(const float endX)
         char text[32];
         std::snprintf(text, sizeof(text), bytes >= 1.0e9 ? "%.1f %s" : "%.0f %s", bytes >= 1.0e9 ? bytes / 1.0e9 : bytes / 1.0e6,
                       bytes >= 1.0e9 ? L("Go", "GB") : L("Mo", "MB"));
-        return juce::String(text);
+        return cydaw::base::Text(text);
     };
 
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
@@ -3568,11 +3566,11 @@ void AppUi::drawSystemStatus(const float endX)
         lightAt(midi_devices::activity("top:midiIn", engine.midiInActivity()), p.play);
         lightAt(midi_devices::activity("top:midiOut", engine.midiOutActivity()), p.accent);
         if (hovering(from, x)) {
-            juce::String tip = ui::Ls("MIDI : la lumière verte s'allume quand un message arrive (un clavier, un contrôleur, le clavier de "
+            cydaw::base::Text tip = ui::Ls("MIDI : la lumière verte s'allume quand un message arrive (un clavier, un contrôleur, le clavier de "
                                       "l'ordinateur), l'orange quand une piste envoie ses notes à une sortie.",
                                       "MIDI: the green light comes on when a message arrives (a keyboard, a controller, the computer "
                                       "keyboard), the orange one when a track sends its notes to an output.");
-            tip << "\n" << juce::String(static_cast<int>(midiIns)) << ui::Ls(" entrée(s), ", " input(s), ") << juce::String(static_cast<int>(midiOuts))
+            tip << "\n" << cydaw::base::Text(static_cast<int>(midiIns)) << ui::Ls(" entrée(s), ", " input(s), ") << cydaw::base::Text(static_cast<int>(midiOuts))
                 << ui::Ls(" sortie(s) branchée(s).", " output(s) plugged in.");
             ui::tooltip(tip.toRawUTF8());
         }
@@ -3599,12 +3597,12 @@ void AppUi::drawSystemStatus(const float endX)
         label(icon::connect, p.textDim);
         label(count, p.textDim);
         if (hovering(from, x)) {
-            juce::String tip = ui::Ls("Périphériques branchés", "Devices plugged in");
+            cydaw::base::Text tip = ui::Ls("Périphériques branchés", "Devices plugged in");
             tip << "\n" << ui::Ls("Carte son : ", "Sound card: ")
-                << (audio != nullptr ? audio->getName() + "  (" + juce::String(audio->getCurrentSampleRate() / 1'000.0, 1) + " kHz)"
+                << (audio != nullptr ? audio->getName() + "  (" + cydaw::base::Text(audio->getCurrentSampleRate() / 1'000.0, 1) + " kHz)"
                                      : ui::Ls("aucune", "none"));
-            const auto names = [](const juce::Array<juce::MidiDeviceInfo>& found) {
-                juce::StringArray list;
+            const auto names = [](const cydaw::base::Array<cydaw::midi::DeviceInfo>& found) {
+                cydaw::base::TextList list;
                 for (const auto& device : found)
                     list.add(device.name);
                 return list.isEmpty() ? ui::Ls("aucune", "none") : list.joinIntoString(", ");

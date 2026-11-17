@@ -1,3 +1,5 @@
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/File.h>
 #include "DjView.h"
 #include "ModeProcessing.h"
 
@@ -50,7 +52,7 @@ ImU32 cueColour(const int index)
     return colours[index & 7];
 }
 
-juce::String clock(double seconds, const bool tenths = true)
+cydaw::base::Text clock(double seconds, const bool tenths = true)
 {
     const auto negative = seconds < 0.0;
     seconds = std::abs(seconds);
@@ -102,22 +104,22 @@ bool pad(const char* label, const ImVec2 size, const bool on, const ImU32 colour
 }
 
 // The keys' names as DJs read them: the wheel's number, then the name.
-juce::String keyText(const int key)
+cydaw::base::Text keyText(const int key)
 {
     if (key < 0)
         return "-";
-    return juce::String(engine::dj::camelotName(key)) + " " + engine::dj::keyName(key);
+    return cydaw::base::Text(engine::dj::camelotName(key)) + " " + engine::dj::keyName(key);
 }
 
-double number(const juce::var& request, const char* key, const double fallback)
+double number(const cydaw::base::Value& request, const char* key, const double fallback)
 {
-    const auto value = request.getProperty(key, juce::var());
+    const auto value = request.getProperty(key, cydaw::base::Value());
     return value.isVoid() ? fallback : static_cast<double>(value);
 }
 
-bool flag(const juce::var& request, const char* key, const bool fallback)
+bool flag(const cydaw::base::Value& request, const char* key, const bool fallback)
 {
-    const auto value = request.getProperty(key, juce::var());
+    const auto value = request.getProperty(key, cydaw::base::Value());
     return value.isVoid() ? fallback : static_cast<bool>(value);
 }
 
@@ -163,7 +165,7 @@ void DjView::saveProcessing(const bool force)
     const auto revision = processing_->revision();
     if (revision == processingRevision_ && !processingWriteFailed_.load())
         return;
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (observedProcessingRevision_ != revision) {
         observedProcessingRevision_ = revision;
         processingChangedAt_ = now;
@@ -174,15 +176,15 @@ void DjView::saveProcessing(const bool force)
         host_.wake(3);
         return;
     }
-    const auto override = juce::SystemStats::getEnvironmentVariable("CYDAW_DJ_PROCESSING_FILE", {});
-    const auto file = override.isNotEmpty() ? juce::File(override)
+    const auto override = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_DJ_PROCESSING_FILE", {});
+    const auto file = override.isNotEmpty() ? cydaw::base::File(override)
         : locations::folder(Location::mixes).getChildFile("DJ processing.cydjmix");
     const auto snapshot = processing_->serialise();
     processingRevision_ = revision;
     processingWriteFailed_.store(false);
     // JSON encoding and disk I/O never run in the knob's draw callback.
     processingWriter_.addJob([this, file, snapshot] {
-        if (!file.getParentDirectory().createDirectory() || !file.replaceWithText(juce::JSON::toString(snapshot)))
+        if (!file.getParentDirectory().createDirectory() || !file.replaceWithText(cydaw::base::JSON::toString(snapshot)))
             processingWriteFailed_.store(true);
     });
 }
@@ -196,10 +198,10 @@ void DjView::ensureLoaded()
     loaded_ = true;
     library_->load();
     processing_=std::make_shared<ModeProcessing>(&host_);
-    const auto override=juce::SystemStats::getEnvironmentVariable("CYDAW_DJ_PROCESSING_FILE",{});
-    const auto file=override.isNotEmpty()?juce::File(override):locations::folder(Location::mixes).getChildFile("DJ processing.cydjmix");
-    processing_->restore(juce::JSON::parse(file));
-    for(int i=0;i<4;++i)processing_->ensureInput(static_cast<std::uint64_t>(i+1),juce::String("Deck ")+deckLetter(i));
+    const auto override=cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_DJ_PROCESSING_FILE",{});
+    const auto file=override.isNotEmpty()?cydaw::base::File(override):locations::folder(Location::mixes).getChildFile("DJ processing.cydjmix");
+    processing_->restore(cydaw::base::JSON::parse(file));
+    for(int i=0;i<4;++i)processing_->ensureInput(static_cast<std::uint64_t>(i+1),cydaw::base::Text("Deck ")+deckLetter(i));
     auto* device=studio_.engine().deviceManager().getCurrentAudioDevice();
     processing_->prepare(device?device->getCurrentSampleRate():48000,device?device->getCurrentBufferSizeSamples():512);
     processingRevision_=processing_->revision();studio_.engine().dj().setProcessor(processing_);
@@ -221,7 +223,7 @@ int DjView::freeDeck() const
     return -1;
 }
 
-void DjView::loadFile(const int deck, const juce::File& file)
+void DjView::loadFile(const int deck, const cydaw::base::File& file)
 {
     auto& dj = studio_.engine().dj();
     if (deck < 0 || deck >= DjEngine::deckCount || !file.existsAsFile())
@@ -246,12 +248,82 @@ void DjView::loadFile(const int deck, const juce::File& file)
     ui.wasPlaying = false;
 }
 
-bool DjView::dropFiles(const juce::StringArray& files)
+cydaw::base::Result DjView::loadTemplate(const cydaw::base::File& file)
+{
+    const auto preset = cydaw::base::JSON::parse(file);
+    const auto count = static_cast<int>(preset.getProperty("deckCount", 2));
+    const auto* entries = preset.getProperty("decks", {}).getArray();
+    if (preset.getProperty("format", {}).toString() != "CyDAW DJ template"
+        || static_cast<int>(preset.getProperty("version", 0)) != 1
+        || (count != 2 && count != 4) || entries == nullptr || entries->size() != count)
+        return cydaw::base::Result::fail(ui::Ls("Modèle DJ invalide", "Invalid DJ template"));
+    // Check every resource before stopping or replacing the current decks.
+    std::array<cydaw::base::File, 4> sources;
+    for (int i = 0; i < count; ++i) {
+        const auto path = (*entries)[i].getProperty("file", {}).toString();
+        sources[i] = file.getSiblingFile(path);
+        if (path.isEmpty() || !sources[i].existsAsFile())
+            return cydaw::base::Result::fail(ui::Ls("Son introuvable : ", "Sound not found: ") + sources[i].getFullPathName());
+    }
+    ensureLoaded();
+    auto& dj = studio_.engine().dj();
+    if (dj.recording())
+        return cydaw::base::Result::fail(ui::Ls("Arrêtez l'enregistrement avant de charger un modèle", "Stop recording before loading a template"));
+    for (int i = 0; i < 4; ++i) {
+        dj.setPlaying(i, false);
+        dj.eject(i);
+        DjEngine::Channel channel;
+        channel.side = i % 2 == 0 ? 0 : 2;
+        dj.setChannel(i, channel);
+        dj.setTempo(i, 1.0);
+        dj.setBend(i, 0.0);
+        dj.setSync(i, false);
+        dj.setKeylock(i, true);
+        decks_[i] = {};
+    }
+    processing_->restore(preset.getProperty("processing", {}));
+    for (int i = 0; i < 4; ++i)
+        processing_->ensureInput(i + 1, cydaw::base::Text("Deck ") + deckLetter(i));
+    autoGain_ = false;
+    dj.setDeckCount(count);
+    dj.setMaster(0);
+    dj.setCrossfader(static_cast<float>(number(preset, "crossfader", 0.0)));
+    dj.setCrossfaderCurve(0.0f);
+    dj.setMasterGainDb(static_cast<float>(number(preset, "masterDb", -3.0)));
+    dj.setCueMode(DjEngine::CueMode::off);
+    dj.setCueMix(0.5f);
+    dj.setLimiter(true);
+    dj.setQuantize(true);
+    for (int i = 0; i < count; ++i) {
+        const auto& entry = (*entries)[i];
+        DjEngine::Known known;
+        known.bpm = number(entry, "bpm", 120.0);
+        known.firstBeat = number(entry, "firstBeat", 0.0);
+        known.hasGrid = known.bpm >= 20 && known.bpm <= 400;
+        known.cuePoint = std::max(0.0, number(entry, "cuePoint", 0.0));
+        if (const auto* cues = entry.getProperty("hotCues", {}).getArray())
+            for (int c = 0; c < std::min(cues->size(), DjEngine::hotCueCount); ++c)
+                known.hotCues[c] = static_cast<double>((*cues)[c]);
+        library_->remember(sources[i]);
+        dj.load(i, sources[i], known);
+        auto& ui = decks_[i];
+        ui.cues = known.hotCues;
+        ui.cuePoint = known.cuePoint;
+        auto channel = dj.channel(i);
+        channel.trimDb = static_cast<float>(number(entry, "trimDb", -3.0));
+        channel.fader = static_cast<float>(number(entry, "fader", i < 2 ? 1.0 : 0.0));
+        dj.setChannel(i, channel);
+    }
+    saveProcessing();
+    return cydaw::base::Result::ok();
+}
+
+bool DjView::dropFiles(const cydaw::base::TextList& files)
 {
     auto deck = freeDeck();
     auto any = false;
     for (const auto& path : files) {
-        const juce::File file(path);
+        const cydaw::base::File file(path);
         if (file.isDirectory()) {
             library().addFolder(file);
             any = true;
@@ -274,7 +346,7 @@ void DjView::learnFromDecks()
     for (int index = 0; index < DjEngine::deckCount; ++index) {
         auto& ui = decks_[static_cast<std::size_t>(index)];
         const auto deck = dj.deck(index);
-        if (deck.state != DjEngine::LoadState::ready || deck.file == juce::File())
+        if (deck.state != DjEngine::LoadState::ready || deck.file == cydaw::base::File())
             continue;
         auto track = library_->find(deck.file).value_or(DjTrack {});
         track.file = deck.file;
@@ -310,7 +382,7 @@ void DjView::learnFromDecks()
         }
         if (deck.playing && !ui.wasPlaying) {
             ++track.plays;
-            track.lastPlayed = juce::Time::currentTimeMillis();
+            track.lastPlayed = cydaw::base::Time::currentTimeMillis();
             if (history_.empty() || history_.back() != deck.file)
                 history_.push_back(deck.file);
             changed = true;
@@ -386,8 +458,8 @@ void DjView::draw()
         ImGui::BeginChild("##djProcessing",ImVec2(0,0),ImGuiChildFlags_Borders);
         processing_->draw([&]{
             ImGui::TextDisabled("%s",L("Ouvrez le son d'une platine dans la Fonderie pour le découper ou le traiter.","Open a deck's sound in the Foundry to edit or process it."));
-            for(int i=0;i<dj.shownDeckCount();++i){ImGui::PushID(i);const auto deck=dj.deck(i);ImGui::BeginDisabled(deck.file==juce::File());
-                if(ImGui::Button((juce::String("Deck ")+deckLetter(i)+ui::Ls(" → Fonderie"," → Foundry")).toRawUTF8())){state_.foundryOpen=deck.file;state_.mode=AppMode::foundry;}
+            for(int i=0;i<dj.shownDeckCount();++i){ImGui::PushID(i);const auto deck=dj.deck(i);ImGui::BeginDisabled(deck.file==cydaw::base::File());
+                if(ImGui::Button((cydaw::base::Text("Deck ")+deckLetter(i)+ui::Ls(" → Fonderie"," → Foundry")).toRawUTF8())){state_.foundryOpen=deck.file;state_.mode=AppMode::foundry;}
                 ImGui::EndDisabled();ImGui::PopID();ImGui::SameLine();}
         }, true, [&] {
             state_.setBottomPanelVisible(false);
@@ -464,7 +536,7 @@ void DjView::startRecording()
 {
     auto& dj = studio_.engine().dj();
     const auto folder = locations::folder(Location::mixes);
-    const auto name = "Mix " + juce::Time::getCurrentTime().formatted("%Y-%m-%d %H-%M-%S") + ".wav";
+    const auto name = "Mix " + cydaw::base::Time::getCurrentTime().formatted("%Y-%m-%d %H-%M-%S") + ".wav";
     const auto result = dj.startRecording(folder.getChildFile(name));
     state_.status = result.wasOk() ? ui::Ls("Enregistrement du mix : ", "Recording the mix: ") + name : result.getErrorMessage();
     state_.statusIsError = result.failed();
@@ -500,7 +572,7 @@ void DjView::drawDeck(const int index, const ImVec2 size)
     // A track dropped on it (the collection's, the studio's browser).
     if (ImGui::BeginDragDropTarget()) {
         if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload != nullptr && payload->DataSize > 1)
-            loadFile(index, juce::File(juce::String::fromUTF8(static_cast<const char*>(payload->Data))));
+            loadFile(index, cydaw::base::File(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data))));
         ImGui::EndDragDropTarget();
     }
     ImGui::PopStyleVar();
@@ -540,11 +612,11 @@ void DjView::drawDeckHeader(const int index, const float width)
     const auto small = ImGui::GetStyle().FontSizeBase * 0.86f;
     const auto timeText = deck.state == DjEngine::LoadState::ready
                               ? (ui.remaining ? clock(deck.position - deck.seconds) : clock(deck.position))
-                              : juce::String("-:--.-");
+                              : cydaw::base::Text("-:--.-");
     ImGui::PushFont(theme::monoFont(), small);
     const auto timeSize = ImGui::CalcTextSize(timeText.toRawUTF8());
     list->AddText(ImVec2(origin.x + width - timeSize.x, origin.y + height - timeSize.y), p.textDim, timeText.toRawUTF8());
-    const auto key = deck.analysis != nullptr ? keyText(deck.analysis->key) : juce::String("-");
+    const auto key = deck.analysis != nullptr ? keyText(deck.analysis->key) : cydaw::base::Text("-");
     list->AddText(ImVec2(right, origin.y + height - timeSize.y), p.textDim, key.toRawUTF8());
     ImGui::PopFont();
     // A click on the time: elapsed or remaining.
@@ -555,8 +627,8 @@ void DjView::drawDeckHeader(const int index, const float width)
     // The title and the artist.
     const auto textX = origin.x + badge + dp(8.0f);
     const auto textWidth = right - textX - dp(8.0f);
-    juce::String title;
-    juce::String artist;
+    cydaw::base::Text title;
+    cydaw::base::Text artist;
     switch (deck.state) {
     case DjEngine::LoadState::empty:
         title = ui::Ls("Glissez un morceau ici", "Drop a track here");
@@ -794,7 +866,7 @@ void DjView::drawDeckButtons(const int index, const float width)
     {
         const ui::LearnScope learn(control_targets::forDeck(index, "play"),
                                    "DJ " + std::string(deckLetter(index)) + " \xc2\xb7 " + ui::Ls("Lecture", "Play").toStdString());
-        if (pad((juce::String::fromUTF8(deck.playing ? icon::pause : icon::play) + "##play").toRawUTF8(), ImVec2(unit * 1.2f, height),
+        if (pad((cydaw::base::Text::fromUTF8(deck.playing ? icon::pause : icon::play) + "##play").toRawUTF8(), ImVec2(unit * 1.2f, height),
                 deck.playing, IM_COL32(90, 200, 100, 255), L("Lecture / pause", "Play / pause")))
             dj.setPlaying(index, !deck.playing);
     }
@@ -814,7 +886,7 @@ void DjView::drawDeckButtons(const int index, const float width)
             L("KEY activé : hauteur conservée. Désactivez KEY pour que le tempo change aussi la hauteur.", "KEY on: pitch is preserved. Turn KEY off to change pitch with tempo.")))
         dj.setKeylock(index, !deck.keylock);
     ImGui::SameLine();
-    if (pad((juce::String::fromUTF8(icon::previous) + "##jumpBack").toRawUTF8(), ImVec2(unit * 0.7f, height), false, colour,
+    if (pad((cydaw::base::Text::fromUTF8(icon::previous) + "##jumpBack").toRawUTF8(), ImVec2(unit * 0.7f, height), false, colour,
             L("Saut en arrière", "Jump back")))
         dj.beatJump(index, -ui.jumpBeats);
     ImGui::SameLine();
@@ -834,7 +906,7 @@ void DjView::drawDeckButtons(const int index, const float width)
         ui::tooltip(L("Temps sautés", "Beats jumped"));
     }
     ImGui::SameLine();
-    if (pad((juce::String::fromUTF8(icon::next) + "##jumpOn").toRawUTF8(), ImVec2(unit * 0.7f, height), false, colour,
+    if (pad((cydaw::base::Text::fromUTF8(icon::next) + "##jumpOn").toRawUTF8(), ImVec2(unit * 0.7f, height), false, colour,
             L("Saut en avant", "Jump forward")))
         dj.beatJump(index, ui.jumpBeats);
 
@@ -876,12 +948,12 @@ void DjView::drawDeckButtons(const int index, const float width)
         if (pad("x2", ImVec2(loopUnit, height), false, IM_COL32(80, 200, 110, 255), L("Boucle deux fois plus longue", "Loop twice as long")))
             dj.loopResize(index, 2.0);
         ImGui::SameLine();
-        if (pad((juce::String::fromUTF8(icon::chevronLeft) + "##loopBack").toRawUTF8(), ImVec2(loopUnit, height), false,
+        if (pad((cydaw::base::Text::fromUTF8(icon::chevronLeft) + "##loopBack").toRawUTF8(), ImVec2(loopUnit, height), false,
                 IM_COL32(80, 200, 110, 255),
                 L("La boucle d'un temps en arrière", "The loop a beat back")))
             dj.loopMove(index, -1.0);
         ImGui::SameLine();
-        if (pad((juce::String::fromUTF8(icon::chevronRight) + "##loopOn").toRawUTF8(), ImVec2(loopUnit, height), false,
+        if (pad((cydaw::base::Text::fromUTF8(icon::chevronRight) + "##loopOn").toRawUTF8(), ImVec2(loopUnit, height), false,
                 IM_COL32(80, 200, 110, 255),
                 L("La boucle d'un temps en avant", "The loop a beat on")))
             dj.loopMove(index, 1.0);
@@ -1231,10 +1303,10 @@ void DjView::drawBrowser(const ImVec2 size)
 
 void DjView::chooseFolder()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un dossier de musique", "A music folder"),
-                                                   juce::File::getSpecialLocation(juce::File::userMusicDirectory));
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un dossier de musique", "A music folder"),
+                                                   cydaw::base::File::getSpecialLocation(cydaw::base::File::userMusicDirectory));
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               if (const auto folder = chooser.getResult(); folder.isDirectory())
                                   library_->addFolder(folder);
                           });
@@ -1262,8 +1334,8 @@ void DjView::drawCollectionTree(const ImVec2 size)
         auto remove = -1;
         for (int i = 0; i < folders.size(); ++i) {
             ImGui::PushID(i);
-            const juce::File folder(folders[i]);
-            if (ImGui::Selectable((juce::String::fromUTF8(icon::folder) + " " + folder.getFileName()).toRawUTF8(), folder_ == i))
+            const cydaw::base::File folder(folders[i]);
+            if (ImGui::Selectable((cydaw::base::Text::fromUTF8(icon::folder) + " " + folder.getFileName()).toRawUTF8(), folder_ == i))
                 folder_ = i;
             ui::tooltip(folder.getFullPathName().toRawUTF8());
             if (ImGui::BeginPopupContextItem("##folderMenu")) {
@@ -1276,7 +1348,7 @@ void DjView::drawCollectionTree(const ImVec2 size)
             ImGui::PopID();
         }
         if (remove >= 0) {
-            library_->removeFolder(juce::File(folders[remove]));
+            library_->removeFolder(cydaw::base::File(folders[remove]));
             folder_ = -1;
         }
         if (folders.isEmpty())
@@ -1288,7 +1360,7 @@ void DjView::drawCollectionTree(const ImVec2 size)
 
 void DjView::refreshRows()
 {
-    const juce::String query = juce::String::fromUTF8(search_.data()).trim();
+    const cydaw::base::Text query = cydaw::base::Text::fromUTF8(search_.data()).trim();
     if (shownRevision_ == library_->revision() && shownQuery_ == query && shownFolder_ == folder_ && !sortChanged_)
         return;
     shownRevision_ = library_->revision();
@@ -1296,10 +1368,10 @@ void DjView::refreshRows()
     shownFolder_ = folder_;
     sortChanged_ = false;
     const auto folders = library_->folders();
-    const auto words = juce::StringArray::fromTokens(query.toLowerCase(), " ", "\"");
+    const auto words = cydaw::base::TextList::fromTokens(query.toLowerCase(), " ", "\"");
     rows_.clear();
     for (auto& track : library_->tracks()) {
-        if (folder_ >= 0 && folder_ < folders.size() && !track.file.isAChildOf(juce::File(folders[folder_])))
+        if (folder_ >= 0 && folder_ < folders.size() && !track.file.isAChildOf(cydaw::base::File(folders[folder_])))
             continue;
         if (folder_ == -2 && std::find(history_.begin(), history_.end(), track.file) == history_.end())
             continue;
@@ -1395,7 +1467,7 @@ void DjView::drawTrackTable(const ImVec2 size)
             specs->SpecsDirty = false;
         }
         auto& dj = studio_.engine().dj();
-        std::array<juce::File, 4> onDecks;
+        std::array<cydaw::base::File, 4> onDecks;
         for (int deck = 0; deck < 4; ++deck)
             onDecks[static_cast<std::size_t>(deck)] = dj.deck(deck).file;
         ImGuiListClipper clipper;
@@ -1457,12 +1529,12 @@ void DjView::drawTrackTable(const ImVec2 size)
 
 // ---- The control port --------------------------------------------------------------------------
 
-juce::var DjView::deckJson(const int index) const
+cydaw::base::Value DjView::deckJson(const int index) const
 {
     auto& dj = studio_.engine().dj();
     const auto deck = dj.deck(index);
     const auto channel = dj.channel(index);
-    auto* item = new juce::DynamicObject();
+    auto* item = new cydaw::base::Object();
     static constexpr const char* states[4] { "empty", "loading", "ready", "failed" };
     item->setProperty("deck", deckLetter(index));
     item->setProperty("state", states[static_cast<int>(deck.state)]);
@@ -1493,7 +1565,7 @@ juce::var DjView::deckJson(const int index) const
     item->setProperty("loopStart", deck.loopStart);
     item->setProperty("loopEnd", deck.loopEnd);
     item->setProperty("cuePoint", deck.cuePoint);
-    juce::Array<juce::var> cues;
+    cydaw::base::Array<cydaw::base::Value> cues;
     for (const auto cue : deck.hotCues)
         cues.add(cue);
     item->setProperty("hotCues", cues);
@@ -1502,10 +1574,10 @@ juce::var DjView::deckJson(const int index) const
     item->setProperty("fader", channel.fader);
     item->setProperty("effect", engine::dj::effectInfo(channel.effect.kind).key);
     item->setProperty("effectOn", channel.effect.on);
-    return juce::var(item);
+    return cydaw::base::Value(item);
 }
 
-juce::var DjView::command(const juce::var& request)
+cydaw::base::Value DjView::command(const cydaw::base::Value& request)
 {
     ensureLoaded();
     auto& dj = studio_.engine().dj();
@@ -1516,7 +1588,7 @@ juce::var DjView::command(const juce::var& request)
     }
     // A deck by its letter or its index.
     auto deck = -1;
-    if (const auto value = request.getProperty("deck", juce::var()); !value.isVoid()) {
+    if (const auto value = request.getProperty("deck", cydaw::base::Value()); !value.isVoid()) {
         if (value.isString()) {
             const auto letter = value.toString().trim().toUpperCase();
             deck = letter.isNotEmpty() ? static_cast<int>(letter[0] - 'A') : -1;
@@ -1524,17 +1596,17 @@ juce::var DjView::command(const juce::var& request)
             deck = static_cast<int>(value);
         }
     }
-    const auto needDeck = [&]() -> juce::String {
+    const auto needDeck = [&]() -> cydaw::base::Text {
         if (deck < 0 || deck >= DjEngine::deckCount)
             return "deck: A, B, C or D (or 0..3)";
         return {};
     };
-    juce::String error;
+    cydaw::base::Text error;
     if (action == "status" || action.isEmpty()) {
         // Below.
     } else if (action == "load") {
         if ((error = needDeck()).isEmpty()) {
-            const juce::File file(request.getProperty("file", juce::var()).toString());
+            const cydaw::base::File file(request.getProperty("file", cydaw::base::Value()).toString());
             if (!file.existsAsFile())
                 error = "no file \"" + file.getFullPathName() + "\"";
             else
@@ -1597,7 +1669,7 @@ juce::var DjView::command(const juce::var& request)
         if ((error = needDeck()).isEmpty()) {
             const auto state = dj.deck(deck);
             dj.setGrid(deck, number(request, "bpm", state.bpm), number(request, "firstBeat", state.firstBeat));
-            if (state.file != juce::File())
+            if (state.file != cydaw::base::File())
                 if (auto track = library_->find(state.file)) {
                     track->bpm = number(request, "bpm", state.bpm);
                     track->firstBeat = number(request, "firstBeat", state.firstBeat);
@@ -1619,11 +1691,11 @@ juce::var DjView::command(const juce::var& request)
             channel.resonance = static_cast<float>(number(request, "resonance", channel.resonance));
             channel.fader = static_cast<float>(number(request, "fader", channel.fader));
             channel.cue = flag(request, "cue", channel.cue);
-            if (const auto side = request.getProperty("side", juce::var()); !side.isVoid())
+            if (const auto side = request.getProperty("side", cydaw::base::Value()); !side.isVoid())
                 channel.side = side.isString() ? (side.toString().equalsIgnoreCase("left") ? 0 : side.toString().equalsIgnoreCase("right") ? 2 : 1)
                                                : static_cast<int>(side);
-            if (const auto effect = request.getProperty("effect", juce::var()); effect.isObject()) {
-                const auto kind = effect.getProperty("kind", juce::var()).toString();
+            if (const auto effect = request.getProperty("effect", cydaw::base::Value()); effect.isObject()) {
+                const auto kind = effect.getProperty("kind", cydaw::base::Value()).toString();
                 for (int k = 0; k < engine::dj::effectKindCount; ++k)
                     if (kind.equalsIgnoreCase(engine::dj::effectInfo(static_cast<engine::dj::EffectKind>(k)).key))
                         channel.effect.kind = static_cast<engine::dj::EffectKind>(k);
@@ -1651,8 +1723,8 @@ juce::var DjView::command(const juce::var& request)
             dj.setLimiter(flag(request, "limiter", true));
     } else if (action == "record") {
         if (flag(request, "on", true)) {
-            const auto path = request.getProperty("path", juce::var()).toString();
-            const auto result = path.isNotEmpty() ? dj.startRecording(juce::File(path)) : juce::Result::ok();
+            const auto path = request.getProperty("path", cydaw::base::Value()).toString();
+            const auto result = path.isNotEmpty() ? dj.startRecording(cydaw::base::File(path)) : cydaw::base::Result::ok();
             if (path.isEmpty())
                 startRecording();
             if (result.failed())
@@ -1661,15 +1733,15 @@ juce::var DjView::command(const juce::var& request)
             dj.stopRecording();
         }
     } else if (action == "folders") {
-        if (const auto add = request.getProperty("add", juce::var()).toString(); add.isNotEmpty())
-            library_->addFolder(juce::File(add));
-        if (const auto remove = request.getProperty("remove", juce::var()).toString(); remove.isNotEmpty())
-            library_->removeFolder(juce::File(remove));
+        if (const auto add = request.getProperty("add", cydaw::base::Value()).toString(); add.isNotEmpty())
+            library_->addFolder(cydaw::base::File(add));
+        if (const auto remove = request.getProperty("remove", cydaw::base::Value()).toString(); remove.isNotEmpty())
+            library_->removeFolder(cydaw::base::File(remove));
         if (flag(request, "scan", false))
             library_->rescan();
     } else if (action == "analyse") {
-        if (const auto file = request.getProperty("file", juce::var()).toString(); file.isNotEmpty())
-            library_->analyse(juce::File(file));
+        if (const auto file = request.getProperty("file", cydaw::base::Value()).toString(); file.isNotEmpty())
+            library_->analyse(cydaw::base::File(file));
         else
             library_->analyseAll();
     } else if (action == "tracks") {
@@ -1680,8 +1752,8 @@ juce::var DjView::command(const juce::var& request)
     }
     if (error.isNotEmpty())
         return error;
-    auto* result = new juce::DynamicObject();
-    juce::Array<juce::var> decks;
+    auto* result = new cydaw::base::Object();
+    cydaw::base::Array<cydaw::base::Value> decks;
     for (int index = 0; index < DjEngine::deckCount; ++index)
         decks.add(deckJson(index));
     result->setProperty("decks", decks);
@@ -1702,17 +1774,17 @@ juce::var DjView::command(const juce::var& request)
     const auto progress = library_->progress();
     result->setProperty("scanning", progress.scanning);
     result->setProperty("analysing", progress.waiting);
-    juce::Array<juce::var> folders;
+    cydaw::base::Array<cydaw::base::Value> folders;
     for (const auto& folder : library_->folders())
         folders.add(folder);
     result->setProperty("folders", folders);
     if (action == "tracks") {
-        juce::Array<juce::var> list;
-        const auto query = request.getProperty("query", juce::var()).toString().toLowerCase();
+        cydaw::base::Array<cydaw::base::Value> list;
+        const auto query = request.getProperty("query", cydaw::base::Value()).toString().toLowerCase();
         for (const auto& track : library_->tracks()) {
             if (query.isNotEmpty() && !(track.title + " " + track.artist + " " + track.file.getFileName()).toLowerCase().contains(query))
                 continue;
-            auto* item = new juce::DynamicObject();
+            auto* item = new cydaw::base::Object();
             item->setProperty("file", track.file.getFullPathName());
             item->setProperty("title", track.title);
             item->setProperty("artist", track.artist);
@@ -1723,12 +1795,12 @@ juce::var DjView::command(const juce::var& request)
             item->setProperty("seconds", track.seconds);
             item->setProperty("analysed", track.analysed);
             item->setProperty("plays", track.plays);
-            list.add(juce::var(item));
+            list.add(cydaw::base::Value(item));
         }
         result->setProperty("tracks", list);
     }
     result->setProperty("trackCount", static_cast<int>(library_->tracks().size()));
-    return juce::var(result);
+    return cydaw::base::Value(result);
 }
 
 } // namespace cydaw::v2

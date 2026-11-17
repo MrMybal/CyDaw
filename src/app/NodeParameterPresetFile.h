@@ -1,6 +1,7 @@
+#include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
+#include <cydaw/base/Utilities.h>
 
 #include <optional>
 
@@ -10,23 +11,23 @@ inline constexpr auto nodeParameterPresetFileExtension = ".cydawnode";
 inline constexpr auto nodeParameterPresetFileFormat =
     "CyDAW Node Parameter Preset";
 inline constexpr int nodeParameterPresetFileSchema = 1;
-inline constexpr juce::int64 maximumNodeParameterPresetBytes = 512 * 1024;
+inline constexpr std::int64_t maximumNodeParameterPresetBytes = 512 * 1024;
 
 struct NodeParameterPresetDocument {
-    juce::String name;
-    juce::String nodeTypeKey;
-    juce::String processorKey;
-    juce::String categoryKey;
-    juce::String description;
-    juce::StringArray tags;
-    juce::var parameters;
-    juce::var portDefaults;
+    cydaw::base::Text name;
+    cydaw::base::Text nodeTypeKey;
+    cydaw::base::Text processorKey;
+    cydaw::base::Text categoryKey;
+    cydaw::base::Text description;
+    cydaw::base::TextList tags;
+    cydaw::base::Value parameters;
+    cydaw::base::Value portDefaults;
 };
 
-[[nodiscard]] inline juce::var makeNodeParameterPresetDocument(
+[[nodiscard]] inline cydaw::base::Value makeNodeParameterPresetDocument(
     NodeParameterPresetDocument document)
 {
-    auto root = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto root = cydaw::base::Object::Ptr(new cydaw::base::Object());
     root->setProperty("format", nodeParameterPresetFileFormat);
     root->setProperty("schema", nodeParameterPresetFileSchema);
     root->setProperty("name", document.name.trim().substring(0, 128));
@@ -35,18 +36,18 @@ struct NodeParameterPresetDocument {
     root->setProperty("category", document.categoryKey.trim().substring(0, 192));
     root->setProperty("description",
                       document.description.trim().substring(0, 2'048));
-    juce::Array<juce::var> tags;
+    cydaw::base::Array<cydaw::base::Value> tags;
     for (const auto& tag : document.tags)
         if (tag.trim().isNotEmpty() && tags.size() < 64)
             tags.add(tag.trim().substring(0, 64));
     root->setProperty("tags", std::move(tags));
     root->setProperty("parameters", document.parameters);
     root->setProperty("portDefaults", document.portDefaults);
-    return juce::var(root.get());
+    return cydaw::base::Value(root.get());
 }
 
 [[nodiscard]] inline std::optional<NodeParameterPresetDocument>
-parseNodeParameterPresetDocument(const juce::var& value)
+parseNodeParameterPresetDocument(const cydaw::base::Value& value)
 {
     const auto* root = value.getDynamicObject();
     if (root == nullptr
@@ -84,10 +85,10 @@ parseNodeParameterPresetDocument(const juce::var& value)
     return document;
 }
 
-[[nodiscard]] inline juce::File userNodeParameterPresetDirectory()
+[[nodiscard]] inline cydaw::base::File userNodeParameterPresetDirectory()
 {
-    return juce::File::getSpecialLocation(
-               juce::File::userDocumentsDirectory)
+    return cydaw::base::File::getSpecialLocation(
+               cydaw::base::File::userDocumentsDirectory)
         .getChildFile("CyDAW")
         .getChildFile("Node Presets");
 }

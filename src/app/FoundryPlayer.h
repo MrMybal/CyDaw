@@ -1,10 +1,11 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/audio/Sources.h>
 #pragma once
 #include "ModeProcessor.h"
 #include <cydaw/realtime/RtPublisher.h>
 
 #include <cydaw/engine/FoundrySession.h>
 
-#include <juce_audio_basics/juce_audio_basics.h>
 
 #include <array>
 #include <atomic>
@@ -19,14 +20,14 @@
 
 namespace cydaw::app {
 
-class FoundryPlayer final : public juce::AudioSource {
+class FoundryPlayer final : public cydaw::audio::AudioSource {
 public:
     FoundryPlayer();
     ~FoundryPlayer() override;
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& output) override;
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output) override;
 
     // The session played from now on (an edit gives a new one; the place is
     // kept). Null: nothing.
@@ -38,7 +39,7 @@ public:
     [[nodiscard]] bool playing() const noexcept { return playing_.load(std::memory_order_acquire); }
     // Where it plays, in the session's frames.
     [[nodiscard]] double position() const noexcept { return position_.load(std::memory_order_relaxed); }
-    void setGainDb(float db) noexcept { gain_.store(juce::Decibels::decibelsToGain(db, -60.0f), std::memory_order_relaxed); }
+    void setGainDb(float db) noexcept { gain_.store(cydaw::audio::Decibels::decibelsToGain(db, -60.0f), std::memory_order_relaxed); }
     // The highest level of a side (0, 1) since the last look.
     [[nodiscard]] float takePeak(int side) noexcept;
 

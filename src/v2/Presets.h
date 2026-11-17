@@ -1,6 +1,6 @@
+#include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
 
 #include <vector>
 
@@ -28,25 +28,25 @@ namespace cydaw::v2::presets {
 inline constexpr auto fileExtension = ".cypreset";
 
 struct Entry {
-    juce::String name;
-    juce::File file;
+    cydaw::base::Text name;
+    cydaw::base::File file;
     bool factory {};
 };
 
 // A target as a folder name (what a file name may hold).
-[[nodiscard]] juce::String folderName(const juce::String& target);
-[[nodiscard]] juce::File userFolder(const juce::String& kind, const juce::String& target);
-[[nodiscard]] juce::File factoryFolder(const juce::String& kind, const juce::String& target);
+[[nodiscard]] cydaw::base::Text folderName(const cydaw::base::Text& target);
+[[nodiscard]] cydaw::base::File userFolder(const cydaw::base::Text& kind, const cydaw::base::Text& target);
+[[nodiscard]] cydaw::base::File factoryFolder(const cydaw::base::Text& kind, const cydaw::base::Text& target);
 // CyDAW's first, then the person's, each by name.
-[[nodiscard]] std::vector<Entry> list(const juce::String& kind, const juce::String& target);
-[[nodiscard]] const Entry* find(const std::vector<Entry>& entries, const juce::String& name);
+[[nodiscard]] std::vector<Entry> list(const cydaw::base::Text& kind, const cydaw::base::Text& target);
+[[nodiscard]] const Entry* find(const std::vector<Entry>& entries, const cydaw::base::Text& name);
 // Kept as the person's (one of that name replaced). False with `error`.
-bool save(const juce::String& kind, const juce::String& target, const juce::String& name, const juce::var& state,
-          juce::String& error);
+bool save(const cydaw::base::Text& kind, const cydaw::base::Text& target, const cydaw::base::Text& name, const cydaw::base::Value& state,
+          cydaw::base::Text& error);
 // The preset's state; void with `error` when the file is not one of that kind.
-[[nodiscard]] juce::var read(const Entry& entry, const juce::String& kind, juce::String& error);
+[[nodiscard]] cydaw::base::Value read(const Entry& entry, const cydaw::base::Text& kind, cydaw::base::Text& error);
 // The person's only: to the recycle bin; under another name.
-bool remove(const Entry& entry, juce::String& error);
-bool rename(const Entry& entry, const juce::String& name, juce::String& error);
+bool remove(const Entry& entry, cydaw::base::Text& error);
+bool rename(const Entry& entry, const cydaw::base::Text& name, cydaw::base::Text& error);
 
 } // namespace cydaw::v2::presets

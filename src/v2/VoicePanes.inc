@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Vocodeur, Dé-Esseur, Accordeur
 // (VoiceDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -17,68 +18,68 @@ constexpr double kVoiceCurveRate = 96'000.0;
 
 // ---- Shared ---
 
-juce::String voiceChoiceText(const voiced::VoiceChoice& choice, const bool hint)
+cydaw::base::Text voiceChoiceText(const voiced::VoiceChoice& choice, const bool hint)
 {
     if (hint)
-        return juce::String::fromUTF8(ui::french() ? choice.frenchHint : choice.englishHint);
-    return juce::String::fromUTF8(ui::french() ? choice.french : choice.english);
+        return cydaw::base::Text::fromUTF8(ui::french() ? choice.frenchHint : choice.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? choice.french : choice.english);
 }
-juce::String vocoderCarrierName(const int index)
+cydaw::base::Text vocoderCarrierName(const int index)
 {
     return voiceChoiceText(voiced::vocoderCarrierOf(static_cast<float>(index)), false);
 }
-juce::String vocoderCarrierHint(const int index)
+cydaw::base::Text vocoderCarrierHint(const int index)
 {
     return voiceChoiceText(voiced::vocoderCarrierOf(static_cast<float>(index)), true);
 }
-juce::String deEsserModeName(const int index)
+cydaw::base::Text deEsserModeName(const int index)
 {
     return voiceChoiceText(voiced::deEsserModeOf(static_cast<float>(index)), false);
 }
-juce::String deEsserModeHint(const int index)
+cydaw::base::Text deEsserModeHint(const int index)
 {
     return voiceChoiceText(voiced::deEsserModeOf(static_cast<float>(index)), true);
 }
-juce::String deEsserDetectorName(const int index)
+cydaw::base::Text deEsserDetectorName(const int index)
 {
     return voiceChoiceText(voiced::deEsserDetectorOf(static_cast<float>(index)), false);
 }
-juce::String deEsserDetectorHint(const int index)
+cydaw::base::Text deEsserDetectorHint(const int index)
 {
     return voiceChoiceText(voiced::deEsserDetectorOf(static_cast<float>(index)), true);
 }
-juce::String tunerDisplayName(const int index)
+cydaw::base::Text tunerDisplayName(const int index)
 {
     return voiceChoiceText(voiced::tunerDisplayOf(static_cast<float>(index)), false);
 }
 
 // "C#3" (in French "Do#3"); a dash for none.
-juce::String voiceNoteText(const int note)
+cydaw::base::Text voiceNoteText(const int note)
 {
     if (note < 0 || note > 127)
-        return juce::String::fromUTF8("\xe2\x80\x94");
+        return cydaw::base::Text::fromUTF8("\xe2\x80\x94");
     const auto pitchClass = static_cast<std::size_t>(voiced::voicePitchClassOf(note));
-    return juce::String::fromUTF8(ui::french() ? voiced::voiceNoteNamesFrench[pitchClass] : voiced::voiceNoteNamesEnglish[pitchClass])
-           + juce::String(voiced::voiceOctaveOf(note));
+    return cydaw::base::Text::fromUTF8(ui::french() ? voiced::voiceNoteNamesFrench[pitchClass] : voiced::voiceNoteNamesEnglish[pitchClass])
+           + cydaw::base::Text(voiced::voiceOctaveOf(note));
 }
 
-juce::String voiceHertz(const double hz)
+cydaw::base::Text voiceHertz(const double hz)
 {
     if (hz >= 1'000.0)
-        return juce::String(hz / 1'000.0, hz >= 10'000.0 ? 1 : 2) + " kHz";
-    return juce::String(hz, hz < 100.0 ? 1 : 0) + " Hz";
+        return cydaw::base::Text(hz / 1'000.0, hz >= 10'000.0 ? 1 : 2) + " kHz";
+    return cydaw::base::Text(hz, hz < 100.0 ? 1 : 0) + " Hz";
 }
 
 // "+3 st", "-0.5 st", "0 st".
-juce::String voiceSemitones(const double value)
+cydaw::base::Text voiceSemitones(const double value)
 {
     if (std::abs(value) < 0.05)
         return "0 st";
     const auto rounded = std::round(value);
-    const juce::String sign(value > 0.0 ? "+" : "");
+    const cydaw::base::Text sign(value > 0.0 ? "+" : "");
     if (std::abs(value - rounded) < 0.05)
-        return sign + juce::String(static_cast<int>(rounded)) + " st";
-    return sign + juce::String(value, 1) + " st";
+        return sign + cydaw::base::Text(static_cast<int>(rounded)) + " st";
+    return sign + cydaw::base::Text(value, 1) + " st";
 }
 
 // The processor's readings while they are fresh and there are enough of
@@ -123,7 +124,7 @@ bool voiceVocoderDisplay(std::vector<Param>& parameters, const Pane& pane, const
     const auto chooserX = large ? box.min.x + dp(4.0f) : box.max.x - chooserWidth - dp(6.0f);
     changed |= chooser("##vocoderCarrier", at(parameters, pane, voiced::vocoderCarrier), voiced::vocoderCarrierCount, vocoderCarrierName,
                        vocoderCarrierHint, ImVec2(chooserX, top), colour, set, chooserScale);
-    juce::String playing;
+    cydaw::base::Text playing;
     if (carrier == voiced::vocoderSawCarrier) {
         playing = voiceNoteText(static_cast<int>(std::lround(values[voiced::vocoderPitch])));
     } else if (carrier == voiced::vocoderFollowCarrier) {
@@ -229,7 +230,7 @@ bool voiceVocoderDisplay(std::vector<Param>& parameters, const Pane& pane, const
         const auto direction = to >= from ? 1.0f : -1.0f;
         list->AddTriangleFilled(ImVec2(to, y), ImVec2(to - head * direction, y + head * 0.7f * direction),
                                 ImVec2(to - head * direction, y - head * 0.7f * direction), arrow);
-        const auto label = juce::String("formants ") + voiceSemitones(formant);
+        const auto label = cydaw::base::Text("formants ") + voiceSemitones(formant);
         const auto size = textSize(label.toRawUTF8(), large ? 0.64f : 0.54f);
         const auto labelX = std::clamp(std::min(from, to), plot.min.x + dp(2.0f), plot.max.x - size.x - dp(2.0f));
         text(list, ImVec2(labelX, y + dp(3.0f)), arrow, label.toRawUTF8(), large ? 0.64f : 0.54f);
@@ -478,9 +479,9 @@ double voiceStrobePhase(std::vector<Param>& parameters, const Pane& pane, const 
         double phase {};
         double last {};
     };
-    static std::map<juce::String, Strobe> strobes;
+    static std::map<cydaw::base::Text, Strobe> strobes;
     const auto* first = at(parameters, pane, 0);
-    auto& strobe = strobes[first != nullptr ? first->binding : juce::String("?")];
+    auto& strobe = strobes[first != nullptr ? first->binding : cydaw::base::Text("?")];
     const auto now = ImGui::GetTime();
     const auto elapsed = std::clamp(now - strobe.last, 0.0, 0.1);
     strobe.last = now;
@@ -539,7 +540,7 @@ bool voiceTunerDisplay(std::vector<Param>& parameters, const Pane& pane, const B
         centred(list, ImVec2((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f), muted ? kDark : p.textDim, label, labelScale);
     }
     {
-        const auto label = juce::String(L("La4 = ", "A4 = ")) + juce::String(reference, std::abs(reference - std::round(reference)) < 0.05 ? 0 : 1)
+        const auto label = cydaw::base::Text(L("La4 = ", "A4 = ")) + cydaw::base::Text(reference, std::abs(reference - std::round(reference)) < 0.05 ? 0 : 1)
                            + " Hz";
         text(list, ImVec2(box.min.x + dp(6.0f), top + (rowHeight - textSize("A", labelScale).y) * 0.5f), p.textDim, label.toRawUTF8(),
              labelScale);
@@ -675,7 +676,7 @@ bool voiceLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& param
 // The values a card shows as knobs (pane indices).
 std::vector<int> voiceCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     if (kind == PaneKind::vocoder)
         return { voiced::vocoderMix, voiced::vocoderFormant, voiced::vocoderRelease, voiced::vocoderUnvoiced };
     if (kind == PaneKind::deEsser)
@@ -686,7 +687,7 @@ std::vector<int> voiceCardFields(const PaneKind kind, std::vector<Param>& parame
 }
 
 // A value as these effects show it; empty for none of theirs.
-juce::String voiceFormat(const juce::String& binding, const double value)
+cydaw::base::Text voiceFormat(const cydaw::base::Text& binding, const double value)
 {
     const auto is = [&binding](const char* suffix) { return binding.endsWith(suffix); };
     const auto onOff = [value] { return value >= 0.5 ? ui::Ls("Actif", "On") : ui::Ls("Coupé", "Off"); };
@@ -697,10 +698,10 @@ juce::String voiceFormat(const juce::String& binding, const double value)
     if (is("vocoder.formant"))
         return voiceSemitones(value);
     if (is("vocoder.bands"))
-        return juce::String(static_cast<int>(std::lround(value)));
+        return cydaw::base::Text(static_cast<int>(std::lround(value)));
     if (is("vocoder.detune"))
         return value < 0.005 ? ui::Ls("Aucun", "None")
-                             : juce::String::fromUTF8("\xc2\xb1") + juce::String(voiced::vocoderDetuneCentsOf(static_cast<float>(value)), 1) + " ct";
+                             : cydaw::base::Text::fromUTF8("\xc2\xb1") + cydaw::base::Text(voiced::vocoderDetuneCentsOf(static_cast<float>(value)), 1) + " ct";
     if (is("vocoder.tone")) {
         if (std::abs(value) < 0.005)
             return ui::Ls("Neutre", "Neutral");
@@ -709,9 +710,9 @@ juce::String voiceFormat(const juce::String& binding, const double value)
     if (is("vocoder.mix") || is("vocoder.unvoiced") || is("vocoder.stereo") || is("deesser.link"))
         return percent(value);
     if (is("vocoder.bandwidth"))
-        return juce::String::fromUTF8("\xc3\x97") + juce::String(value, 2);
+        return cydaw::base::Text::fromUTF8("\xc3\x97") + cydaw::base::Text(value, 2);
     if (is("vocoder.gate"))
-        return value <= -89.5 ? ui::Ls("Coupée", "Off") : juce::String(juce::roundToInt(value)) + " dB";
+        return value <= -89.5 ? ui::Ls("Coupée", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " dB";
     if (is("deesser.mode"))
         return deEsserModeName(whole(static_cast<float>(value), voiced::deEsserModeCount));
     if (is("deesser.detectorType"))
@@ -719,16 +720,16 @@ juce::String voiceFormat(const juce::String& binding, const double value)
     if (is("deesser.listen") || is("tuner.mute"))
         return onOff();
     if (is("deesser.bandwidth"))
-        return juce::String(value, 2) + " oct";
+        return cydaw::base::Text(value, 2) + " oct";
     if (is("tuner.displayMode"))
         return tunerDisplayName(whole(static_cast<float>(value), voiced::tunerDisplayCount));
     if (is("tuner.reference"))
-        return juce::String(value, std::abs(value - std::round(value)) < 0.05 ? 0 : 1) + " Hz";
+        return cydaw::base::Text(value, std::abs(value - std::round(value)) < 0.05 ? 0 : 1) + " Hz";
     return {};
 }
 
 // A parameter of theirs that takes whole steps (a choice, a switch).
-bool voiceStepped(const juce::String& binding)
+bool voiceStepped(const cydaw::base::Text& binding)
 {
     for (const auto* suffix : { "vocoder.carrier", "vocoder.bands", "vocoder.pitch", "deesser.mode", "deesser.detectorType",
                                 "deesser.listen", "tuner.mute", "tuner.displayMode" })

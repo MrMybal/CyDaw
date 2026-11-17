@@ -1,3 +1,5 @@
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "SampleCatalog.h"
@@ -5,7 +7,7 @@
 #include "UiState.h"
 
 #include <imgui.h>
-#include <juce_gui_basics/juce_gui_basics.h>
+
 
 #include <memory>
 #include <optional>
@@ -44,12 +46,14 @@ public:
         double buildMs {};
         double extractMs {};
         double frameMs {};
-        std::vector<std::pair<juce::String, std::vector<std::pair<juce::String, int>>>> facets;
-        juce::StringArray names; // the first rows
+        std::vector<std::pair<cydaw::base::Text, std::vector<std::pair<cydaw::base::Text, int>>>> facets;
+        cydaw::base::Value entries; // Visible device rows with their actual metadata.
+        cydaw::base::TextList names; // the first rows
     };
     // A search shown: text, semantic, a facet's values chosen by key.
-    void setSampleQuery(const juce::String& text, bool semantic, const std::vector<std::pair<int, juce::StringArray>>& chosen,
+    void setSampleQuery(const cydaw::base::Text& text, bool semantic, const std::vector<std::pair<int, cydaw::base::TextList>>& chosen,
                         int sortColumn, bool ascending);
+    void setDeviceQuery(int content, int role, const cydaw::base::Text* query = nullptr);
     [[nodiscard]] Probe probe();
 
 private:
@@ -61,12 +65,12 @@ private:
     // A column of the multi-column filter, as drawn.
     struct FacetEntry {
         int value {};
-        juce::String label;
+        cydaw::base::Text label;
         int count {};
         int family { -1 }; // a family's heading when the value is -1
     };
     struct FacetColumn {
-        juce::String title;
+        cydaw::base::Text title;
         std::vector<FacetEntry> entries;
         std::vector<char>* selected {};
         float weight { 1.0f };
@@ -77,13 +81,13 @@ private:
     void drawSamples();
     void drawSamplePreview(const SampleCatalog::Item* item, float width);
     // The "at tempo" switch, and the tempos of the loop heard.
-    void tempoSwitch(const juce::String& path);
+    void tempoSwitch(const cydaw::base::Text& path);
     void drawInstruments();
     void drawEffects();
     void requery();
-    void addSampleToTrack(const juce::String& path);
+    void addSampleToTrack(const cydaw::base::Text& path);
     void takeSemanticAnswer();
-    void report(const juce::String& message, bool error = false);
+    void report(const cydaw::base::Text& message, bool error = false);
     [[nodiscard]] std::optional<TrackRef> target() const;
     void picked();
 
@@ -109,17 +113,17 @@ private:
     bool semanticMode_ {};
     bool semanticPending_ {};
     double editedAt_ {};
-    juce::String semanticAsked_;
-    juce::String semanticEnglish_;
-    juce::String semanticSimilarTo_;
-    juce::String semanticError_;
-    std::vector<std::pair<juce::String, float>> semanticHits_;
-    juce::String selectedPath_;
+    cydaw::base::Text semanticAsked_;
+    cydaw::base::Text semanticEnglish_;
+    cydaw::base::Text semanticSimilarTo_;
+    cydaw::base::Text semanticError_;
+    std::vector<std::pair<cydaw::base::Text, float>> semanticHits_;
+    cydaw::base::Text selectedPath_;
     int selectedRow_ { -1 };
     bool scrollToSelected_ {};
     bool autoPreview_ { true };
     float facetHeight_ { 190.0f };
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 
     // ---- Instruments and effects: small, filtered each time they change.
     std::unique_ptr<Facets> instrumentFacets_;
@@ -128,12 +132,15 @@ private:
     bool downloading_ {};
     char instrumentSearch_[120] {};
     int selectedInstrument_ { -1 };
+    int instrumentContent_ {}; // all, native modules, presets, samples, user devices
     std::unique_ptr<Facets> effectFacets_;
     std::vector<EffectRow> effects_;
     std::optional<TrackRef> effectsFor_;
     double effectsTime_ { -100.0 };
     char effectSearch_[120] {};
     int selectedEffect_ { -1 };
+    int effectContent_ {}; // devices (default), presets, all
+    int effectRole_ {}; // all, audio, MIDI, instrument, control
     std::unique_ptr<PluginScan> plugins_;
 };
 

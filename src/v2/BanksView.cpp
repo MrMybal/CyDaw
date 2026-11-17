@@ -1,3 +1,6 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Text.h>
 #include "BanksView.h"
 
 #include "SamplerMapFile.h"
@@ -15,7 +18,7 @@ using ui::L;
 
 BanksView::BanksView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 
-void BanksView::report(const juce::String& text, const bool error)
+void BanksView::report(const cydaw::base::Text& text, const bool error)
 {
     if (text.isEmpty())
         return;
@@ -40,12 +43,12 @@ void BanksView::drawProgress()
                               : 0.0f;
     auto overlay = ui::sizeText(progress.bytesDone) + " / " + ui::sizeText(progress.bytesTotal);
     if (progress.bytesPerSecond > 0.0)
-        overlay << "  \xc2\xb7  " << ui::sizeText(static_cast<juce::int64>(progress.bytesPerSecond)) << "/s";
+        overlay << "  \xc2\xb7  " << ui::sizeText(static_cast<std::int64_t>(progress.bytesPerSecond)) << "/s";
     ImGui::ProgressBar(std::clamp(fraction, 0.0f, 1.0f), ImVec2(-dp(110.0f), 0.0f), overlay.toRawUTF8());
     ImGui::SameLine();
     if (ImGui::Button(L("Annuler", "Cancel"), ImVec2(-1.0f, 0.0f)))
         studio_.banks().cancel();
-    auto files = juce::String(progress.done) + " / " + juce::String(progress.total) + ui::Ls(" fichiers", " files");
+    auto files = cydaw::base::Text(progress.done) + " / " + cydaw::base::Text(progress.total) + ui::Ls(" fichiers", " files");
     if (progress.failed > 0)
         files << " \xc2\xb7 " << progress.failed << ui::Ls(" en échec : ", " failed: ") << progress.error;
     ImGui::TextColored(theme::vec(progress.failed > 0 ? p.record : p.textFaint), "%s", files.toRawUTF8());
@@ -61,7 +64,7 @@ void BanksView::drawDetails(const SoundBanks::Bank& bank)
     ImGui::PushTextWrapPos(0.0f);
     if (bank.description.isNotEmpty())
         ImGui::TextUnformatted(bank.description.toRawUTF8());
-    const auto row = [&p](const char* label, const juce::String& text, const juce::String& link = {}) {
+    const auto row = [&p](const char* label, const cydaw::base::Text& text, const cydaw::base::Text& link = {}) {
         if (text.isEmpty())
             return;
         ImGui::TextColored(theme::vec(p.textDim), "%s", label);
@@ -78,13 +81,13 @@ void BanksView::drawDetails(const SoundBanks::Bank& bank)
             ui::tooltip(link.toRawUTF8());
         }
         if (ImGui::IsItemClicked())
-            (void) juce::URL(link).launchInDefaultBrowser();
+            (void) cydaw::base::Url(link).launchInDefaultBrowser();
     };
     row(L("Auteur", "Author"), bank.author);
     row(L("Licence", "Licence"), bank.licence, bank.licenceUrl);
     const auto source = bank.homepage.isNotEmpty() ? bank.homepage
                         : bank.repository.isNotEmpty() ? "https://github.com/" + bank.repository
-                                                       : juce::String();
+                                                       : cydaw::base::Text();
     row(L("Provenance", "Source"), source, source);
     if (bank.commit.isNotEmpty())
         row(L("Version", "Version"), bank.commit.substring(0, 12));
@@ -158,7 +161,7 @@ void BanksView::draw()
             ImGui::TableNextColumn();
             if (ImGui::Selectable(bank.title.toRawUTF8(), selected_ == bank.id, ImGuiSelectableFlags_SpanAllColumns
                                                                                      | ImGuiSelectableFlags_AllowOverlap))
-                selected_ = selected_ == bank.id ? juce::String() : bank.id;
+                selected_ = selected_ == bank.id ? cydaw::base::Text() : bank.id;
             if (bank.author.isNotEmpty()) {
                 ImGui::SameLine();
                 ImGui::TextColored(theme::vec(p.textFaint), "%s", bank.author.toRawUTF8());
@@ -178,14 +181,14 @@ void BanksView::draw()
                 ImGui::TextColored(theme::vec(p.textFaint), "%s",
                                    bank.generator.isNotEmpty() ? L("à générer", "not generated") : L("à télécharger", "not downloaded"));
             else
-                ImGui::TextUnformatted((juce::String(disk->count) + " / " + juce::String(bank.count) + " \xc2\xb7 "
+                ImGui::TextUnformatted((cydaw::base::Text(disk->count) + " / " + cydaw::base::Text(bank.count) + " \xc2\xb7 "
                                         + ui::sizeText(disk->bytes))
                                            .toRawUTF8());
             ImGui::TableNextColumn();
             if (disk.has_value() && !complete) {
                 const auto generated = bank.generator.isNotEmpty();
                 const auto label = (generated ? ui::Ls("Générer ", "Generate ") : ui::Ls("Télécharger ", "Download "))
-                                   + ui::sizeText(std::max<juce::int64>(0, bank.bytes - disk->bytes));
+                                   + ui::sizeText(std::max<std::int64_t>(0, bank.bytes - disk->bytes));
                 if (ImGui::SmallButton(label.toRawUTF8())) {
                     const auto missing = banks.missingOfBank(bank.id);
                     if (missing.empty())
@@ -238,7 +241,7 @@ void BanksView::draw()
                              "They go to the recycle bin. The instruments that play them fall silent until they are "
                              "downloaded again; their sound models stay."));
         if (ui::primaryButton(L("Supprimer", "Remove"))) {
-            juce::String error;
+            cydaw::base::Text error;
             if (banks.remove(selected_, error))
                 report(ui::Ls("Échantillons supprimés", "Samples removed"), false);
             else
