@@ -334,7 +334,7 @@ public:
         : cydaw::audio::AudioFormatWriter(nullptr, writerName(format), options.getSampleRate(),
               static_cast<unsigned>(options.getNumChannels()), static_cast<unsigned>(options.getBitsPerSample())),
           bridge_(stream), stream_(std::make_shared<std::ostream>(&bridge_)), pointers_(numChannels), zero_(chunkFrames, 0.0f), format_(format), quality_(std::move(quality)) {
-        usesFloatingPointData = true; // JUCE source adapter passes normalized floats.
+        usesFloatingPointData = true; // Native source adapter passes normalized floats.
     }
     bool open(const cydaw::audio::AudioFormatWriterOptions& options) {
         if (options.getNumChannels() <= 0 || options.getNumChannels() > 256) return false;

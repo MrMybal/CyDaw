@@ -9,7 +9,7 @@ def main():
   env=dict(os.environ,CYDAW_NO_RECOVERY='1',CYDAW_SINGLE_VIEWPORT='1',CYDAW_LOCATIONS_FILE=str(locations),CYDAW_DJ_COLLECTION_FILE=str(scratch/'dj.json'),CYDAW_DJ_PROCESSING_FILE=str(scratch/'processing.json'),CYDAW_VIRTUAL_IO_FILE=str(scratch/'io.json'))
   startup=subprocess.STARTUPINFO();startup.dwFlags|=subprocess.STARTF_USESHOWWINDOW;startup.wShowWindow=0
   with (a.output/'app.log').open('w',encoding='utf-8') as log:
-   app=subprocess.Popen([str(a.exe.resolve()),'--silent','--language=en','--window-size=1800x1100',f'--control-port={a.port}'],cwd=scratch,env=env,startupinfo=startup,stdout=log,stderr=subprocess.STDOUT)
+   app=subprocess.Popen([str(a.exe.resolve()),'--hidden','--silent','--language=en','--window-size=1800x1100',f'--control-port={a.port}'],cwd=scratch,env=env,startupinfo=startup,stdout=log,stderr=subprocess.STDOUT)
    def raw(**data):
     with socket.create_connection(('127.0.0.1',a.port),timeout=5) as s:
      s.settimeout(120);s.sendall((json.dumps(data)+'\n').encode());return json.loads(s.makefile('rb').readline())
@@ -34,10 +34,10 @@ def main():
     events(dict(type='move',x=270,y=12),dict(type='down'),dict(type='up'))
     q(cmd='snapshot',path=str((a.output/'help-menu.png').resolve()))
     beforeMenu=help()['requests']
-    events(dict(type='move',x=315,y=33),dict(type='down'),dict(type='up'))
+    events(dict(type='move',x=315,y=43),dict(type='down'),dict(type='up'))
     assert help()['requests']==beforeMenu+1,'real Help > User manual'
     events(dict(type='move',x=270,y=12),dict(type='down'),dict(type='up'))
-    events(dict(type='move',x=315,y=75),dict(type='down'),dict(type='up'))
+    events(dict(type='move',x=315,y=86),dict(type='down'),dict(type='up'))
     assert help()['url'].endswith('#/en/shortcuts'),'real Help > Keyboard shortcuts'
     assert help()['engine']=='CyDoc';before=help()['requests'];shortcut()
     current=help();assert current['requests']==before+1 and current['url'].startswith('file:///') and current['launchSuppressed']

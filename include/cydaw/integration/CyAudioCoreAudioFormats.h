@@ -3,8 +3,7 @@
 #include <cyaudio/io/AudioFile.h>
 
 namespace cydaw::integration {
-// Transitional boundary only: sample decoding is CyAudioCore. JUCE's reader/source
-// interfaces remain until the desktop source graph has been ported. Metadata
+// Native CyAudioCore file adapters. Metadata
 // exposes typed WAV markers/regions/loops through the stable application vocabulary.
 // Supplemental legacy parsing preserves other formats and non-typed fields.
 void registerCyAudioCoreReaders(audio::AudioFormatManager&);

@@ -1,18 +1,19 @@
-# CyAudioCore integration — CyDSP-CORE
+# CyAudioCore integration
 
 CyDaw's production Windows desktop and isolated plugin worker configure and
 build without JUCE. CyAudioCore owns the CyDSP numerical dependency. The DAW
 uses `cyaudio` service APIs and `cydsp` processors, including internal/exported
 instruments and effects. Neither sibling repository is modified by this port.
 
-Current dependency revisions: CyAudioCore `f9b0c813c233e9d5d3cfdef6c8492bbe8f5548ea`,
-CyDSP `0d67c6a60749ef241a87bc3592fa63c61998a5e2` (0.3.2). See the
-[plugin sleep acceptance](CyAudioCorePluginSleep.fr.md) for this build. The earlier
-[15 November SDK update campaign](CyAudioCore032Update.fr.md) and the
-[14 November numerical integration campaign](CyDSPNumericalReuse.fr.md) rebuilds
-both libraries, desktop and worker from immutable source snapshots and records
-its numerical/RT tests and actual kernel costs. It migrates the base compressor,
-convolution sums, shared vector dispatch and coefficient/mixing operations.
+Release dependency revisions: CyAudioCore `8716ce67b0c3467017369cdc7745e8ff8ef147f2`,
+CyDSP `c1d9a52fce7ac90515b0e264545903fdad2901b4` (0.4.0), and
+CyUI `7a793e9281e78572818d85e9cf856d779a7792a1`. CI uses exact commits.
+See the [0.4 update acceptance](CyAudioCore040Update.fr.md),
+[DJ/Cinema cross-mode fix](CinemaDcFix.fr.md) and [native release report](NativeRelease.fr.md).
+Earlier [plugin sleep acceptance](CyAudioCorePluginSleep.fr.md),
+[15 November SDK update](CyAudioCore032Update.fr.md) and
+[numerical integration](CyDSPNumericalReuse.fr.md) retain their dated evidence.
+The sibling repositories are read-only; builds use immutable commit snapshots.
 
 The earlier [JUCE retirement snapshot](reports/JuceRetirementSourceSnapshot.json)
 and [13 November integration report](CyAudioCoreIntegrationReport.fr.md) describe
@@ -90,11 +91,11 @@ outside the MIT siblings and travel with builds/packages. `OFF` gives an
 SDK-free WASAPI/DirectSound build. Never enable global fast-math/AVX flags;
 CyDSP owns its per-kernel ISA dispatch.
 
-`CYDAW_BUILD_LEGACY_JUCE_TESTS=ON` explicitly opts into historical comparison
-fixtures. That option is OFF by default and those fixtures are not production
-runtime dependencies. `CYDAW_FETCH_JUCE` is OFF in native presets. A fresh
-Windows build's generated dependency graph is checked by
-`tests/no_juce_build_check.py` for actual includes and libraries.
+The historical JUCE build options and unused implementation files have been removed.
+Use `archive/juce-main-2026-11-17` for the previous main; dated comparison
+reports and their measurements are retained. A fresh Windows build's generated
+dependency graph and all active application/authoring sources are checked by
+`tests/no_juce_build_check.py` for JUCE includes, types and libraries.
 
 ## Validation and distribution
 
@@ -127,10 +128,10 @@ bank directory. Tests synthesize their other audio assets locally.
 
 The native/alpha workflows check out tested dependencies using
 `.github/actions/audio-dependencies`; private access requires
-`CYDAW_DEPENDENCIES_TOKEN`. Local integration does not push or publish anything.
+`CYDAW_DEPENDENCIES_TOKEN`. Release publication is an explicit workflow dispatch after the tested migration is merged into `main`.
 Packaging no longer requires a JUCE checkout/notice. It still verifies offline
 CyDoc resources, FFmpeg runtimes/corresponding sources and all native dependency
-notices. An explicitly supplied historical `--juce-source` remains optional.
+notices. Ignored personal templates and unfinished sound models are never collected into Alpha packages. The old `--juce-source` packaging switch is removed.
 
 The application executable remains `CyDAW 2.exe` internally for existing scripts;
 its user-facing product name is CyDaw. Runtime files stay beside the executable.

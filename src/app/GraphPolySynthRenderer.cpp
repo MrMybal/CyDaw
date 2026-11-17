@@ -45,7 +45,7 @@ public:
     bool appliesToChannel(int) override { return true; }
 };
 
-// A thin host: JUCE's voice bookkeeping around the engine's PolyVoice,
+// A thin host: native voice allocation around the engine's PolyVoice,
 // which is the same one a MIDI track plays.
 class GraphSynthVoice final : public cydaw::audio::AllocatedVoice, public PlanVoice {
 public:

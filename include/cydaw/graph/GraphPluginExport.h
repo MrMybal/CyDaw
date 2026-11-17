@@ -16,7 +16,7 @@ enum class PluginExportTarget : std::uint8_t {
 struct PluginIdentity {
     std::string productName;
     std::string companyName;
-    // Four printable ASCII characters. These become the stable JUCE/VST3
+    // Four printable ASCII characters. These become the stable plugin
     // manufacturer and plug-in codes of a generated wrapper.
     std::string manufacturerCode;
     std::string pluginCode;
@@ -94,7 +94,7 @@ struct PluginExportResult {
     [[nodiscard]] explicit operator bool() const noexcept { return ok(); }
 };
 
-// Produces the format-neutral contract consumed by the generated JUCE/VST3
+// Produces the format-neutral contract consumed by the generated native plugin
 // wrapper. It does not compile source code or touch the file system, so it can
 // also be used by a standalone editor or another host embedding CyDAW Graph.
 [[nodiscard]] PluginExportResult planVst3Export(

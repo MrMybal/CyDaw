@@ -25,7 +25,7 @@ def version():
     return match.group(1)
 
 
-def package(build, output, alpha=False, juce_source=None):
+def package(build, output, alpha=False):
     build, output = Path(build).resolve(), Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     name = 'CyDAW2-%s-Windows-x64-%s' % (version(), 'Alpha' if alpha else 'test')
@@ -62,11 +62,6 @@ def package(build, output, alpha=False, juce_source=None):
     for file in required:
         if not file.is_file():
             raise FileNotFoundError('Missing runtime file: ' + str(file))
-    # Only explicitly requested historical fixture builds carry a JUCE notice.
-    # Production CyDaw has no JUCE runtime or checkout requirement.
-    juce_licence = Path(juce_source) / 'LICENSE.md' if juce_source else None
-    if juce_licence is not None and not juce_licence.is_file():
-        raise FileNotFoundError('Requested historical JUCE notice is missing')
     # An incomplete offline manual must never silently ship in a release.
     spec = importlib.util.spec_from_file_location('cydaw_manual_validate',
         Path(__file__).resolve().parents[1] / '.CyDocBuild/tools/validate.py')
@@ -86,17 +81,11 @@ def package(build, output, alpha=False, juce_source=None):
                 shutil.copytree(source, stage / folder, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
         shutil.copytree(build / 'Documentation', stage / 'Documentation')
         (stage / 'templates').mkdir()
-        templates = ROOT / 'templates'
-        if templates.is_dir():
-            shutil.copytree(templates, stage / 'templates', dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns('*-comparaison-midi.cydaw', '*.v2-roundtrip.cydaw'))
         factory = ROOT / 'content/factory'
         if (factory / 'catalogue.json').is_file():
-            shutil.copytree(factory, stage / 'Factory', ignore=shutil.ignore_patterns('*.flac', '*.wav'))
+            shutil.copytree(factory, stage / 'Factory', ignore=shutil.ignore_patterns('*.flac', '*.wav', 'Sound Models'))
         shutil.copy2(ROOT / 'LICENSE', stage / 'LICENSE')
         shutil.copy2(ROOT / 'README.md', stage / 'README.md')
-        if juce_licence is not None:
-            shutil.copy2(juce_licence, stage / 'JUCE_LICENSE.md')
         for notice in (ROOT / 'third_party/imgui/LICENSE.txt', ROOT / 'third_party/zstd/LICENSE'):
             if notice.is_file():
                 destination = stage / 'Licenses' / notice.parent.name
@@ -106,11 +95,11 @@ def package(build, output, alpha=False, juce_source=None):
         for notice in font_notices.glob('*.txt'):
             shutil.copy2(notice, stage / 'fonts' / notice.name)
         if alpha:
-            text = ('CyDAW V2 ' + version() + ' - ALPHA\n\n'
+            text = ('CyDaw ' + version() + ' - ALPHA\n\n'
                     'Experimental Windows x64 preview. Extract the whole archive, then run CyDAW 2.exe.\n'
                     'Keep its DLLs and folders beside the executable. Choose Windows Audio in Options.\n'
                     'Factory sample banks are downloaded separately from Options > Sound banks.\n'
-                    'Local example projects and unfinished sound models may be absent from this build.\n'
+                    'Personal example projects and unfinished sound models are not included.\n'
                     'Compiling exported plugins requires C++ build tools and the CyDAW sources.\n\n'
                     'Version experimentale Windows x64. Extraire toute l archive puis lancer CyDAW 2.exe.\n'
                     'Conserver les DLL et dossiers a cote de l executable. Choisir Windows Audio dans Options.\n'
@@ -141,10 +130,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', type=Path, default=BUILD)
     parser.add_argument('--output', type=Path, default=ROOT / 'dist')
-    parser.add_argument('--juce-source', type=Path)
     parser.add_argument('--alpha', action='store_true')
     args = parser.parse_args()
-    package(args.build_dir, args.output, args.alpha, args.juce_source)
+    package(args.build_dir, args.output, args.alpha)
 
 
 if __name__ == '__main__':

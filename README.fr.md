@@ -12,24 +12,24 @@
     </td>
     <td width="300" align="right" valign="top">
       <p><sub>Licence de l’application</sub><br><a href="LICENSE"><strong>AGPL-3.0</strong></a></p>
-      <p><sub>Version</sub><br><a href="VERSION.fr.md"><strong>0.78.0 · Alpha 1</strong></a><br><strong>ALPHA</strong></p>
-      <p><a href="https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/CyDAW2-0.78.0-Windows-x64-Alpha.zip"><strong>Télécharger</strong></a><br><sub>Windows x64 · archive portable</sub></p>
+      <p><sub>Version</sub><br><a href="VERSION.fr.md"><strong>0.79.0 · Alpha 1</strong></a><br><strong>ALPHA</strong></p>
+      <p><a href="https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/CyDAW2-0.79.0-Windows-x64-Alpha.zip"><strong>Télécharger</strong></a><br><sub>Windows x64 · archive portable</sub></p>
     </td>
   </tr>
 </table>
 
 <h1 align="center">CyDaw</h1>
 
-> **Branche CyDSP-CORE :** l'intégration audio utilise désormais **CyAudioCore**,
+> **Moteur audio natif :** l'intégration audio utilise désormais **CyAudioCore**,
 > qui gère **CyDSP** en interne pour le calcul DSP, y compris les plugins internes/exportés.
 > Le desktop Windows et le worker isolé compilent sans JUCE. CyAudioCore assure
 > l’audio/MIDI, les fichiers et l’hébergement VST3/CLAP/LV2/JSFX ; CyUI assure l’interface. Voir le
 > [guide de compilation](docs/CyAudioCoreIntegration.md) et le
-> [rapport actuel](docs/CyAudioCoreIntegrationReport.fr.md).
+> [bilan de validation et limites restantes](docs/NativeRelease.fr.md).
 
 **CyDaw** est une station audionumérique open source pour les musiciens, sound designers et créateurs audio. Composez et arrangez un morceau, jouez un set DJ, montez des enregistrements, travaillez à l’image ou créez vos propres instruments et effets.
 
-> **ALPHA · 0.78.0 · Alpha 1**
+> **ALPHA · 0.79.0 · Alpha 1**
 >
 > Version expérimentale Windows x64 destinée aux essais et aux retours. Certaines fonctions peuvent être incomplètes. Consultez les [notes de version, évolutions des sources et limites connues](VERSION.fr.md). Les sources et le manuel en ligne peuvent être plus récents que l’archive Alpha 1 téléchargeable.
 
@@ -90,10 +90,10 @@ Ouvrez **Aide > Manuel utilisateur** ou **Ctrl+F1** pour le manuel embarqué. La
 
 L’archive publiée de l’application est **Windows 10/11 x64 · Alpha 1**. Les cibles de compilation/export n’impliquent pas des applications Linux ou macOS téléchargeables.
 
-1. [Télécharger CyDaw 0.78.0 Alpha 1](https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/CyDAW2-0.78.0-Windows-x64-Alpha.zip). Les [notes de publication](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.78.0-alpha.1) et [sommes SHA-256](https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/SHA256SUMS.txt) l’accompagnent.
+1. [Télécharger CyDaw 0.79.0 Alpha 1](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/CyDAW2-0.79.0-Windows-x64-Alpha.zip). Les [notes de publication](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.1) et [sommes SHA-256](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/SHA256SUMS.txt) l’accompagnent.
 2. Extraire toute l’archive dans un dossier accessible en écriture. Garder DLL, worker de plugins, polices, traductions et licences à côté de l’exécutable.
 3. Lancer **`CyDAW 2.exe`** (nom interne de l’exécutable), sélectionner **Windows Audio / WASAPI** dans les réglages audio et choisir les sorties reliées aux enceintes.
-4. Télécharger les banques souhaitées dans **Options > Banques de sons**. L’archive publiée n’active ni ASIO ni VST2.
+4. Télécharger les banques souhaitées dans **Options > Banques de sons**. L’Alpha Windows inclut WASAPI et ASIO (PortAudio avec le SDK GPL). VST2 n’est pas pris en charge.
 
 ## Sources, compilation et bibliothèques nécessaires
 
@@ -155,7 +155,7 @@ Ce tableau indexe les principaux composants ; il ne remplace pas leurs notices t
 ## Références et liens
 
 - [Présentation](https://mrmybal.github.io/CyDaw/?lang=fr) · [Manuel français](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/welcome) · [English manual](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/welcome).
-- [Notes de version](VERSION.fr.md) · [Alpha 1 publiée](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.78.0-alpha.1) · [Toutes les versions](https://github.com/MrMybal/CyDaw/releases).
+- [Notes de version](VERSION.fr.md) · [Alpha 1 publiée](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.1) · [Toutes les versions](https://github.com/MrMybal/CyDaw/releases).
 - [Dépôt des sources](https://github.com/MrMybal/CyDaw) · [Suivi des problèmes](https://github.com/MrMybal/CyDaw/issues).
 
 <details>

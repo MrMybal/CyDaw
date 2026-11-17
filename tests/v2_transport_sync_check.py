@@ -61,7 +61,12 @@ s=inject([[0xf2,80,0],[0xfb],[0xf8]])['transport'];assert s['playing'] and abs(s
 inject([[0xfc]])
 # Switch off individual received dimensions.
 cfg(protocol='midi-clock',target='studio',tempo=False,play=False,position=False)
-before=sync()['transport'];s=inject([[0xfa],[0xf2,1,0],[0xfb]])['transport'];assert s==before,(s,before)
+before=sync()['transport'];s=inject([[0xfa],[0xf2,1,0],[0xfb]])['transport']
+# Beat/second conversion may round the displayed double by a few ULPs.
+# 1 ns is below 1/20,000 of a sample at 48 kHz; an actual seek still fails.
+assert s.keys()==before.keys() and all(
+    math.isclose(s[key], before[key], rel_tol=0, abs_tol=1e-9) if key in ('position','bpm')
+    else s[key]==before[key] for key in before), (s,before)
 report['midi_clock']='tempo 100 BPM, Start/Stop/Continue/SPP, independent switches'
 # Fonderie uses its own session and cursor.
 q(cmd='foundry',action='open',file=str(tone.resolve()))

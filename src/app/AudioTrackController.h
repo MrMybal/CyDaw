@@ -367,7 +367,7 @@ private:
 // every track routed into it; one routed nowhere goes to the master. Each
 // track renders in its own format (mono to 7.1) and converts into what it
 // goes to (the master is stereo). Inputs are added and removed as with
-// juce::MixerAudioSource; the routing is published by the controller.
+// audio::MixerAudioSource; the routing is published by the controller.
 class TrackMixer final : public cydaw::audio::AudioSource, public DirectOutputSource {
 public:
     static constexpr std::size_t buses = RoutedInputReceiver::maximumBuses;

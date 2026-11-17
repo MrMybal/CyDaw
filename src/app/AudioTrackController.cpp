@@ -3782,7 +3782,7 @@ public:
     bool appliesToChannel(int) override { return true; }
 };
 
-// A thin host: JUCE's voice bookkeeping around the engine's PolyVoice,
+// A thin host: native voice allocation around the engine's PolyVoice,
 // which is the same one the graph editor's preview plays.
 // What the instrument's control cables put on its voices this block. Written
 // and read on the audio thread only, before the voices render.

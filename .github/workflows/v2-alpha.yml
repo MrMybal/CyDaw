@@ -1,5 +1,5 @@
-name: CyDAW V2 Alpha
-run-name: CyDAW V2 Alpha — ${{ inputs.tag }}
+name: CyDaw Alpha
+run-name: CyDaw Alpha — ${{ inputs.tag }}
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
       tag:
         description: Alpha release tag (v2-<CMake version>-alpha.<number>)
         required: true
-        default: v2-0.78.0-alpha.1
+        default: v2-0.79.0-alpha.1
 
 permissions:
   contents: read
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   windows-v2:
-    name: Build and verify CyDAW V2 / Windows x64
+    name: Build and verify CyDaw / Windows x64
     runs-on: windows-2022
     timeout-minutes: 90
     env:
@@ -57,7 +57,7 @@ jobs:
           if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6') { throw 'NASM checksum mismatch' }
           Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
           (Join-Path $env:RUNNER_TEMP 'nasm-2.16.03') | Out-File -FilePath $env:GITHUB_PATH -Append
-      - name: Configure CyDAW V2 Release
+      - name: Configure CyDaw Release
         run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=ON -DCYDAW_ENABLE_LTO=ON -DCYDAW_ENABLE_ASIO=ON
       - name: Build V2 and native tests
         run: cmake --build --preset desktop-windows-wasapi --parallel 2
@@ -91,7 +91,7 @@ jobs:
           if-no-files-found: ignore
 
   publish-alpha:
-    name: Publish CyDAW V2 Alpha
+    name: Publish CyDaw Alpha
     needs: windows-v2
     runs-on: ubuntu-24.04
     permissions:

@@ -2,49 +2,31 @@
 
 [Retour au README](README.fr.md) · [English](VERSION.md)
 
-**Application publiée : 0.78.0 · Alpha 1**<br>
-**Statut : ALPHA · Windows x64**<br>
-**Tag : `v2-0.78.0-alpha.1` · 3 novembre 2026**
+**0.79.0 · Alpha 1 · Windows x64**<br>
+**Tag : `v2-0.79.0-alpha.1` · 17 novembre 2026**
 
-CyDaw est le nom public du produit. Le tag de publication, la cible `CyDAW2` et `CyDAW 2.exe` conservent le nommage interne.
+Le nom public reste CyDaw. Les cibles de compilation, l’exécutable `CyDAW 2.exe` et les tags conservent leur nomenclature interne.
 
-## Alpha 1 publiée
+## Moteur audio natif
 
-La [publication officielle](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.78.0-alpha.1) a été compilée depuis [c159b7d](https://github.com/MrMybal/CyDaw/commit/c159b7d08ef61bcf64b6df97b3bd8f27e7fe2712). Ses notes décrivent :
+Cette Alpha remplace l’intégration JUCE par **CyAudioCore**, qui utilise sa dépendance **CyDSP** pour les traitements natifs. Le desktop, le worker isolé, les périphériques audio/MIDI, les codecs et les exports VST3/CLAP/LV2 natifs compilent sans JUCE. Les anciens adaptateurs, éditeurs et outils JUCE ont été retirés ; les rapports historiques de comparaison restent consultables.
 
-- Studio, Mix DJ, Fonderie, Cinéma, Traitements et Atelier Plugin.
-- Instruments/effets natifs, hébergement isolé VST3/CLAP/LV2/JSFX et codecs vidéo.
-- Contrôles CyUI modulaires, thèmes, éditeurs de sources natifs, aperçu Cinéma et brouillons de propriétés du master.
-- Windows Audio / WASAPI ; cette archive n’active ni ASIO ni VST2.
-- Banques d’usine téléchargées séparément ; exemples locaux et modèles de son inachevés peuvent être absents.
+- WASAPI et ASIO via l’intégration PortAudio/SDK GPL portée par l’application.
+- Hébergement isolé VST3, CLAP, LV2 et JSFX, avec mise en veille des plugins.
+- Pont contrôleur/MIDI direct pour le clavier de l’ordinateur et contrôleurs programmables.
+- Contrôles de modules nommés, filtres de bibliothèque plus clairs, automation Master/bus dans Arrangement et dézoom MIDI étendu.
+- Cadence d’interface configurable et commandes de fenêtre Windows intégrées.
+- Retours CUE ASIO corrigés, longueur exacte des enregistrements WAV et silence après pause DJ lors des transitions Studio/Cinéma.
+- Aide CyDoc illustrée anglais/français, intégralement consultable hors ligne.
 
-[Télécharger l’archive de l’application](https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/CyDAW2-0.78.0-Windows-x64-Alpha.zip) · [Sommes SHA-256](https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/SHA256SUMS.txt). Conserver le dossier extrait complet, ses DLL et ses notices.
+[Télécharger l’Alpha Windows](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/CyDAW2-0.79.0-Windows-x64-Alpha.zip) · [État de publication](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.1) · [SHA-256](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/SHA256SUMS.txt)
 
-## Évolutions des sources depuis cette publication
+Extraire l’archive complète et conserver DLL, documentation, polices et notices avec l’exécutable. Les banques d’usine se téléchargent séparément. Les projets personnels de test et les modèles de son inachevés sont exclus.
 
-L’arbre courant déclare toujours la version **0.78.0** dans [CMakeLists.txt](CMakeLists.txt). Ces évolutions ultérieures n’impliquent pas une recompilation de l’archive Alpha 1 :
+## Validation et limites restantes
 
-- Migration de l’aide hors ligne vers le lecteur CyDoc 0.1.0 fixé, avec guides anglais/français et références des API publiques.
-- Vitrine bilingue illustrée, manuel HTML distinct, redirections de compatibilité et déploiement Pages automatisé.
-- Nom public **CyDaw** sans suffixe interne ; README et notes de version désormais entièrement en anglais/français.
+Voir le [bilan de livraison native](docs/NativeRelease.fr.md), les [comparaisons](docs/CyAudioCoreComparison.fr.md), la [mise à jour CUE/export](docs/CyAudioCore040Update.fr.md) et la [correction audio entre modes](docs/CinemaDcFix.fr.md).
 
-Voir les [commits depuis l’Alpha 1](https://github.com/MrMybal/CyDaw/compare/v2-0.78.0-alpha.1...main), le [manuel en ligne](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/welcome) et l’[historique des publications](https://github.com/MrMybal/CyDaw/releases). Le téléchargement ci-dessus reste l’archive Alpha 1 publiée.
+La migration ne garantit pas un rendu identique au bit près pour tous les anciens projets. Le projet historique 08 présente encore environ **0,49 dB** d’écart au niveau de sa chaîne, ainsi qu’une différence sur le premier bloc après rechargement. Ces constats restent documentés. Les applications Linux/macOS ne font pas partie de cette livraison ; l’export de plugins macOS reste reporté. Compiler des plugins natifs exige les sources et les outils C++ adaptés. La compatibilité des plugins et imports doit aussi être vérifiée avec les projets habituels de l’utilisateur.
 
-## Problèmes connus
-
-Les notes de publication ne fournissent pas de liste détaillée de bugs confirmés. Consulter le [suivi des problèmes](https://github.com/MrMybal/CyDaw/issues) ou [créer un signalement](https://github.com/MrMybal/CyDaw/issues/new). Les limites ci-dessous sont documentées ; ce ne sont ni des tickets inventés ni une affirmation d’absence de bugs.
-
-## Limites documentées
-
-- L’application publiée est uniquement pour Windows x64 ; les presets des sources et cibles d’export Linux ne sont pas des applications Linux/macOS téléchargeables.
-- L’hébergement externe VST3/CLAP/LV2/JSFX passe actuellement par les pistes audio. Il ne fournit ni instruments externes sur pistes MIDI ni effets sur les bus matériels/master. Les extensions CLAP de pool de threads/modulation par note ne sont pas annoncées.
-- Compiler un plugin natif demande les sources et outils adaptés. Les exports Linux nécessitent X11/OpenGL et une vérification dans un hôte Linux ; l’export macOS est reporté. Certains nœuds/conteneurs, dont les pads de Drum Machine, sont exclus ; utiliser la vérification d’export de l’Atelier.
-- Les transferts `.cydawdevice` listent les médias externes sans recopier les banques entières. La fidélité des imports de projets varie ; comparer à un rendu de référence.
-- Les codecs audio/vidéo dépendent des bibliothèques partagées fournies. Banques et modèles de recherche facultatifs se téléchargent séparément. Modèles de son et exemples locaux peuvent être absents.
-- Les protocoles de transport exigent des pairs compatibles ; ils ne transportent pas l’audio et ne verrouillent pas plusieurs cartes son à l’échantillon près.
-- Le manuel en ligne/des sources courantes peut différer de l’aide embarquée dans l’ancienne archive. Modifier le README ou le site ne crée pas une nouvelle version de l’application.
-
-## Références
-
-- [Formats de plugins et limites d’export](docs/PLUGIN_FORMATS.md) · [Transport](docs/TRANSPORT_SYNC.md) · [FFmpeg](third_party/FFMPEG.md).
-- [Licence de l’application](LICENSE) · [Crédits d’usine](content/factory/LICENCE.txt).
+L’ancien main JUCE est conservé par `archive/juce-main-2026-11-17`. Les anciens packages restent dans l’[historique des publications](https://github.com/MrMybal/CyDaw/releases).

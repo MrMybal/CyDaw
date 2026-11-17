@@ -28,3 +28,11 @@ for name in ("CyDAW2.vcxproj", "CyDAWPluginWorker.vcxproj"):
 assert not (build / "JUCE").exists(), "Strict build unexpectedly configured JUCE"
 assert not (build / "_deps/juce-src").exists(), "Strict build unexpectedly fetched JUCE"
 print(f"Production desktop + worker: {len(seen)} generated dependency projects, no JUCE includes or libraries")
+
+source = pathlib.Path(__file__).resolve().parents[1]
+for folder in ("src", "include", "tools"):
+    for path in (source / folder).rglob("*"):
+        if path.suffix in {".h", ".hpp", ".cpp", ".mm"}:
+            assert not re.search(r"#\s*include\s*[<\"]juce_|\bjuce::", path.read_text("utf-8")), path
+assert not re.search(r"FetchContent_Declare\(JUCE|juce_add_|juce::", (source / "CMakeLists.txt").read_text("utf-8")), "Legacy CMake dependency returned"
+print("Active application and authoring tools contain no JUCE includes or types")
