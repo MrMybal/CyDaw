@@ -560,13 +560,15 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
                 find_package(Python3 3.12 REQUIRED COMPONENTS Interpreter)
             endif()
             add_executable(CyDAW2 WIN32)
+            set(CYDAW_DESKTOP_RUNTIME_ROOT "${CMAKE_BINARY_DIR}/CyDAW2_artefacts" CACHE PATH
+                "Runtime output root; override to build beside an already running portable copy")
             set_target_properties(CyDAW2 PROPERTIES OUTPUT_NAME "CyDAW 2"
-                RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CyDAW2_artefacts/$<CONFIG>")
+                RUNTIME_OUTPUT_DIRECTORY "${CYDAW_DESKTOP_RUNTIME_ROOT}/$<CONFIG>")
             include(cmake/NativeDesktopResources.cmake)
             cydaw_native_desktop_resources(CyDAW2)
             # Header-only Link transport (no audio sharing) and JACK's dynamically loaded control API.
             include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/ableton-link/AbletonLinkConfig.cmake")
-            target_link_libraries(CyDAW2 PRIVATE Ableton::Link ws2_32 iphlpapi)
+            target_link_libraries(CyDAW2 PRIVATE Ableton::Link ws2_32 iphlpapi advapi32)
             include("${CMAKE_CURRENT_SOURCE_DIR}/src/v2/FFmpeg.cmake")
             target_compile_definitions(CyDAW2 PRIVATE ASIO_STANDALONE)
             target_include_directories(CyDAW2 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/jack-transport/include")
@@ -578,6 +580,8 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
             target_sources(CyDAW2 PRIVATE
                 src/v2/HelpDocumentation.cpp
                 src/v2/HelpDocumentation.h
+                src/v2/ProjectFileAssociation.cpp
+                src/v2/ProjectFileAssociation.h
                 src/v2/Main.cpp
                 src/v2/HiddenDesktop.cpp
                 src/v2/Processing.cpp
@@ -808,6 +812,15 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
                 cydaw_configure_test(cydaw_cyui_tests 60)
             endif()
             if(CYDAW_BUILD_TESTS AND Python3_Interpreter_FOUND AND MSVC)
+                add_executable(cydaw_project_file_tests tests/ProjectFileAssociationTests.cpp src/v2/ProjectFileAssociation.cpp)
+                target_include_directories(cydaw_project_file_tests PRIVATE src/v2)
+                target_compile_features(cydaw_project_file_tests PRIVATE cxx_std_20)
+                target_compile_definitions(cydaw_project_file_tests PRIVATE UNICODE _UNICODE)
+                target_compile_options(cydaw_project_file_tests PRIVATE /utf-8)
+                target_link_libraries(cydaw_project_file_tests PRIVATE advapi32 shell32)
+                add_dependencies(cydaw_project_file_tests CyDAW2)
+                add_test(NAME cydaw_project_file_association COMMAND cydaw_project_file_tests "$<TARGET_FILE:CyDAW2>")
+                cydaw_configure_test(cydaw_project_file_association 30)
                 add_test(NAME cydaw_no_juce_production_graph COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/no_juce_build_check.py" "${CMAKE_BINARY_DIR}")
                 cydaw_configure_test(cydaw_no_juce_production_graph 30)
                 add_test(NAME cydaw_native_headless COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/native_headless_check.py"

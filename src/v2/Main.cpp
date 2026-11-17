@@ -13,6 +13,7 @@
 #include <cydaw/engine/EffectProcessors.h>
 #include "RemoteControlServer.h"
 #include "CrashReport.h"
+#include "ProjectFileAssociation.h"
 #include "ImGuiHost.h"
 #include "Studio.h"
 #include "Widgets.h"
@@ -62,6 +63,7 @@ struct LaunchOptions {
     cydaw::base::File dumpGraphs;
     cydaw::base::File saveAs;
     bool audioSettings {};
+    bool registerProjectFiles {};
     cydaw::base::File roundTrip;
     cydaw::base::File modulationTest;
     cydaw::base::File displayTest;
@@ -109,6 +111,8 @@ LaunchOptions parseOptions(const cydaw::base::Text& commandLine)
             options.detach = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
         else if (value.startsWith("--control-port="))
             options.controlPort = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
+        else if (value == "--register-project-files")
+            options.registerProjectFiles = true;
         else if (value == "--audio-settings")
             options.audioSettings = true;
         else if (value.startsWith("--save-as="))
@@ -977,6 +981,15 @@ public:
     {
         installCrashReport();
         options_ = parseOptions(commandLine);
+        if (options_.registerProjectFiles) {
+            const auto registered = shell::registerCurrentProjectFiles();
+            std::printf("CyDaw project files: status=%lu changed=%d default=%d\n",
+                static_cast<unsigned long>(registered.error), registered.changed, registered.defaultAssigned);
+            std::fflush(stdout);
+            setApplicationReturnValue(registered ? 0 : 1);
+            quit();
+            return;
+        }
         if (options_.language.isNotEmpty())
             (void) app::Localization::instance().setLanguage(options_.language);
         ui::setLanguage(app::Localization::instance().languageCode());
@@ -1020,6 +1033,11 @@ public:
 
         // Probes keep the speakers silent and leave the saved device alone.
         const auto probe = options_.snapshot != cydaw::base::File {};
+        if (!options_.hidden && !options_.silent && !probe) {
+            const auto registered = shell::registerCurrentProjectFiles();
+            if (!registered) std::fprintf(stderr, "CyDaw project file registration failed (%lu)\n",
+                static_cast<unsigned long>(registered.error));
+        }
         // Automated sessions (the MCP check) leave no copy to recover.
         noRecovery_ = probe || cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isNotEmpty();
         // Where things are kept: the person's choices, which automated
