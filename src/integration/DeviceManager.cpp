@@ -1,4 +1,6 @@
 #include <chrono>
+#include <cstdlib>
+#include <string_view>
 #include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
 #include <map>
@@ -97,6 +99,14 @@ struct DeviceManager::Impl final : audio::DeviceCallback, midi::InputCallback {
 namespace {
 std::vector<std::unique_ptr<audio::DeviceType>> platformTypes() {
   std::vector<std::unique_ptr<audio::DeviceType>> types;
+  // Explicit test-only selection: the same Core callback path, clocked by its
+  // null backend, with no enumeration or access to physical audio devices.
+  const auto* virtualAudio = std::getenv("CYDAW_TEST_VIRTUAL_AUDIO");
+  if (virtualAudio && std::string_view(virtualAudio) == "1") {
+    types.push_back(createNativeCoreDeviceType("Virtual Audio (test only)",
+                                               cyaudio::AudioBackend::nullDevice));
+    return types;
+  }
 #if defined(_WIN32)
   types.push_back(createNativeCoreDeviceType("Windows Audio",
                                              cyaudio::AudioBackend::wasapi));

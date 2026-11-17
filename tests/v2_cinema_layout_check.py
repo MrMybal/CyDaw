@@ -79,7 +79,7 @@ try:
     c(action='view',start=0,seconds=2,length=30);c(action='cursor',at=.1,seconds=True);c(action='play')
     navigate(-40,0);assert tab()['followPaused']
     c(action='view',start=20,seconds=2);events(dict(type='wait',frames=6));assert tab()['viewStart']==20
-    c(action='stop');events(dict(type='wait',frames=3));assert not tab()['followPaused']
+    c(action='stop');wait(lambda:not tab()['followPaused'])  # Stop is acknowledged by the audio callback.
     report['manualNavigationPausesPlaybackFollowing']=True
     screenshot('double-band-navigator.png')
     # Mouse-wheel zoom must retain the time under the pointer.

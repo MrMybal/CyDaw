@@ -300,5 +300,23 @@
     "First block after reload still differs in paired tests",
     "No new Linux/macOS runtime acceptance",
     "Physical ASIO and PCM acceptance belongs to the preceding 17 November campaign; this cleanup did not remeasure latency or CPU"
-  ]
+  ],
+  "headlessCi": {
+    "firstAlphaRun": 44005966276,
+    "firstNativeTestCount": 47,
+    "firstNativeFailures": 4,
+    "publishedAfterFailure": false,
+    "workerFixedRun": 44007436310,
+    "workerFixedConclusion": "success",
+    "mode": "CYDAW_TEST_VIRTUAL_AUDIO=1",
+    "defaultEnabled": false,
+    "backend": "CyAudioCore nullDevice",
+    "simulatedNotPhysical": true,
+    "localFocusedCases": 5,
+    "localFocusedFailures": 0,
+    "oversizedRender": [
+      2816,
+      1568
+    ]
+  }
 }

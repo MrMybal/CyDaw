@@ -45,3 +45,15 @@ Les preuves brutes sont dans `output/native-release-2026-11-17/` : builds, JUnit
 La comparaison historique du projet 08 garde environ 0,49 dB d’écart et une différence sur le premier bloc après rechargement. La campagne n’établit pas une équivalence universelle ni de nouveaux chiffres de CPU/latence. Les validations ASIO physiques et PCM du 17 novembre sont documentées dans [la mise à jour Core](CyAudioCore040Update.fr.md) et [la correction DJ/Cinéma](CinemaDcFix.fr.md) ; elles ne sont pas présentées comme remesurées par ce nettoyage. Linux/macOS ne sont pas revalidés pour cette livraison Windows.
 
 La publication utilise le workflow `v2-alpha.yml`, après fusion dans `main`, avec le tag `v2-0.79.0-alpha.1`. Le workflow reconstruit, teste, package et publie une préversion, avec les DLL, ressources locales, notices et sommes SHA-256.
+
+## Ajustements après la première exécution GitHub
+
+Le worker Windows GUI compilait, mais PowerShell pouvait lire son résultat avant sa fin : `worker_protocol_check.py` attend et capture ses pipes. Le workflow natif corrigé passe sur GitHub (`44007436310`).
+
+La première Alpha distante (`44005966276`) a compilé et passé le packaging, puis conservé quatre échecs sur 47 tests : transport DJ/Cinéma sans carte son, et vignettes sur une fenêtre plafonnée par l’écran 1024 pixels du runner. La publication a été bloquée par ces tests.
+
+Le mode explicitement activé par `CYDAW_TEST_VIRTUAL_AUDIO=1` sélectionne uniquement le backend **null** existant de CyAudioCore, sans énumérer les cartes physiques. Il est désactivé par défaut. Le même chemin de callback/mixage/DSP fonctionne avec une horloge simulée : ces résultats ne sont pas des mesures ASIO ou de latence physique.
+
+Les fenêtres masquées respectent maintenant `--window-size`, même au-delà de l’écran disponible ; la taille est réappliquée après installation des données HWND. Les fenêtres visibles gardent les limites normales du moniteur. Le nouveau test `cydaw_native_headless` vérifie un PNG réellement rendu à 2816 × 1568, le backend virtuel isolé et l’avancement du transport. Le test Cinéma attend l’acquittement asynchrone de l’arrêt plutôt que trois frames UI arbitraires.
+
+Les cinq contrôles concernés passent localement avec le backend virtuel, sans retirer leurs assertions de lecture, de niveau, de montage ou de vignettes. Preuves : `virtual-acceptance.log` conserve le premier constat de course à l’arrêt ; `virtual-verified.log/.xml` confirme les cinq contrôles corrigés ; `headless-regression/checks.json` conserve les dimensions du rendu. Le workflow Alpha garde les diagnostics et captures synthétiques en cas d’échec.

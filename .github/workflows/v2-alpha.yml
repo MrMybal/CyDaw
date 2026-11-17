@@ -66,6 +66,9 @@ jobs:
           CYDAW_TEST_HELP_ROOT: build/windows-wasapi/Documentation
         run: python tests/v2_package_check.py
       - name: Native tests
+        # Clock the actual Core/DSP graph without requiring runner hardware.
+        env:
+          CYDAW_TEST_VIRTUAL_AUDIO: '1'
         run: ctest --preset desktop-windows-wasapi --parallel 2
       - name: Package Alpha
         run: >-
@@ -88,6 +91,8 @@ jobs:
             build/windows-wasapi/Testing/Temporary/LastTest.log
             build/windows-wasapi/Testing/Temporary/LastTestsFailed.log
             build/windows-wasapi/CMakeFiles/CMakeConfigureLog.yaml
+            build/windows-wasapi/cinema-*-check/**
+            build/windows-wasapi/transport-check/**
           if-no-files-found: ignore
 
   publish-alpha:

@@ -145,6 +145,7 @@ class MainWindow final {
     HWND window_{};
     std::unique_ptr<MainContent> content_;
     bool hidden_{};
+    POINT automationSize_{};
     std::function<void()> close_;
     int hitTest(const int x, const int y) const {
         RECT bounds{};GetWindowRect(window_, &bounds);
@@ -187,6 +188,12 @@ class MainWindow final {
             if(message==WM_SIZE&&w!=SIZE_MINIMIZED){if(self->content_)self->content_->host().setBounds({0,0,int(LOWORD(l)),int(HIWORD(l))});return 0;}
             if(message==WM_GETMINMAXINFO){
                 auto* info=reinterpret_cast<MINMAXINFO*>(l);
+                // Hidden automation surfaces must honour --window-size even
+                // when a headless runner exposes only a 1024x768 monitor.
+                if(self->hidden_) {
+                    info->ptMaxTrackSize.x=std::max(info->ptMaxTrackSize.x,self->automationSize_.x);
+                    info->ptMaxTrackSize.y=std::max(info->ptMaxTrackSize.y,self->automationSize_.y);
+                }
                 const auto dpi=GetDpiForWindow(window);const auto scale=dpi?dpi:96;
                 info->ptMinTrackSize={MulDiv(960,scale,96),MulDiv(600,scale,96)};
                 MONITORINFO monitor{sizeof(monitor)};
@@ -207,7 +214,7 @@ class MainWindow final {
     }
 public:
     MainWindow(Studio& studio,const LaunchOptions& options,std::function<void()> close,std::function<void()> forceQuit)
-        :content_(std::make_unique<MainContent>(studio)),hidden_(options.hidden),close_(std::move(close)) {
+        :content_(std::make_unique<MainContent>(studio)),hidden_(options.hidden),automationSize_{options.width,options.height},close_(std::move(close)) {
         WNDCLASSEXW type{sizeof(type)};type.style=CS_DBLCLKS;type.lpfnWndProc=proc;type.hInstance=GetModuleHandleW(nullptr);type.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));type.hbrBackground=static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));type.lpszClassName=L"CyDaw.Desktop";type.hIcon=LoadIconW(type.hInstance,MAKEINTRESOURCEW(101));RegisterClassExW(&type);
         const DWORD style=WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN;const DWORD extra=hidden_?WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE:WS_EX_APPWINDOW;
         RECT bounds{0,0,options.width,options.height};
@@ -216,6 +223,9 @@ public:
         window_=CreateWindowExW(extra,type.lpszClassName,L"CyDaw",style,x,y,bounds.right-bounds.left,bounds.bottom-bounds.top,nullptr,nullptr,type.hInstance,this);
         if(!window_)throw std::runtime_error("CyDaw main window creation failed");
         SetWindowPos(window_,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+        // The initial WM_GETMINMAXINFO can precede WM_NCCREATE/user data.
+        // Reapply the requested hidden size now that our track limit is active.
+        if(hidden_)SetWindowPos(window_,nullptr,0,0,options.width,options.height,SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE);
         const MARGINS shadow{1,1,1,1};DwmExtendFrameIntoClientArea(window_,&shadow);
         content_->host().onWindowHitTest=[this](int x,int y){return hitTest(x,y);};
         content_->host().windowMaximized=[this]{return IsZoomed(window_)!=FALSE;};
