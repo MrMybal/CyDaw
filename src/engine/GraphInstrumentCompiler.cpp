@@ -381,6 +381,9 @@ GraphInstrumentCompileResult compileGraphInstrument(
     const auto* envelope = firstNode(flattener.nodes, "core.adsr");
     const auto* amplifier = firstNode(flattener.nodes, "core.gain");
     const auto* filter = firstNode(flattener.nodes, "core.lowpass");
+    const auto compact = allocator != nullptr && oscillator != nullptr
+        && graph::hasCompleteVoice(oscillator->processorKey)
+        && (envelope == nullptr || !reaches(flattener.connections, allocator->id, envelope->id));
     const auto containsInstrument = allocator != nullptr
                                     || firstMatchingNode(
                                            flattener.nodes,
@@ -390,8 +393,8 @@ GraphInstrumentCompileResult compileGraphInstrument(
                                     || amplifier != nullptr;
     if (!containsInstrument)
         return result;
-    if (allocator == nullptr || oscillator == nullptr || envelope == nullptr
-        || amplifier == nullptr || filter == nullptr) {
+    if (allocator == nullptr || oscillator == nullptr
+        || (!compact && (envelope == nullptr || amplifier == nullptr || filter == nullptr))) {
         addIssue(result.validation, graph::ValidationCode::invalidRole,
                  "Polyphonic Graph requires Voice Allocator, a sound source "
                  "(Oscillator, Wavetable or String), ADSR, Gain/VCA and "
@@ -421,11 +424,12 @@ GraphInstrumentCompileResult compileGraphInstrument(
     const auto signalFlow = anyReach(flattener.connections, midiInputs,
                                      allocator->id)
         && reaches(flattener.connections, allocator->id, oscillator->id)
-        && reaches(flattener.connections, allocator->id, envelope->id)
+        && (compact ? reachesAny(flattener.connections, oscillator->id, audioOutputs)
+        : reaches(flattener.connections, allocator->id, envelope->id)
         && reaches(flattener.connections, oscillator->id, amplifier->id)
         && reaches(flattener.connections, envelope->id, amplifier->id)
         && reaches(flattener.connections, amplifier->id, filter->id)
-        && reachesAny(flattener.connections, filter->id, audioOutputs);
+        && reachesAny(flattener.connections, filter->id, audioOutputs));
     if (!signalFlow) {
         addIssue(result.validation, graph::ValidationCode::invalidConnection,
                  "Polyphonic MIDI, pitch, gate, audio and envelope paths are "
@@ -523,7 +527,8 @@ GraphInstrumentCompileResult compileGraphInstrument(
     }
     result.plan.oscillatorLevel = static_cast<float>(std::clamp(
         value(*oscillator, "level", 0.14), 0.0, 1.0));
-    result.plan.attackSeconds = static_cast<float>(std::clamp(
+    if (!compact) {
+        result.plan.attackSeconds = static_cast<float>(std::clamp(
         value(*envelope, "attack", 8.0) * 0.001, 0.0001, 30.0));
     result.plan.decaySeconds = static_cast<float>(std::clamp(
         value(*envelope, "decay", 120.0) * 0.001, 0.0001, 30.0));
@@ -533,8 +538,9 @@ GraphInstrumentCompileResult compileGraphInstrument(
         value(*envelope, "release", 280.0) * 0.001, 0.0001, 60.0));
     result.plan.filterCutoffHz = static_cast<float>(std::clamp(
         value(*filter, "cutoff", 12'000.0), 20.0, 20'000.0));
-    result.plan.filterResonance = static_cast<float>(std::clamp(
-        value(*filter, "resonance", 0.707), 0.1, 20.0));
+        result.plan.filterResonance = static_cast<float>(std::clamp(
+            value(*filter, "resonance", 0.707), 0.1, 20.0));
+    }
 
     for (const auto& node : flattener.nodes) {
         if (!anyReach(flattener.connections, midiInputs, node.id)

@@ -153,6 +153,7 @@ private:
     std::array<std::atomic<float>, maximumBuses> inputLevels_ {};
 };
 
+class MasterOutputAudioSource;
 class GainPanAudioSource final : public cydaw::audio::AudioSource, public RoutedInputReceiver {
 public:
     static constexpr std::size_t maximumPluginCount = 8;
@@ -302,8 +303,16 @@ public:
     // The last block's sound before the fader, on the audio thread right
     // after rendering it; null when not kept.
     [[nodiscard]] const cydaw::audio::SampleBuffer<float>* preFader() const noexcept { return preFaderValid_ ? &preFader_ : nullptr; }
+    // Updated only with the device callback stopped or its lock held.
+    void setBounceTap(MasterOutputAudioSource* tap, bool preFader) noexcept
+    {
+        bounceTap_ = tap;
+        bouncePreFader_ = preFader;
+    }
 
 private:
+    MasterOutputAudioSource* bounceTap_ {};
+    bool bouncePreFader_ {};
     std::array<const cydaw::audio::SampleBuffer<float>*, maximumBuses> routedInputs_ {};
     int routedSamples_ {};
     std::atomic<bool> keepPreFader_ {};
@@ -581,6 +590,8 @@ public:
     [[nodiscard]] bool captureComplete() const noexcept;
     [[nodiscard]] double captureProgress() const noexcept;
     [[nodiscard]] int droppedBlockCount() const noexcept;
+    void captureBlock(const cydaw::audio::AudioSourceChannelInfo& info) noexcept;
+    void setExternalCapture(bool external) noexcept { externalCapture_ = external; }
     [[nodiscard]] bool tryPopAnalysisFrame(
         cydaw::engine::AudioAnalysisFrame& frame) noexcept;
     void setGain(float linearGain) noexcept;
@@ -628,6 +639,7 @@ private:
     std::atomic<std::int64_t> skipSamples_ {};
     std::atomic<bool> captureComplete_ {};
     std::atomic<int> droppedBlocks_ {};
+    bool externalCapture_ {}; // changed under the device callback lock
     std::unique_ptr<cydaw::realtime::SpscRing<
         cydaw::engine::AudioAnalysisFrame, 8>> analysisFrames_;
     std::uint64_t analysisSequence_ {};
@@ -2102,6 +2114,8 @@ public:
         std::optional<std::uint64_t> targetClipId = std::nullopt);
 
     [[nodiscard]] cydaw::base::Result startMasterExport(const cydaw::base::File& destination);
+    [[nodiscard]] cydaw::base::Result startMidiBounce(std::uint64_t track, const cydaw::base::File& destination,
+                                                     double from, double duration, bool preFader);
     [[nodiscard]] cydaw::base::Result finishMasterExport();
     void cancelMasterExport();
     [[nodiscard]] bool isMasterExporting() const noexcept;
@@ -2477,6 +2491,9 @@ private:
     std::atomic<int> mixLatencySamples_ {};
     cydaw::engine::NativeDspGraph defaultNativeDspGraph_;
     cydaw::base::File masterExportDestination_;
+    std::uint64_t bounceTrack_ {};
+    double bouncePreviousPosition_ {};
+    void detachBounceTap() noexcept;
     bool masterExportPreviousLooping_ {};
 };
 

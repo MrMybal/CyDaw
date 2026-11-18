@@ -5055,6 +5055,70 @@ cydaw::base::Result Studio::applyFactoryChain(const TrackRef& track, const cydaw
     return publishGraph(track, true);
 }
 
+cydaw::base::Result Studio::addFactoryChain(const TrackRef& track, const cydaw::base::Text& key, const std::uint64_t before)
+{
+    auto* slot = graphFor(track);
+    if (slot == nullptr)
+        return cydaw::base::Result::fail(ui::Ls("Piste introuvable", "No such track"));
+    const auto catalogue = slot->graph().deviceCatalogue();
+    const auto preset = std::find_if(catalogue.begin(), catalogue.end(), [&key](const auto& entry) {
+        return entry.key == key && entry.kind == "preset" && !entry.soundSource
+               && entry.input == "audio" && entry.output == "audio";
+    });
+    if (preset == catalogue.end())
+        return cydaw::base::Result::fail(ui::Ls("Chaîne d’effets introuvable", "No such effect chain"));
+
+    auto source = makeSlot(GraphSlot::Owner::audioTrack);
+    source->restore(withLibrary({}, factoryAudioGraph_));
+    if (const auto loaded = source->graph().insertFactoryDevice(key); loaded.failed())
+        return loaded;
+    return addEffectGraph(track, source->graph().serialise(), preset->name, before);
+}
+
+cydaw::base::Result Studio::addEffectGraph(const TrackRef& track, const cydaw::base::Value& state,
+                                           const cydaw::base::Text& name, const std::uint64_t before)
+{
+    auto* slot = graphFor(track);
+    if (slot == nullptr || !state.isObject())
+        return cydaw::base::Result::fail(ui::Ls("Chaîne d’effets illisible", "Unreadable effect chain"));
+    auto& graph = slot->graph();
+    const auto card = graph.editorInsertModuleFromState(withLibrary(state, factoryAudioGraph_),
+                                                        cydaw::graph::GraphRole::audioEffect, name);
+    if (card == 0)
+        return cydaw::base::Result::fail(ui::Ls("Impossible d’ajouter la chaîne", "Could not add the chain"));
+    if (before != 0)
+        (void) graph.editorMoveCard(card, 0, -1, before);
+    graph_layout::arrange(graph);
+    dirty_ = true;
+    return publishGraph(track, true);
+}
+
+cydaw::base::Result Studio::addDevicePreset(const TrackRef& track, const cydaw::base::Text& key,
+                                          const cydaw::base::Value& state, const std::uint64_t before)
+{
+    auto* slot = graphFor(track);
+    if (slot == nullptr || state.getProperty("type", {}).toString() != key)
+        return cydaw::base::Result::fail(ui::Ls("Preset de périphérique incompatible", "Incompatible device preset"));
+    auto& graph = slot->graph();
+    const auto previous = graph.serialise();
+    const auto nodes = graph.editorNodes();
+    const auto inserted = insertDeviceBefore(track, key, before);
+    if (inserted.failed())
+        return inserted;
+    cydaw::base::Text error;
+    for (const auto& node : graph.editorNodes())
+        if (node.typeKey == key && std::none_of(nodes.begin(), nodes.end(), [&node](const auto& old) {
+                return old.id == node.id && old.typeKey == node.typeKey;
+            })) {
+            if (applyDevicePreset(track, node.id, state, error))
+                return cydaw::base::Result::ok();
+            break;
+        }
+    slot->restore(previous);
+    (void) publishGraph(track, true);
+    return cydaw::base::Result::fail(error.isNotEmpty() ? error : ui::Ls("Preset non appliqué", "Preset could not be applied"));
+}
+
 cydaw::base::Text Studio::presetName(const cydaw::base::Text& holderKey) const
 {
     const auto found = presetNames_.find(holderKey);
@@ -5762,6 +5826,113 @@ std::optional<TrackRef> Studio::addMidiTrack(const cydaw::base::Text& name, cons
     return track;
 }
 
+cydaw::base::Result Studio::bounceMidiTrack(const TrackRef& track, const bool preFader, const double tailSeconds)
+{
+    if (!track.midi || !isValid(track) || isCompanion(track))
+        return cydaw::base::Result::fail(ui::Ls("Sélectionnez une piste instrument", "Select an instrument track"));
+    if (!std::isfinite(tailSeconds) || tailSeconds < 0.0 || tailSeconds > 120.0)
+        return cydaw::base::Result::fail(ui::Ls("Queue de rendu entre 0 et 120 s", "Render tail must be between 0 and 120 s"));
+    if (pendingMidiBounce_ || engine_.isMasterExporting())
+        return cydaw::base::Result::fail(ui::Ls("Un rendu est déjà en cours", "A render is already in progress"));
+    auto start = std::numeric_limits<double>::infinity();
+    auto end = 0.0;
+    const auto beat = 60.0 / engine_.tempo();
+    if (const auto* clips = engine_.midiClipsView(track.midiId))
+        for (const auto& clip : *clips)
+            if (clip.launcherScene < 0 && !clip.notes.empty()) {
+                start = std::min(start, clip.startBeats * beat);
+                end = std::max(end, (clip.startBeats + clip.lengthBeats) * beat);
+            }
+    if (!(end > start))
+        return cydaw::base::Result::fail(ui::Ls("La piste n’a aucune note dans l’arrangement", "This track has no notes in the arrangement"));
+    const auto folder = projectFile_ == cydaw::base::File()
+                            ? locations::folder(Location::mixes).getChildFile("Bounces")
+                            : projectFile_.getParentDirectory().getChildFile(projectFile_.getFileNameWithoutExtension() + " Audio")
+                                  .getChildFile("Bounces");
+    if (const auto created = folder.createDirectory(); created.failed())
+        return created;
+    const auto file = folder.getNonexistentChildFile(cydaw::base::File::createLegalFileName(trackName(track) + " - Bounce"), ".wav", false);
+    const auto result = engine_.startMidiBounce(track.midiId, file, start, end - start + tailSeconds, preFader);
+    if (result.wasOk())
+        pendingMidiBounce_ = PendingMidiBounce { routingKey(track), file, start, preFader };
+    return result;
+}
+
+void Studio::finishMidiBounce(const cydaw::base::Result& result)
+{
+    const auto pending = std::exchange(pendingMidiBounce_, std::nullopt);
+    if (!pending)
+        return;
+    if (result.failed()) {
+        (void) pending->file.deleteFile();
+        notices_.emplace_back(result.getErrorMessage(), true);
+        return;
+    }
+    const auto source = trackForKey(pending->source);
+    const auto rendered = source ? addAudioTrack(pending->file, pending->start) : std::nullopt;
+    if (!rendered) {
+        notices_.emplace_back(ui::Ls("WAV rendu, import impossible : ", "WAV rendered, import failed: ") + pending->file.getFullPathName(), true);
+        return;
+    }
+    auto original = trackMix(*source);
+    auto mix = original;
+    mix.muted = false;
+    mix.armed = false;
+    if (pending->preFader) {
+        engine_.replaceAutomationPoints(rendered->audioIndex, engine_.midiAutomationPoints(source->midiId));
+    } else {
+        mix.gainDb = 0.0f;
+        mix.pan = 0.0f;
+    }
+    setTrackMix(*rendered, mix);
+    (void) setTrackOutputs(*rendered, trackOutputs(*source));
+    const auto renderedKey = routingKey(*rendered);
+    midiBounces_[renderedKey] = { pending->source, original.muted };
+    original.muted = true;
+    original.solo = false;
+    setTrackMix(*source, original);
+    std::erase(trackOrder_, renderedKey);
+    const auto position = std::find(trackOrder_.begin(), trackOrder_.end(), pending->source);
+    trackOrder_.insert(position == trackOrder_.end() ? position : std::next(position), renderedKey);
+    notices_.emplace_back(ui::Ls("Bounce ajouté : ", "Bounce added: ") + trackName(*rendered), false);
+}
+
+std::optional<TrackRef> Studio::midiSourceOfBounce(const TrackRef& track) const
+{
+    const auto found = midiBounces_.find(routingKey(track));
+    return found != midiBounces_.end() ? trackForKey(found->second.source) : std::nullopt;
+}
+
+std::optional<TrackRef> Studio::returnToMidi(const TrackRef& track)
+{
+    const auto source = midiSourceOfBounce(track);
+    if (!source || engine_.isMasterExporting())
+        return std::nullopt;
+    auto render = trackMix(track);
+    auto original = trackMix(*source);
+    original.muted = bounceSourceWasMuted(track);
+    original.solo = render.solo;
+    render.muted = true;
+    render.solo = false;
+    setTrackMix(track, render);
+    setTrackMix(*source, original);
+    return source;
+}
+
+void Studio::restoreBounceLink(const std::uint64_t rendered, const std::uint64_t source, const bool wasMuted)
+{
+    const auto audio = trackForKey(rendered);
+    const auto midi = trackForKey(source);
+    if (audio && !audio->midi && midi && midi->midi)
+        midiBounces_[rendered] = { source, wasMuted };
+}
+
+bool Studio::bounceSourceWasMuted(const TrackRef& rendered) const
+{
+    const auto found = midiBounces_.find(routingKey(rendered));
+    return found != midiBounces_.end() && found->second.wasMuted;
+}
+
 bool Studio::removeTrack(const TrackRef& track)
 {
     if (track.master)
@@ -5781,6 +5952,9 @@ bool Studio::removeTrack(const TrackRef& track)
     // The indices of the tracks after it move.
     clipsAtStop_.clear();
     const auto removedKey = routingKey(track);
+    std::erase_if(midiBounces_, [removedKey](const auto& entry) {
+        return entry.first == removedKey || entry.second.source == removedKey;
+    });
     struct Republish {
         Studio& studio;
         std::uint64_t key;
@@ -5839,6 +6013,10 @@ bool Studio::moveTrack(const TrackRef& track, const int delta)
 
 void Studio::clearSession()
 {
+    if (engine_.isMasterExporting())
+        engine_.cancelMasterExport();
+    pendingMidiBounce_.reset();
+    midiBounces_.clear();
     ++trackRefsSerial_;
     // The next project opens heard (its own mute, if any, comes with it).
     engine_.setMasterMuted(false);
@@ -6529,8 +6707,13 @@ void Studio::tick()
         if (!engine_.isPlaying())
             engine_.stopMidiRecording(true);
     }
-    if (engine_.isMasterExporting() && engine_.masterExportComplete())
-        (void) engine_.finishMasterExport();
+    if (engine_.isMasterExporting() && engine_.masterExportComplete()) {
+        const auto result = engine_.finishMasterExport();
+        if (pendingMidiBounce_)
+            finishMidiBounce(result);
+    } else if (pendingMidiBounce_ && !engine_.isMasterExporting()) {
+        pendingMidiBounce_.reset();
+    }
     autosaveIfDue();
     applyTrackModulations();
 
@@ -6971,6 +7154,11 @@ void Studio::play()
 
 void Studio::stopPlayback()
 {
+    if (pendingMidiBounce_) {
+        engine_.cancelMasterExport();
+        pendingMidiBounce_.reset();
+        return;
+    }
     if (engine_.isPlaying()) {
         clipsAtStop_.clear();
         for (const auto& track : tracks()) {

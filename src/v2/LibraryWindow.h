@@ -3,6 +3,7 @@
 #pragma once
 
 #include "SampleCatalog.h"
+#include "Presets.h"
 #include "Studio.h"
 #include "UiState.h"
 
@@ -84,6 +85,7 @@ private:
     void tempoSwitch(const cydaw::base::Text& path);
     void drawInstruments();
     void drawEffects();
+    void drawPresets();
     void requery();
     void addSampleToTrack(const cydaw::base::Text& path);
     void takeSemanticAnswer();
@@ -132,16 +134,25 @@ private:
     bool downloading_ {};
     char instrumentSearch_[120] {};
     int selectedInstrument_ { -1 };
-    int instrumentContent_ {}; // all, native modules, presets, samples, user devices
+    int instrumentContent_ {}; // all, native modules, samples, user devices
     std::unique_ptr<Facets> effectFacets_;
     std::vector<EffectRow> effects_;
     std::optional<TrackRef> effectsFor_;
     double effectsTime_ { -100.0 };
     char effectSearch_[120] {};
     int selectedEffect_ { -1 };
-    int effectContent_ {}; // devices (default), presets, all
     int effectRole_ {}; // all, audio, MIDI, instrument, control
     std::unique_ptr<PluginScan> plugins_;
+    struct PresetRow {
+        presets::Entry entry;
+        cydaw::base::Text key, device, category;
+        bool instrument {}, chain {};
+    };
+    std::vector<PresetRow> presets_;
+    double presetsTime_ { -100.0 };
+    char presetSearch_[120] {};
+    int presetRole_ {};
+    int selectedPreset_ { -1 };
 };
 
 } // namespace cydaw::v2

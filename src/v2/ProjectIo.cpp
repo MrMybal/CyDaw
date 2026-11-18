@@ -557,6 +557,13 @@ void restoreRouting(Studio& studio, const cydaw::base::Object& root, const BusId
             if (track && companion)
                 studio.restoreCompanion(*track, *companion, static_cast<bool>(item.getProperty("recordsAudio", false)));
         }
+    if (const auto* bounces = root.getProperty("midiBounces").getArray())
+        for (const auto& item : *bounces) {
+            const auto audio = keyOf(item.getProperty("audio", {}));
+            const auto midi = keyOf(item.getProperty("midi", {}));
+            if (audio && midi)
+                studio.restoreBounceLink(*audio, *midi, static_cast<bool>(item.getProperty("wasMuted", false)));
+        }
     // Its groups: each group's track, its tracks, folded or not.
     if (const auto* groups = root.getProperty("groups").getArray())
         for (const auto& item : *groups) {
@@ -1967,6 +1974,17 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
             }
         if (!hybrids.isEmpty())
             document->setProperty("hybrids", hybrids);
+        cydaw::base::Array<cydaw::base::Value> bounces;
+        for (const auto& track : studio.tracks())
+            if (const auto source = studio.midiSourceOfBounce(track)) {
+                auto value = makeObject();
+                value->setProperty("audio", placeOf(track));
+                value->setProperty("midi", placeOf(*source));
+                value->setProperty("wasMuted", studio.bounceSourceWasMuted(track));
+                bounces.add(cydaw::base::Value(value.get()));
+            }
+        if (!bounces.isEmpty())
+            document->setProperty("midiBounces", bounces);
     }
 
     // The first MIDI clip's notes, for projects read by CyDAW 0.7.

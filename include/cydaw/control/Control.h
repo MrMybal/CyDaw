@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -80,6 +81,15 @@ struct Modifier {
 // A modifier with its usual settings.
 [[nodiscard]] Modifier defaultModifier(ModifierKind kind) noexcept;
 
+// Reusable graphs are compiled off the input thread into a sequence of
+// stateless functions. Stateful encoders and toggles stay on controls.
+struct Transfer {
+    std::string graph;
+    std::vector<Modifier> functions;
+};
+[[nodiscard]] double evaluateTransfer(std::span<const Modifier> functions, double value) noexcept;
+[[nodiscard]] double invertTransfer(std::span<const Modifier> functions, double value) noexcept;
+
 // ---- Virtual controllers --------------------------------------------------------------------
 
 enum class ControlKind : std::uint8_t {
@@ -117,6 +127,7 @@ struct VirtualControl {
     double value {};
     bool known {};
     double lastRaw {};
+    Transfer transfer;
 
     // A momentary control: a press, then a let go.
     [[nodiscard]] bool momentary() const noexcept { return kind == ControlKind::button || kind == ControlKind::pad; }
@@ -155,6 +166,7 @@ struct Assignment {
     bool project {};
     // Takeover: whether the control holds the target now.
     bool caught { true };
+    Transfer transfer;
 };
 
 // ---- The router -----------------------------------------------------------------------------

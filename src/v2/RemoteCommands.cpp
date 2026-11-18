@@ -1094,6 +1094,20 @@ cydaw::base::Value Commands::run()
         return onSetLoop();
     if (command == "set_master_gain")
         return onSetMasterGain();
+    if (command == "bounce_midi" || command == "return_to_midi") {
+        std::optional<RemoteTrack> track;
+        if (auto error = trackOrFail(track); !error.isVoid())
+            return error;
+        if (command == "return_to_midi") {
+            if (const auto source = studio_.returnToMidi(track->ref())) {
+                ui_.selectTrack(*source);
+                return ok(status());
+            }
+            return fail("this audio track has no MIDI bounce source");
+        }
+        const auto result = studio_.bounceMidiTrack(track->ref(), flag("preFader", false), number("tail", 4.0));
+        return result.wasOk() ? ok(status()) : fail(result.getErrorMessage());
+    }
     if (command == "add_midi_track")
         return onAddMidiTrack();
     if (command == "add_audio_track")

@@ -188,6 +188,8 @@ void BrowserView::draw()
             drawDevices();
             ImGui::EndTabItem();
         }
+        if (ImGui::TabItemButton(L("Presets", "Presets")))
+            openLarge(3);
         // The big window, on the same tab.
         if (ImGui::TabItemButton(icon::fullScreen, ImGuiTabItemFlags_Trailing))
             openLarge(currentTab_);
@@ -781,22 +783,9 @@ void BrowserView::drawInstruments()
                                    "No factory instrument: the Factory folder is not beside CyDAW."));
         return;
     }
-    // The instrument track picked: a double click puts it there, in place of
-    // its instrument (its effects kept); without one, a new track.
-    std::optional<TrackRef> onto;
-    if (state_.selectedTrack && state_.selectedTrack->midi && !state_.selectedTrack->master && studio_.isValid(*state_.selectedTrack))
-        onto = state_.selectedTrack;
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    if (onto)
-        ImGui::TextWrapped("%s", (ui::Ls("Double-clic : il remplace l'instrument de « ", "Double click: it replaces the instrument of \"")
-                                  + studio_.trackName(*onto)
-                                  + ui::Ls(" » (ses effets restent). Clic droit : une nouvelle piste, le modèle de son.",
-                                           "\" (its effects stay). Right click: a new track, the sound model."))
-                                     .toRawUTF8());
-    else
-        ImGui::TextWrapped("%s", L("Double-clic : une nouvelle piste (ses échantillons téléchargés s'il le faut). Clic droit : "
-                                   "le modèle de son.",
-                                   "Double click: a new track (its samples downloaded if need be). Right click: the sound model."));
+    ImGui::TextWrapped("%s", L("Double-clic : ajouter une piste. Clic droit : choisir le modèle de son.",
+                               "Double click: add a track. Right click: choose the sound model."));
     ImGui::PopStyleColor();
     ImGui::BeginChild("##instrumentList");
     cydaw::base::TextList categories;
@@ -832,7 +821,7 @@ void BrowserView::drawInstruments()
                 cydaw::base::Text error;
                 if (missing && !fetching)
                     startDownload();
-                if (const auto track = studio_.addFactoryInstrument(instrument.key, error, false, onto)) {
+                if (const auto track = studio_.addFactoryInstrument(instrument.key, error, false)) {
                     state_.selectTrack(*track);
                     if (!missing)
                         report(studio_.trackName(*track));
@@ -863,30 +852,20 @@ void BrowserView::drawInstruments()
                 ImGui::SetTooltip("%s", text.toRawUTF8());
             }
             if (ImGui::BeginPopupContextItem("##instrumentMenu")) {
-                const auto add = [&](const bool model, const std::optional<TrackRef> on) {
+                const auto add = [&](const bool model) {
                     cydaw::base::Text error;
-                    if (const auto track = studio_.addFactoryInstrument(instrument.key, error, model, on)) {
+                    if (const auto track = studio_.addFactoryInstrument(instrument.key, error, model)) {
                         state_.selectTrack(*track);
                         report(studio_.trackName(*track));
                     } else {
                         report(error, true);
                     }
                 };
-                if (onto) {
-                    const auto label = ui::Ls("Remplacer l'instrument de « ", "Replace the instrument of \"") + studio_.trackName(*onto)
-                                       + ui::Ls(" »", "\"");
-                    if (ImGui::MenuItem(label.toRawUTF8()))
-                        add(false, onto);
-                    if (ImGui::MenuItem(L("Le remplacer par son modèle de son", "Replace it with its sound model"), nullptr, false,
-                                        instrument.model != cydaw::base::File()))
-                        add(true, onto);
-                    ImGui::Separator();
-                }
                 if (ImGui::MenuItem(L("Nouvelle piste : échantillons (sampler)", "New track: samples (sampler)")))
-                    add(false, std::nullopt);
+                    add(false);
                 if (ImGui::MenuItem(L("Nouvelle piste : modèle de son", "New track: sound model"), nullptr, false,
                                     instrument.model != cydaw::base::File()))
-                    add(true, std::nullopt);
+                    add(true);
                 if (missing) {
                     ImGui::Separator();
                     const auto label = (studio_.banks().generatedOnly(instrument.banks)
@@ -944,18 +923,12 @@ void BrowserView::drawDevices()
     cydaw::base::Text lastCategory;
     for (std::size_t index = 0; index < entries.size(); ++index) {
         const auto& entry = entries[index];
-        if (!track.midi && entry.soundSource)
-            continue;
-        // A whole chain of effects would take every card's place: the
-        // track's preset button (in Devices) has them.
-        if (entry.kind == "preset" && !entry.soundSource)
+        if (entry.kind == "preset" || entry.soundSource)
             continue;
         if (query.isNotEmpty() && !fold(entry.name).contains(query) && !fold(entry.category).contains(query)
             && !fold(entry.description).contains(query))
             continue;
-        const auto heading = entry.kind == "preset" ? ui::Ls("Instruments", "Instruments")
-                             : entry.category.isNotEmpty() ? entry.category
-                                                           : ui::Ls("Autres", "Others");
+        const auto heading = entry.category.isNotEmpty() ? entry.category : ui::Ls("Autres", "Others");
         if (query.isEmpty() && heading != lastCategory) {
             lastCategory = heading;
             ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.8f);

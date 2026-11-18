@@ -94,4 +94,11 @@ namespace cydaw::graph {
     return processorKey == "core.oscillator";
 }
 
+// These voices already implement their envelope, gain and filtering. A
+// composed instrument can still opt into the traditional per-voice stages.
+[[nodiscard]] constexpr bool hasCompleteVoice(const std::string_view key) noexcept
+{
+    return key.ends_with("-synth") && isPolyphonicVoiceSource(key);
+}
+
 } // namespace cydaw::graph

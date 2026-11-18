@@ -315,6 +315,7 @@ public:
     void beforeNewFrame();
 
 private:
+    float midiBounceTailSeconds_ { 4.0f };
     // Runs the action once the unsaved changes are saved or dropped, or
     // at once when there are none.
     void whenSaved(std::function<void()> action);

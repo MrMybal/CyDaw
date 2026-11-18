@@ -228,8 +228,9 @@ void DevicesView::draw()
     const ui::ModulationHostScope modulationScope(modulators_->host());
     // Inside a container: in its frame, after it.
     const auto inside = graph.editorContainerMembers();
+    const auto voice = track.midi ? graph.editorVoiceNodes() : std::set<std::uint64_t>();
     for (const auto& node : nodes)
-        if (!node.boundary && !(prismVoice && !wholeVoiceType(node.typeKey) && graph.editorIsVoiceNode(node.id))
+        if (!node.boundary && !(prismVoice && !wholeVoiceType(node.typeKey) && voice.contains(node.id))
             && !modulators_->owned(node.id) && !inside.contains(node.id))
             chain.push_back(&node);
     std::stable_sort(chain.begin(), chain.end(), [](const auto* a, const auto* b) {
@@ -237,6 +238,13 @@ void DevicesView::draw()
             return a->position.x < b->position.x;
         return a->position.y < b->position.y;
     });
+    const auto isVoice = [&voice](const auto* node) { return voice.contains(node->id); };
+    const auto firstVoice = std::find_if(chain.begin(), chain.end(), isVoice);
+    const auto afterVoice = std::stable_partition(firstVoice, chain.end(), isVoice);
+    const auto voiceBegin = static_cast<std::size_t>(firstVoice - chain.begin());
+    const auto voiceEnd = static_cast<std::size_t>(afterVoice - chain.begin());
+    const auto groupedVoice = voiceEnd > voiceBegin + 1;
+    const auto voiceSwitch = std::find_if(firstVoice, afterVoice, [](const auto* node) { return node->typeKey == "voice-allocator"; });
 
     ImGui::BeginChild("##chain", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
     // A strip, as in Live or Bitwig: a tall panel does not make tall devices.
@@ -498,23 +506,54 @@ void DevicesView::draw()
     const auto visibleMax = visibleMin + ImGui::GetWindowSize().x;
     const auto mayPass = !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) && !ImGui::IsAnyItemActive();
     for (std::size_t chainIndex = 0; chainIndex < chain.size(); ++chainIndex) {
-        if (ownChain)
+        const auto inVoice = groupedVoice && chainIndex >= voiceBegin && chainIndex < voiceEnd;
+        if (ownChain && !inVoice)
             insertGap(strip, chain[chainIndex]->id, height);
+        if (inVoice && chainIndex == voiceBegin) {
+            ImGui::BeginGroup();
+            ImGui::BeginGroup();
+            const auto name = L("Voix", "Voice");
+            ImGui::TextDisabled("%s", name);
+            if (voiceSwitch != afterVoice) {
+                const auto& allocator = **voiceSwitch;
+                if (ui::iconButton(icon::power, L("Activer ou couper tout l’instrument", "Enable or bypass the entire instrument"),
+                                   !allocator.bypassed, p.play, ImVec2(dp(26.0f), dp(23.0f))))
+                    (void) graph.editorSetBypassed(allocator.id, !allocator.bypassed);
+            }
+            ImGui::EndGroup();
+            ImGui::SameLine(0.0f, dp(5.0f));
+        }
         const auto id = chain[chainIndex]->id;
         const auto at = ImGui::GetCursorScreenPos().x;
         if (const auto known = cardAdvance_.find(id);
             mayPass && known != cardAdvance_.end() && (at + known->second < visibleMin || at > visibleMax)) {
             ImGui::Dummy(ImVec2(known->second, height));
             ImGui::SameLine(0.0f, 0.0f);
-            continue;
+        } else {
+            drawCard(strip, *chain[chainIndex], height, CardPlace { 0, -1, nextMovable(chainIndex), 0 });
+            cardAdvance_[id] = std::max(1.0f, ImGui::GetCursorScreenPos().x - at);
         }
-        drawCard(strip, *chain[chainIndex], height, CardPlace { 0, -1, nextMovable(chainIndex), 0 });
-        cardAdvance_[id] = std::max(1.0f, ImGui::GetCursorScreenPos().x - at);
+        if (inVoice && chainIndex + 1 == voiceEnd) {
+            ImGui::EndGroup();
+            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                                               theme::alpha(colourBar, .65f), dp(4.0f), dp(1.5f));
+            ImGui::SameLine(0.0f, dp(7.0f));
+        }
     }
     if (strip.removeNode) {
         // Its modulators go with it (a container's, with all it holds).
         modulators_->removeWith(*strip.removeNode);
         graph.editorRemoveFromChain(*strip.removeNode);
+    }
+    if (strip.wrapFrom) {
+        if (graph.editorWrapEffectChain(*strip.wrapFrom) != 0)
+            graph_layout::arrange(graph);
+        else {
+            state_.status = L("Sélectionnez le début d’une chaîne série d’au moins deux effets",
+                              "Choose the start of a serial chain with at least two effects");
+            state_.statusTime = ImGui::GetTime();
+            state_.statusIsError = true;
+        }
     }
     // A card dropped elsewhere in the chain or into a container: moved
     // there, the cards laid out again in the order the signal now takes.
@@ -903,6 +942,11 @@ void DevicesView::drawCard(Strip& strip, const app::GraphDocument::EditorNode& c
             ImGui::EndDragDropSource();
         } else if (ImGui::IsItemHovered()) {
             ui::tooltip(L("Glissez son nom pour le déplacer dans la chaîne", "Drag its name to move it along the chain"));
+        }
+        if (place.head == 0 && !containerCard && ImGui::BeginPopupContextItem("##audioCardMenu")) {
+            if (ImGui::MenuItem(L("Grouper les effets liés à partir d’ici", "Group connected effects from here")))
+                strip.wrapFrom = node->id;
+            ImGui::EndPopup();
         }
     }
     // Header buttons.

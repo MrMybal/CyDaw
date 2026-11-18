@@ -1109,6 +1109,8 @@ void GainPanAudioSource::getNextAudioBlock(const cydaw::audio::AudioSourceChanne
     }
 
     nativeGraph_.setExtraInputs(nullptr, 0);
+    if (bounceTap_ != nullptr && bouncePreFader_)
+        bounceTap_->captureBlock(bufferToFill);
     preFaderValid_ = false;
     if (keepPreFader_.load(std::memory_order_relaxed) && bufferToFill.buffer != nullptr && channels > 0) {
         if (preFader_.getNumSamples() < bufferToFill.numSamples)
@@ -1145,6 +1147,8 @@ void GainPanAudioSource::getNextAudioBlock(const cydaw::audio::AudioSourceChanne
                        * automationGain;
         }
         publishAnalysisFrame(bufferToFill);
+        if (bounceTap_ != nullptr && !bouncePreFader_)
+            bounceTap_->captureBlock(bufferToFill);
         return;
     }
 
@@ -1153,6 +1157,8 @@ void GainPanAudioSource::getNextAudioBlock(const cydaw::audio::AudioSourceChanne
                                        channelGains[static_cast<std::size_t>(
                                            std::min(channel, static_cast<int>(channelGains.size()) - 1))]);
     publishAnalysisFrame(bufferToFill);
+    if (bounceTap_ != nullptr && !bouncePreFader_)
+        bounceTap_->captureBlock(bufferToFill);
 }
 
 InputRecorder::InputRecorder()
@@ -1968,6 +1974,12 @@ void MasterOutputAudioSource::getNextAudioBlock(
     if (bufferToFill.buffer != nullptr)
         key_latency::output(*bufferToFill.buffer, bufferToFill.startSample, bufferToFill.numSamples);
     publishAnalysisFrame(bufferToFill);
+    if (!externalCapture_)
+        captureBlock(bufferToFill);
+}
+
+void MasterOutputAudioSource::captureBlock(const cydaw::audio::AudioSourceChannelInfo& bufferToFill) noexcept
+{
     if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0
         || bufferToFill.buffer->getNumChannels() <= 0
         || captureComplete_.load(std::memory_order_acquire))
@@ -12959,6 +12971,8 @@ bool AudioTrackController::moveMidiTrack(const std::size_t fromIndex,
 
 bool AudioTrackController::removeMidiTrack(const std::uint64_t trackId)
 {
+    if (bounceTrack_ != 0 && bounceTrack_ == trackId)
+        cancelMasterExport();
     if (midiRecordingTrackId_ == trackId)
         stopMidiRecording(false);
     const auto found = std::find_if(midiTracks_.begin(), midiTracks_.end(),
@@ -16489,6 +16503,8 @@ cydaw::base::Result AudioTrackController::commitRecordedTake(
 cydaw::base::Result AudioTrackController::startMasterExport(
     const cydaw::base::File& destination)
 {
+    if (isMasterExporting())
+        return cydaw::base::Result::fail("An audio export is already running");
     if (isRecording())
         return cydaw::base::Result::fail(tr("error.masterExportRecording"));
     if (contentLength() <= 0.0)
@@ -16516,6 +16532,52 @@ cydaw::base::Result AudioTrackController::startMasterExport(
     return cydaw::base::Result::ok();
 }
 
+cydaw::base::Result AudioTrackController::startMidiBounce(const std::uint64_t trackId,
+                                                         const cydaw::base::File& destination,
+                                                         const double from, const double duration,
+                                                         const bool preFader)
+{
+    auto* track = findMidiTrack(trackId);
+    if (track == nullptr || !(duration > 0.0) || !(from >= 0.0))
+        return cydaw::base::Result::fail("The instrument has no arrangement to bounce");
+    if (isPlaying() || isRecording() || isMidiRecording() || isMasterExporting())
+        return cydaw::base::Result::fail("Stop playback or recording before bouncing");
+    if (!preFader && (track->muted || (!track->solo
+          && (std::ranges::any_of(tracks_, [](const auto& other) { return other->solo; })
+              || std::ranges::any_of(midiTracks_, [](const auto& other) { return other->solo; })))))
+        return cydaw::base::Result::fail("The track must be audible for a post-fader bounce");
+    if (destination.existsAsFile())
+        return cydaw::base::Result::fail("The bounce file already exists");
+    const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+    const auto previousPosition = position();
+    stop();
+    const auto started = masterOutput_.startCapture(destination, duration, midiTrackLatencySamples(trackId));
+    if (started.failed()) {
+        (void) destination.deleteFile();
+        return started;
+    }
+    masterExportDestination_ = destination;
+    masterExportPreviousLooping_ = looping_;
+    bouncePreviousPosition_ = previousPosition;
+    bounceTrack_ = trackId;
+    masterOutput_.setExternalCapture(true);
+    track->gainPanSource.setBounceTap(&masterOutput_, preFader);
+    setLooping(false);
+    setPosition(from);
+    play();
+    return cydaw::base::Result::ok();
+}
+
+void AudioTrackController::detachBounceTap() noexcept
+{
+    if (bounceTrack_ == 0)
+        return;
+    if (auto* track = findMidiTrack(bounceTrack_))
+        track->gainPanSource.setBounceTap(nullptr, false);
+    masterOutput_.setExternalCapture(false);
+    bounceTrack_ = 0;
+}
+
 cydaw::base::Result AudioTrackController::finishMasterExport()
 {
     if (!masterOutput_.isCapturing())
@@ -16526,11 +16588,13 @@ cydaw::base::Result AudioTrackController::finishMasterExport()
     bool complete = false;
     {
         const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+        const auto positionToRestore = bounceTrack_ != 0 ? bouncePreviousPosition_ : 0.0;
+        detachBounceTap();
         result = masterOutput_.stopCapture();
         dropped = masterOutput_.droppedBlockCount();
         complete = masterOutput_.captureComplete();
         stop();
-        setPosition(0.0);
+        setPosition(positionToRestore);
         setLooping(masterExportPreviousLooping_);
     }
     masterExportDestination_ = cydaw::base::File {};
@@ -16550,9 +16614,11 @@ void AudioTrackController::cancelMasterExport()
     const auto destination = masterExportDestination_;
     {
         const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+        const auto positionToRestore = bounceTrack_ != 0 ? bouncePreviousPosition_ : 0.0;
+        detachBounceTap();
         masterOutput_.stopCapture();
         stop();
-        setPosition(0.0);
+        setPosition(positionToRestore);
         setLooping(masterExportPreviousLooping_);
     }
     masterExportDestination_ = cydaw::base::File {};

@@ -1,5 +1,6 @@
 #include "GraphDocument.h"
 #include "SamplerMapFile.h"
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 using namespace cydaw;
@@ -80,6 +81,33 @@ int main() {
     graph.editorInvalidateParameterGesture();
     require(graph.editorParameterRevision() != beforePreset && ambreValues() == original,
             "external replacement invalidates and restores the current preview first");
+    for (const auto* key : {"ambre-instrument", "prism-instrument", "kick-instrument"}) {
+      require(graph.insertFactoryDevice(key).wasOk(), "insert a compact native instrument");
+      const auto nodes = graph.editorNodes();
+      require(std::ranges::none_of(nodes, [](const auto& node) {
+        return node.typeKey == "envelope" || node.typeKey == "gain" || node.typeKey == "voice-filter";
+      }), "complete instruments contain no external voice envelope, VCA or filter");
+      engine::PolySynthGraphPlan compact;
+      require(graph.compilePolySynthGraph(compact).wasOk() && compact.enabled,
+              "a complete instrument compiles with its MIDI input");
+      require(graph.insertNodeBeforeOutput("gain").wasOk() && graph.compilePolySynthGraph(compact).wasOk(),
+              "a post-instrument gain is not misidentified as a voice stage");
+    }
+    require(graph.insertFactoryDevice("plate-reverb").wasOk(), "load the serial effects fixture");
+    const auto effects = graph.editorNodes();
+    const auto equalizer = std::ranges::find_if(effects, [](const auto& node) { return node.typeKey == "eq"; });
+    require(equalizer != effects.end(), "serial effects have an entry card");
+    const auto frame = graph.editorWrapEffectChain(equalizer->id);
+    const auto chain = graph.editorContainer(frame);
+    require(frame != 0 && chain && chain->branches.size() == 1 && chain->branches[0].size() == 2,
+            "grouping retains both connected effects inside one container");
+    require(graph.editorSetBypassed(frame, true), "the chain has a single bypass");
+    auto grouped = graph.runtimeGraphExport();
+    require(grouped.compilationResult.wasOk(), "grouped and bypassed chain still compiles");
+    const auto native = graph.nativeDspGraph();
+    require(std::ranges::any_of(native.bypasses, [&](const auto& bypass) {
+      return bypass.node == chain->end && bypass.from == frame;
+    }), "bypass forwards the frame's input to its output");
     require(base::Uuid().toString().length() == 32,
             "graph asset identifiers retain 128-bit encoding");
     app::SampleStore::shutdown();

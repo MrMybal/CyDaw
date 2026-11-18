@@ -1,6 +1,7 @@
 #include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "ClipEditorView.h"
+#include "ClipReference.h"
 
 #include "AudioEditorView.h"
 #include "MasterClipEditor.h"
@@ -20,6 +21,127 @@ namespace cydaw::v2 {
 
 using ui::dp;
 using ui::L;
+
+void clip_reference::button(Studio& studio, UiState& state, const TrackRef& edited)
+{
+    const auto count = static_cast<int>(state.clipReferences.size());
+    const auto label = ui::Ls("Superposition", "Overlay") + (count > 0 ? " (" + cydaw::base::Text(count) + ")" : cydaw::base::Text())
+                       + "###clipReference";
+    if (ImGui::Button(label.toRawUTF8()))
+        ImGui::OpenPopup("##clipReferences");
+    ui::recordSpot("clip-reference:toggle");
+    if (!ImGui::BeginPopup("##clipReferences"))
+        return;
+    if (ImGui::MenuItem(L("Tout retirer", "Clear all"), nullptr, false, count > 0))
+        state.clipReferences.clear();
+    ImGui::Separator();
+    if (ImGui::BeginChild("##referenceTracks", ImVec2(dp(260.0f), dp(210.0f)))) {
+        for (const auto& track : studio.tracks()) {
+            if (track == edited || track.master || track.isBus() || studio.isBusTrack(track))
+                continue;
+            const auto key = studio.routingKey(track);
+            if (key == 0)
+                continue;
+            ImGui::PushID(cydaw::base::Text(static_cast<std::int64_t>(key)).toRawUTF8());
+            const auto name = studio.trackName(track) + (track.midi ? "  ·  MIDI" : "  ·  Audio");
+            auto on = state.clipReferences.contains(key);
+            if (ImGui::Checkbox(name.toRawUTF8(), &on)) {
+                if (on)
+                    state.clipReferences.insert(key);
+                else
+                    state.clipReferences.erase(key);
+            }
+            ui::recordSpot("clip-reference:" + studio.trackName(track).toStdString());
+            ImGui::PopID();
+        }
+    }
+    ImGui::EndChild();
+    ImGui::EndPopup();
+}
+
+void clip_reference::draw(Studio& studio, const UiState& state, const TrackRef& edited, WaveformCache& waveforms,
+                          ImGuiHost& host, ImDrawList& list, const ImVec2 minimum, const ImVec2 maximum,
+                          const std::function<float(double)>& xOf, const std::function<float(int)>& yOf,
+                          const float noteHeight)
+{
+    if (state.clipReferences.empty() || maximum.x <= minimum.x)
+        return;
+    auto& engine = studio.engine();
+    const auto secondsPerBeat = 60.0 / std::max(20.0, engine.tempo());
+    auto row = 0;
+    list.PushClipRect(minimum, maximum, true);
+    for (const auto key : state.clipReferences) {
+        const auto track = studio.trackForKey(key);
+        if (!track || *track == edited)
+            continue;
+        const auto color = theme::fromArgb(studio.trackColour(*track));
+        const auto center = minimum.y + (maximum.y - minimum.y) * (0.23f + 0.18f * (row++ % 4));
+        const auto waveHeight = std::min(dp(58.0f), (maximum.y - minimum.y) * 0.18f);
+        const auto drawWave = [&](const cydaw::base::File& source, const double from, const double duration,
+                                  const auto& sourceTime) {
+            const auto left = xOf(from);
+            const auto right = xOf(from + duration);
+            if (left >= maximum.x || right <= minimum.x || right <= left)
+                return;
+            auto* waveform = waveforms.get(source);
+            if (waveform == nullptr)
+                return;
+            if (!waveform->isFullyLoaded())
+                host.wake(2);
+            const auto colorWave = theme::alpha(color, 0.47f);
+            const auto scale = duration / static_cast<double>(right - left);
+            for (auto x = std::max(left, minimum.x); x < std::min(right, maximum.x); x += 1.0f) {
+                const auto a = sourceTime((x - left) * scale);
+                const auto b = sourceTime(std::min(duration, (x + 1.0f - left) * scale));
+                float low = 0, high = 0;
+                for (int channel = 0; channel < std::min(2, waveform->getNumChannels()); ++channel) {
+                    float lo = 0, hi = 0;
+                    waveform->getApproximateMinMax(std::min(a, b), std::max(a, b) + 1.0e-6, channel, lo, hi);
+                    low = std::min(low, lo);
+                    high = std::max(high, hi);
+                }
+                if (high - low > .002f)
+                    list.AddLine(ImVec2(x, center - high * waveHeight), ImVec2(x, center - low * waveHeight), colorWave);
+            }
+        };
+        const auto drawTrack = [&](const TrackRef& part) {
+            if (part == edited)
+                return;
+            if (part.midi) {
+                if (const auto* clips = engine.midiClipsView(part.midiId))
+                    for (const auto& clip : *clips) {
+                        if (clip.launcherScene >= 0 || xOf((clip.startBeats + clip.lengthBeats) * secondsPerBeat) <= minimum.x
+                            || xOf(clip.startBeats * secondsPerBeat) >= maximum.x)
+                            continue;
+                        for (const auto& note : clip.notes) {
+                            const auto left = xOf((clip.startBeats + note.startBeats) * secondsPerBeat);
+                            const auto right = xOf((clip.startBeats + std::min(clip.lengthBeats, note.startBeats + note.durationBeats)) * secondsPerBeat);
+                            const auto y = yOf ? yOf(note.noteNumber) : center + (60 - note.noteNumber) * dp(.38f);
+                            const auto height = yOf ? std::max(dp(2.0f), noteHeight * .52f) : dp(3.0f);
+                            if (right >= minimum.x && left <= maximum.x && y + height >= minimum.y && y <= maximum.y)
+                                list.AddRectFilled(ImVec2(left, y), ImVec2(std::max(left + 1.0f, right), y + height),
+                                                   theme::alpha(color, .42f), dp(1.5f));
+                        }
+                    }
+                return;
+            }
+            if (const auto* clips = engine.audioClipsView(part.audioIndex))
+                for (const auto& clip : *clips)
+                    if (clip.usesEventTimeline) {
+                        for (const auto& event : clip.events)
+                            drawWave(event.sourceFile, clip.startSeconds + event.startSeconds, event.durationSeconds,
+                                     [&event](double seconds) { return app::AudioTrackController::eventSourceTime(event, seconds); });
+                    } else {
+                        drawWave(clip.sourceFile, clip.startSeconds, clip.durationSeconds,
+                                 [&clip](double seconds) { return app::AudioTrackController::clipSourceTime(clip, seconds); });
+                    }
+        };
+        drawTrack(*track);
+        if (const auto companion = studio.companionOf(*track))
+            drawTrack(*companion);
+    }
+    list.PopClipRect();
+}
 
 namespace {
 
@@ -315,6 +437,10 @@ void ClipEditorView::drawMidiToolbar(const TrackRef& track, const MidiClip& clip
         (void) engine.setMidiClipPresentation(track.midiId, clip.id, cydaw::base::Text::fromUTF8(name), 0);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", studio_.trackName(track).toRawUTF8());
+    if (clip.launcherScene < 0) {
+        ImGui::SameLine();
+        clip_reference::button(studio_, state_, track);
+    }
 
     ui::toolbarSeparator();
     ImGui::TextDisabled("%s", L("Longueur", "Length"));
@@ -761,6 +887,12 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     }
 
     // Input over the grid.
+    if (clip.launcherScene < 0) {
+        const auto secondsPerBeat = 60.0 / std::max(20.0, engine.tempo());
+        clip_reference::draw(studio_, state_, track, waveforms_, host_, *list, gridMin_, gridMax_,
+                             [&](const double seconds) { return beatToX(seconds / secondsPerBeat - clip.startBeats); },
+                             [&](const int note) { return noteToY(note) + rowH * .24f; }, rowH);
+    }
     ImGui::SetCursorScreenPos(gridMin_);
     ImGui::InvisibleButton("##grid", ImVec2(std::max(1.0f, gridMax_.x - gridMin_.x), std::max(1.0f, gridMax_.y - gridMin_.y)),
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);

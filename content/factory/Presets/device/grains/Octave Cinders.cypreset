@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Octave Cinders",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 165,
+   "grains.feedback": 0.34,
+   "grains.pitch": -12,
+   "grains.spray": 82,
+   "grains.density": 18,
+   "grains.pitchRandom": 0.14,
+   "grains.mix": 0.31,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 64,
+   "grains.stereo": 0.8,
+   "grains.reverseChance": 0.2,
+   "grains.freeze": 0.0,
+   "grains.highCut": 6700
+  }
+ },
+ "description": "Sparse tiny grains at the lower octave with occasional reverses."
+}

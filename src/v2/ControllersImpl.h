@@ -24,6 +24,7 @@
 #include <map>
 #include <mutex>
 #include <set>
+#include <variant>
 
 namespace cydaw::v2 {
 
@@ -148,6 +149,19 @@ public:
 
     // ---- Virtual controllers and assignments ----------------------------------------------
     control::Router router;
+    using MathNode = std::variant<control::Modifier, std::string>;
+    struct MathGraph {
+        std::string name;
+        std::vector<MathNode> nodes;
+    };
+    std::map<std::string, MathGraph> mathGraphs;
+    [[nodiscard]] std::optional<std::vector<control::Modifier>> compileMath(const std::string& id) const;
+    [[nodiscard]] cydaw::base::Value mathGraphList() const;
+    void rebuildMath();
+    void drawMathGraphs();
+    bool mathGraphCombo(const char* label, std::string& id);
+    std::string selectedMathGraph;
+    float mathPreview_ { .5f };
     ControlTargets targets;
     void applyOrders(const std::vector<control::Router::Order>& orders);
     // Targets told by this router, a moment ago (no feedback echo).
@@ -241,6 +255,9 @@ public:
     std::string selectedControl;
     int tab {};
     int requestedTab { -1 };
+    bool openAssignments {};
+    std::string assignmentMenuTarget;
+    std::string learnMenuTarget;
     // Brought back over the main window at its next frame.
     bool centreWindow {};
     // The window in front (its keys are learnt only then).

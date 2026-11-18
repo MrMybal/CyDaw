@@ -227,6 +227,11 @@ void Controllers::Impl::drawButton(bool& visible)
 void Controllers::Impl::draw(bool& visible)
 {
     windowFocused = false;
+    if (std::exchange(openAssignments, false)) {
+        visible = true;
+        requestedTab = 2;
+        ImGui::SetNextWindowFocus();
+    }
     if (!visible)
         return;
     const auto& p = theme::palette();
@@ -269,8 +274,9 @@ void Controllers::Impl::draw(bool& visible)
         const auto requested = std::exchange(requestedTab, -1);
         const char* names[] { L("Périphériques###devices", "Devices###devices"), L("Matériel détecté###hardware", "Detected hardware###hardware"),
                               L("Toutes les assignations###assignments", "All assignments###assignments"),
-                              L("Clavier musical###keyboard", "Musical keyboard###keyboard") };
-        for (int index = 0; index < 4; ++index) {
+                              L("Clavier musical###keyboard", "Musical keyboard###keyboard"),
+                              L("Graphes MIDI###mathGraphs", "MIDI graphs###mathGraphs") };
+        for (int index = 0; index < 5; ++index) {
             const auto flags = requested == index ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
             if (!ImGui::BeginTabItem(names[index], nullptr, flags))
                 continue;
@@ -311,10 +317,12 @@ void Controllers::Impl::draw(bool& visible)
                 if (ImGui::BeginChild("##assignments", ImVec2(0.0f, 0.0f)))
                     drawAssignments();
                 ImGui::EndChild();
-            } else {
+            } else if (index == 3) {
                 if (ImGui::BeginChild("##musicalKeyboard", ImVec2(0.0f, 0.0f)))
                     drawComputerKeyboard();
                 ImGui::EndChild();
+            } else {
+                drawMathGraphs();
             }
             ImGui::EndTabItem();
         }
@@ -809,7 +817,7 @@ void Controllers::Impl::drawControls(control::VirtualDevice& device)
                 address << middleDot() << (control.sourceDevice.empty() ? ui::Ls("aucune entrée", "no input") : nameOf(control.sourceDevice));
             ImGui::TextDisabled("%s", address.toRawUTF8());
             ImGui::TableNextColumn();
-            valueBar(control.value);
+            valueBar(control::evaluateTransfer(control.transfer.functions, control.value));
             ImGui::TableNextColumn();
             const auto found = moves.find(control.id);
             if (found == moves.end()) {
@@ -1038,6 +1046,11 @@ void Controllers::Impl::drawControl(control::VirtualDevice& device, control::Vir
         }
         ImGui::EndCombo();
     }
+    ImGui::SetNextItemWidth(dp(245.0f));
+    if (mathGraphCombo(L("Graphe d’entrée", "Input graph"), control.transfer.graph))
+        changed(true, false);
+    ui::tooltip(L("Transforme la valeur virtuelle avant ses destinations MIDI et DAW.",
+                  "Transforms the virtual value before its MIDI and DAW destinations."));
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
@@ -1096,6 +1109,11 @@ void Controllers::Impl::drawControlTargets(control::VirtualDevice& device, contr
         ImGui::SameLine();
         if (ImGui::SmallButton("x"))
             removed = index;
+        ImGui::SetNextItemWidth(dp(245.0f));
+        if (mathGraphCombo(L("Graphe de l’assignation", "Assignment graph"), assignment.transfer.graph)) {
+            assignment.caught = !assignment.takeover;
+            changed(!assignment.project, assignment.project);
+        }
         ImGui::PopID();
     }
     if (!any)
@@ -1290,25 +1308,246 @@ void Controllers::Impl::drawRaw()
 
 // ---- Every assignment ---------------------------------------------------------------------------
 
+bool Controllers::Impl::mathGraphCombo(const char* label, std::string& id)
+{
+    const auto selected = mathGraphs.find(id);
+    const auto* name = selected != mathGraphs.end() ? selected->second.name.c_str()
+                       : id.empty() ? L("Linéaire", "Linear") : L("Graphe manquant", "Missing graph");
+    if (!ImGui::BeginCombo(label, name))
+        return false;
+    bool edited = false;
+    if (ImGui::Selectable(L("Linéaire", "Linear"), id.empty())) {
+        id.clear();
+        edited = true;
+    }
+    for (const auto& [key, graph] : mathGraphs) {
+        ImGui::PushID(key.c_str());
+        ImGui::BeginDisabled(!compileMath(key).has_value());
+        if (ImGui::Selectable(graph.name.c_str(), key == id)) {
+            id = key;
+            edited = true;
+        }
+        ImGui::EndDisabled();
+        ImGui::PopID();
+    }
+    ImGui::EndCombo();
+    return edited;
+}
+
+void Controllers::Impl::drawMathGraphs()
+{
+    if (ImGui::BeginChild("##mathLibrary", ImVec2(dp(248.0f), 0.0f), ImGuiChildFlags_Borders)) {
+        if (ImGui::Button(L("+ Nouveau graphe", "+ New graph"), ImVec2(-1.0f, 0.0f))) {
+            std::vector<std::string> ids;
+            for (const auto& [id, graph] : mathGraphs)
+                ids.push_back(id);
+            selectedMathGraph = control::Router::freshId("curve", ids);
+            auto& graph = mathGraphs[selectedMathGraph];
+            graph.name = (ui::Ls("Courbe ", "Curve ") + cydaw::base::Text(static_cast<int>(mathGraphs.size()))).toStdString();
+            changed(true, false);
+        }
+        for (const auto& [id, graph] : mathGraphs) {
+            ImGui::PushID(id.c_str());
+            if (ImGui::Selectable(graph.name.c_str(), selectedMathGraph == id))
+                selectedMathGraph = id;
+            ImGui::PopID();
+        }
+    }
+    ImGui::EndChild();
+    ImGui::SameLine();
+    if (!ImGui::BeginChild("##mathEditor", ImVec2(0.0f, 0.0f))) {
+        ImGui::EndChild();
+        return;
+    }
+    const auto current = mathGraphs.find(selectedMathGraph);
+    if (current == mathGraphs.end()) {
+        ImGui::TextDisabled("%s", L("Sélectionnez un graphe ou créez-en un.", "Select or create a graph."));
+        ImGui::EndChild();
+        return;
+    }
+    ImGui::PushID(current->first.c_str());
+    auto& graph = current->second;
+    bool edited = false;
+    char name[128] {};
+    cydaw::base::Text(graph.name).copyToUTF8(name, sizeof(name));
+    ImGui::SetNextItemWidth(dp(280.0f));
+    if (ImGui::InputText(L("Nom", "Name"), name, sizeof(name), ImGuiInputTextFlags_EnterReturnsTrue))
+        if (const auto entered = cydaw::base::Text::fromUTF8(name).trim(); entered.isNotEmpty()) {
+            graph.name = entered.toStdString();
+            edited = true;
+        }
+    const auto& p = theme::palette();
+    const auto compiled = compileMath(current->first);
+    if (compiled) {
+        std::array<float, 129> values {};
+        for (std::size_t i = 0; i < values.size(); ++i)
+            values[i] = static_cast<float>(control::evaluateTransfer(*compiled, static_cast<double>(i) / (values.size() - 1)));
+        ImGui::SetNextItemWidth(dp(200.0f));
+        ImGui::SliderFloat(L("Entrée de simulation", "Simulation input"), &mathPreview_, 0.0f, 1.0f, "%.3f");
+        const auto output = control::evaluateTransfer(*compiled, mathPreview_);
+        char readout[45];
+        std::snprintf(readout, sizeof(readout), "%.3f → %.3f", static_cast<double>(mathPreview_), output);
+        ImGui::PlotLines("##transferPreview", values.data(), static_cast<int>(values.size()), 0, readout, 0.0f, 1.0f,
+                         ImVec2(-1.0f, dp(146.0f)));
+    } else {
+        ImGui::TextColored(theme::vec(p.record), "%s", L("Graphe incomplet ou circulaire", "Incomplete or circular graph"));
+    }
+    ImGui::Separator();
+    ImGui::TextColored(theme::vec(p.accent), "%s", L("Entrée  [0, 1]", "Input  [0, 1]"));
+    std::optional<std::size_t> remove;
+    std::optional<std::size_t> moveUp;
+    for (std::size_t i = 0; i < graph.nodes.size(); ++i) {
+        ImGui::PushID(static_cast<int>(i));
+        auto& node = graph.nodes[i];
+        const auto* function = std::get_if<control::Modifier>(&node);
+        const auto* nested = std::get_if<std::string>(&node);
+        const auto definition = nested != nullptr ? mathGraphs.find(*nested) : mathGraphs.end();
+        const auto title = function != nullptr ? cydaw::base::Text(modifierLabel(function->kind))
+                         : ui::Ls("Graphe : ", "Graph: ") + cydaw::base::Text(definition != mathGraphs.end() ? definition->second.name : *nested);
+        ImGui::BulletText("%s", title.toRawUTF8());
+        ImGui::SameLine();
+        if (i > 0) {
+            if (ImGui::SmallButton("↑"))
+                moveUp = i;
+            ImGui::SameLine();
+        }
+        if (ImGui::SmallButton("×"))
+            remove = i;
+        if (auto* parameter = std::get_if<control::Modifier>(&node)) {
+            switch (parameter->kind) {
+            case Kind::range:
+            case Kind::scale:
+            case Kind::curve:
+            case Kind::threshold:
+            case Kind::deadzone:
+            case Kind::steps: {
+                const auto kind = parameter->kind;
+                auto a = static_cast<float>(parameter->a);
+                const auto minimum = kind == Kind::curve ? -1.0f : kind == Kind::steps ? 2.0f : 0.0f;
+                const auto maximum = kind == Kind::steps ? 128.0f : kind == Kind::deadzone ? .49f : 1.0f;
+                ImGui::SetNextItemWidth(dp(115.0f));
+                if (ImGui::DragFloat("##a", &a, .008f, minimum, maximum, kind == Kind::steps ? "%.0f" : "%.3f",
+                                     ImGuiSliderFlags_AlwaysClamp)) {
+                    parameter->a = a;
+                    edited = true;
+                }
+                if (kind == Kind::range || kind == Kind::scale) {
+                    auto b = static_cast<float>(parameter->b);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(dp(115.0f));
+                    if (ImGui::DragFloat("##b", &b, .008f, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags_AlwaysClamp)) {
+                        parameter->b = b;
+                        edited = true;
+                    }
+                }
+                break;
+            }
+            case Kind::drawnCurve: {
+                const auto min = ImGui::GetCursorScreenPos();
+                const auto size = ImVec2(std::max(dp(140.0f), ImGui::GetContentRegionAvail().x), dp(95.0f));
+                ImGui::InvisibleButton("##curve", size);
+                const auto xy = [&](std::size_t knot) {
+                    return ImVec2(min.x + size.x * static_cast<float>(knot) / 16.0f,
+                                  min.y + size.y * (1.0f - static_cast<float>(parameter->points[knot])));
+                };
+                if (ImGui::IsItemActive() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    const auto mouse = ImGui::GetIO().MousePos;
+                    const auto knot = std::clamp(static_cast<int>(std::lround(16.0f * (mouse.x - min.x) / size.x)), 0, 16);
+                    parameter->points[static_cast<std::size_t>(knot)] = std::clamp(1.0 - (mouse.y - min.y) / size.y, 0.0, 1.0);
+                    edited = true;
+                }
+                auto* draw = ImGui::GetWindowDrawList();
+                draw->AddRectFilled(min, ImVec2(min.x + size.x, min.y + size.y), p.bg0);
+                for (std::size_t i = 0; i < parameter->points.size(); ++i) {
+                    if (i > 0)
+                        draw->AddLine(xy(i - 1), xy(i), p.accent, dp(1.5f));
+                    draw->AddCircleFilled(xy(i), dp(2.5f), p.accent);
+                }
+                break;
+            }
+            default:
+                break;
+            }
+        }
+        ImGui::PopID();
+    }
+    if (remove) {
+        graph.nodes.erase(graph.nodes.begin() + static_cast<std::ptrdiff_t>(*remove));
+        edited = true;
+    } else if (moveUp) {
+        std::swap(graph.nodes[*moveUp], graph.nodes[*moveUp - 1]);
+        edited = true;
+    }
+    ImGui::SetNextItemWidth(dp(165.0f));
+    if (ImGui::BeginCombo("##newMathNode", L("+ Fonction", "+ Function"), ImGuiComboFlags_NoArrowButton)) {
+        for (int i = 0; i < control::modifierKindCount; ++i) {
+            const auto kind = static_cast<Kind>(i);
+            if (kind == Kind::toggle || kind == Kind::relative)
+                continue;
+            if (ImGui::Selectable(modifierLabel(kind))) {
+                graph.nodes.emplace_back(control::defaultModifier(kind));
+                if (compileMath(current->first))
+                    edited = true;
+                else
+                    graph.nodes.pop_back();
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(dp(180.0f));
+    if (ImGui::BeginCombo("##nestedMathGraph", L("+ Sous-graphe", "+ Subgraph"), ImGuiComboFlags_NoArrowButton)) {
+        for (const auto& [id, other] : mathGraphs) {
+            graph.nodes.emplace_back(id);
+            const auto valid = compileMath(current->first).has_value();
+            graph.nodes.pop_back();
+            ImGui::PushID(id.c_str());
+            ImGui::BeginDisabled(!valid);
+            if (ImGui::Selectable(other.name.c_str())) {
+                graph.nodes.emplace_back(id);
+                edited = true;
+            }
+            ImGui::EndDisabled();
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::TextColored(theme::vec(p.accent), "%s", L("Sortie  [0, 1]", "Output  [0, 1]"));
+    if (edited)
+        changed(true, false);
+    ImGui::PopID();
+    ImGui::EndChild();
+}
+
 void Controllers::Impl::drawAssignments()
 {
     const auto& p = theme::palette();
+    if (!assignmentMenuTarget.empty()) {
+        const auto info = targets.describe(assignmentMenuTarget);
+        ImGui::TextUnformatted(info ? info->label.toRawUTF8() : assignmentMenuTarget.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(L("Voir toutes", "Show all")))
+            assignmentMenuTarget.clear();
+    }
     if (router.assignments.empty()) {
         ImGui::TextDisabled("%s", L("Aucune. Dans un périphérique, une règle dit ce qu'elle pilote ; ou « Apprendre », puis cliquez une commande de CyDAW et bougez un contrôle.",
                                     "None. In a device, a rule says what it moves; or « Learn », then click a CyDAW control and move a control."));
         return;
     }
     std::optional<std::size_t> removed;
-    if (ImGui::BeginTable("##assigned", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_ScrollY, ImVec2(0.0f, 0.0f))) {
+    if (ImGui::BeginTable("##assigned", 6, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_ScrollY, ImVec2(0.0f, 0.0f))) {
         ImGui::TableSetupColumn(L("Périphérique · règle", "Device · rule"), ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableSetupColumn(L("Cible", "Target"), ImGuiTableColumnFlags_WidthStretch, 1.3f);
         ImGui::TableSetupColumn(L("Plage", "Range"), ImGuiTableColumnFlags_WidthFixed, dp(110.0f));
+        ImGui::TableSetupColumn(L("Graphe", "Graph"), ImGuiTableColumnFlags_WidthStretch, 0.9f);
         ImGui::TableSetupColumn(L("Reprise", "Pickup"), ImGuiTableColumnFlags_WidthFixed, dp(50.0f));
         ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, dp(24.0f));
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableHeadersRow();
         for (std::size_t index = 0; index < router.assignments.size(); ++index) {
             auto& assignment = router.assignments[index];
+            if (!assignmentMenuTarget.empty() && assignment.target != assignmentMenuTarget)
+                continue;
             ImGui::PushID(static_cast<int>(index));
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
@@ -1339,6 +1578,12 @@ void Controllers::Impl::drawAssignments()
             ImGui::SameLine(0.0f, dp(2.0f));
             ImGui::SetNextItemWidth(dp(50.0f));
             edited |= ImGui::DragFloat("##high", &high, 0.005f, 0.0f, 1.0f, "%.2f");
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            if (mathGraphCombo("##mappingGraph", assignment.transfer.graph)) {
+                assignment.caught = !assignment.takeover;
+                edited = true;
+            }
             ImGui::TableNextColumn();
             auto takeover = assignment.takeover;
             if (ImGui::Checkbox("##takeover", &takeover)) {
@@ -1546,8 +1791,12 @@ void Controllers::Impl::drawOverlay()
     // What each target is moved by now.
     std::map<std::string, cydaw::base::Text> assigned;
     for (const auto& assignment : router.assignments)
-        if (const auto* control = router.findControl(assignment.device, assignment.control))
-            assigned[assignment.target] = cydaw::base::Text(control->name);
+        if (const auto* control = router.findControl(assignment.device, assignment.control)) {
+            auto& label = assigned[assignment.target];
+            if (label.isNotEmpty())
+                label << ", ";
+            label << cydaw::base::Text(control->name);
+        }
     std::map<ImGuiID, std::vector<const ui::LearnSpot*>> byViewport;
     byViewport[ImGui::GetMainViewport()->ID];
     for (const auto& spot : spots)
@@ -1604,8 +1853,8 @@ void Controllers::Impl::drawOverlay()
             if (assigned.contains(hovered->key))
                 ImGui::TextColored(theme::vec(p.play), "← %s", assigned[hovered->key].toRawUTF8());
             ImGui::TextDisabled("%s", picking != nullptr ? L("Clic : la règle la pilote", "Click: the rule moves it")
-                                                         : L("Clic : apprendre · clic droit : retirer l'assignation",
-                                                             "Click: learn · right click: remove the assignment"));
+                                                         : L("Clic : apprendre · clic droit : gérer les assignations",
+                                                             "Click: learn · right click: manage assignments"));
             ImGui::EndTooltip();
             if (clickedLeft) {
                 const auto info = targets.describe(hovered->key);
@@ -1624,10 +1873,35 @@ void Controllers::Impl::drawOverlay()
                     learnStatus.clear();
                 }
             }
-            if (clickedRight)
-                for (std::size_t index = router.assignments.size(); index-- > 0;)
-                    if (router.assignments[index].target == hovered->key)
-                        unassign(index);
+            if (clickedRight && assigned.contains(hovered->key)) {
+                learnMenuTarget = hovered->key;
+                ImGui::OpenPopup("##targetAssignments");
+            }
+        }
+        if (ImGui::BeginPopup("##targetAssignments")) {
+            if (ImGui::MenuItem(L("Modifier les assignations…", "Edit assignments…"))) {
+                assignmentMenuTarget = learnMenuTarget;
+                openAssignments = true;
+                stopLearning();
+                learnMode = false;
+                ui::setLearnMode(false);
+            }
+            for (std::size_t i = 0; i < router.assignments.size(); ++i) {
+                const auto& assignment = router.assignments[i];
+                if (assignment.target != learnMenuTarget)
+                    continue;
+                const auto* control = router.findControl(assignment.device, assignment.control);
+                const auto label = ui::Ls("Retirer ", "Remove ")
+                                   + cydaw::base::Text(control != nullptr ? control->name : assignment.control);
+                ImGui::PushID(static_cast<int>(i));
+                const auto remove = ImGui::MenuItem(label.toRawUTF8());
+                ImGui::PopID();
+                if (remove) {
+                    unassign(i);
+                    break;
+                }
+            }
+            ImGui::EndPopup();
         }
         // The banner, on the main window.
         if (id == ImGui::GetMainViewport()->ID && learnMode) {

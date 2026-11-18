@@ -1460,6 +1460,19 @@ void GraphDocument::initialiseFactoryPresets() {
                                 {"graph-audio-output-2", {0.96f, 0.42f}}},
                                {{0, 1}, {1, 2}, {2, 3}, {3, 4}}});
   });
+  // The unmodified seven-node recipes for native synths need only MIDI
+  // allocation and the synth itself. Authored graphs retain their stages.
+  for (auto &preset : factoryPresets_) {
+    auto &nodes = preset.nodes;
+    if (nodes.size() != 7 || nodes[0].typeKey != "midi-input" ||
+        nodes[1].typeKey != "voice-allocator" || nodes[3].typeKey != "envelope" ||
+        nodes[4].typeKey != "gain" || nodes[5].typeKey != "voice-filter" ||
+        nodes[6].typeKey != "master" ||
+        !graph::hasCompleteVoice(primitiveProcessorKeyForType(nodes[2].typeKey).toStdString()))
+      continue;
+    nodes.erase(nodes.begin() + 3, nodes.begin() + 6);
+    preset.connections = {{0, 1}, {1, 2, 2, 2}, {2, 3}};
+  }
 }
 
 void GraphDocument::initialiseCatalog() {

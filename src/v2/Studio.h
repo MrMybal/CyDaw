@@ -272,6 +272,11 @@ public:
     [[nodiscard]] std::optional<PresetHolder> chainPresetHolder(const TrackRef& track) const;
     [[nodiscard]] cydaw::base::Value devicePresetState(const TrackRef& track, std::uint64_t nodeId) const override;
     bool applyDevicePreset(const TrackRef& track, std::uint64_t nodeId, const cydaw::base::Value& state, cydaw::base::Text& error) override;
+    cydaw::base::Result addDevicePreset(const TrackRef& track, const cydaw::base::Text& key,
+                                       const cydaw::base::Value& state, std::uint64_t before = 0);
+    cydaw::base::Result addFactoryChain(const TrackRef& track, const cydaw::base::Text& key, std::uint64_t before = 0);
+    cydaw::base::Result addEffectGraph(const TrackRef& track, const cydaw::base::Value& graph,
+                                      const cydaw::base::Text& name, std::uint64_t before = 0);
 
     // ---- Audio editing (a clip's own sound) -----------------------------------------
     // Where destructive edits' results are written: the project's folder
@@ -1134,6 +1139,12 @@ public:
     // the empty instrument graph when the key is empty.
     std::optional<TrackRef> addMidiTrack(const cydaw::base::Text& name = {}, const cydaw::base::Text& instrumentKey = {});
     bool removeTrack(const TrackRef& track);
+    cydaw::base::Result bounceMidiTrack(const TrackRef& track, bool preFader, double tailSeconds);
+    [[nodiscard]] bool bouncingMidi() const noexcept { return pendingMidiBounce_.has_value(); }
+    [[nodiscard]] std::optional<TrackRef> midiSourceOfBounce(const TrackRef& track) const;
+    [[nodiscard]] std::optional<TrackRef> returnToMidi(const TrackRef& track);
+    void restoreBounceLink(std::uint64_t rendered, std::uint64_t source, bool wasMuted);
+    [[nodiscard]] bool bounceSourceWasMuted(const TrackRef& rendered) const;
     bool moveTrack(const TrackRef& track, int delta);
     // Counts what makes a TrackRef kept aside stale (a track removed, the
     // session cleared): the undo histories holding refs drop theirs.
@@ -1264,6 +1275,19 @@ private:
     // instrument tracks whose audio part records.
     std::map<std::uint64_t, std::uint64_t> companions_;
     std::set<std::uint64_t> hybridAudioRecords_;
+    struct PendingMidiBounce {
+        std::uint64_t source {};
+        cydaw::base::File file;
+        double start {};
+        bool preFader {};
+    };
+    struct MidiBounceLink {
+        std::uint64_t source {};
+        bool wasMuted {};
+    };
+    std::optional<PendingMidiBounce> pendingMidiBounce_;
+    std::map<std::uint64_t, MidiBounceLink> midiBounces_;
+    void finishMidiBounce(const cydaw::base::Result& result);
     // A hybrid track's other part recording with it: the companion, its MIDI
     // clip (0: its sound), the audio track armed before it.
     std::optional<TrackRef> companionRecording_;

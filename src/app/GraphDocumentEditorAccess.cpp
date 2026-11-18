@@ -1229,6 +1229,11 @@ bool GraphDocument::editorIsVoiceNode(const std::uint64_t id) const {
   const auto boundary = instrumentVoiceBoundary();
   return boundary.outputNodeId != 0 && boundary.voiceNodes.contains(id);
 }
+
+std::set<std::uint64_t> GraphDocument::editorVoiceNodes() const
+{
+  return instrumentVoiceBoundary().voiceNodes;
+}
 std::optional<cydaw::engine::PolyVoiceTarget>
 GraphDocument::editorVoiceTargetFor(const cydaw::base::Text &binding) const {
   if (!binding.startsWith("node."))
@@ -1654,6 +1659,89 @@ GraphDocument::editorInsertContainer(const cydaw::base::Text &typeKey,
   notifyLayoutChanged("v2-insert-container");
   return head;
 }
+std::uint64_t GraphDocument::editorWrapEffectChain(const std::uint64_t first)
+{
+  if (editingLocked_)
+    return 0;
+  const auto excluded = editorContainerMembers();
+  const auto voice = instrumentVoiceBoundary();
+  const auto ports = [&](const NodeId id) -> std::optional<CardSpan> {
+    const auto *node = findNode(id);
+    if (!node || isBoundaryNode(*node) || excluded.contains(id) ||
+        voice.voiceNodes.contains(id) || editorIsContainer(id))
+      return std::nullopt;
+    CardSpan span{id, 0, id, 0};
+    for (const auto &port : node->ports)
+      if (port.type == cydaw::graph::PortType::audio && port.key != "sidechain-in") {
+        auto &socket = port.input ? span.in : span.out;
+        if (socket != 0)
+          return std::nullopt;
+        socket = port.id;
+      }
+    return span.in != 0 && span.out != 0 ? std::optional<CardSpan>(span) : std::nullopt;
+  };
+  const auto start = ports(first);
+  if (!start)
+    return 0;
+  const auto feeds = [&](const CardSpan &card) {
+    return std::ranges::count_if(connections_, [&](const Connection &wire) {
+      return wire.kind == PortKind::audio && wire.destination == card.first && wire.destinationPort == card.in;
+    });
+  };
+  if (feeds(*start) != 1)
+    return 0;
+  auto current = *start;
+  Connection outgoing;
+  std::set<NodeId> visited;
+  for (;;) {
+    if (!visited.insert(current.last).second)
+      return 0;
+    const auto matches = [&current](const Connection &wire) {
+      return wire.kind == PortKind::audio && wire.source == current.last && wire.sourcePort == current.out;
+    };
+    if (std::ranges::count_if(connections_, matches) != 1)
+      return 0;
+    outgoing = *std::ranges::find_if(connections_, matches);
+    const auto next = ports(outgoing.destination);
+    if (!next || outgoing.destinationPort != next->in || feeds(*next) != 1)
+      break;
+    current = *next;
+  }
+  if (visited.size() < 2)
+    return 0;
+
+  const auto previousNodes = nodes_;
+  const auto previousConnections = connections_;
+  const auto previousId = nextNodeId_;
+  const auto head = editorInsertContainer("fx-chain", first);
+  const auto container = head != 0 ? editorContainer(head) : std::nullopt;
+  if (container && container->end != 0) {
+    const auto end = container->end;
+    const auto branch = containers::branchPort(0);
+    std::erase_if(connections_, [&](const Connection &wire) {
+      return (wire.source == end && wire.destination == first && wire.destinationPort == start->in)
+             || (wire.source == head && wire.sourcePort == branch && wire.destination == end)
+             || (wire.source == outgoing.source && wire.sourcePort == outgoing.sourcePort
+                 && wire.destination == outgoing.destination && wire.destinationPort == outgoing.destinationPort);
+    });
+    if (connectNodes(head, first, branch, start->in) &&
+        connectNodes(current.last, end, current.out, branch) &&
+        connectNodes(end, outgoing.destination, containers::endOutputPort, outgoing.destinationPort)) {
+      for (auto &node : nodes_)
+        node.serialised = cydaw::base::Value();
+      synchroniseGraphInterface();
+      notifyLayoutChanged("v2-wrap-effects");
+      return head;
+    }
+  }
+  nodes_ = previousNodes;
+  connections_ = previousConnections;
+  nextNodeId_ = previousId;
+  synchroniseGraphInterface();
+  notifyLayoutChanged("v2-wrap-effects-rollback");
+  return 0;
+}
+
 bool GraphDocument::editorMoveCard(const std::uint64_t id,
                                    const std::uint64_t head, const int branch,
                                    const std::uint64_t before) {

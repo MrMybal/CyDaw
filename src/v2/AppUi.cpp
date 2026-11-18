@@ -2658,7 +2658,7 @@ cydaw::base::Value AppUi::library(const cydaw::base::Text& command, const cydaw:
     }
     if (request.hasProperty("tab")) {
         const auto tab = request.getProperty("tab", {}).toString();
-        state_.libraryTab = tab == "instruments" ? 1 : tab == "effects" ? 2 : 0;
+        state_.libraryTab = tab == "instruments" ? 1 : tab == "effects" ? 2 : tab == "presets" ? 3 : 0;
     }
     if (request.hasProperty("detached"))
         ui::setDetached("###library", static_cast<bool>(request.getProperty("detached", false)));
@@ -2685,7 +2685,7 @@ cydaw::base::Value AppUi::library(const cydaw::base::Text& command, const cydaw:
     }
     const auto probe = library_->probe();
     result->setProperty("shown", probe.shown);
-    result->setProperty("tab", probe.tab == 1 ? "instruments" : probe.tab == 2 ? "effects" : "samples");
+    result->setProperty("tab", probe.tab == 1 ? "instruments" : probe.tab == 2 ? "effects" : probe.tab == 3 ? "presets" : "samples");
     result->setProperty("detached", ui::isDetached("###library"));
     result->setProperty("rows", probe.rows);
     result->setProperty("total", probe.total);
@@ -2898,7 +2898,8 @@ void AppUi::drawMenuBar()
         if (ImGui::MenuItem(L("Importer un fichier MIDI…", "Import a MIDI file…")))
             chooseImportMidi();
         const auto exporting = studio_.engine().isMasterExporting();
-        if (ImGui::MenuItem(exporting ? L("Annuler l'export", "Cancel the export") : L("Exporter le mix (WAV)…", "Export the mix (WAV)…"))) {
+        if (ImGui::MenuItem(exporting ? (studio_.bouncingMidi() ? L("Annuler le bounce", "Cancel the bounce") : L("Annuler l'export", "Cancel the export"))
+                                     : L("Exporter le mix (WAV)…", "Export the mix (WAV)…"))) {
             if (exporting)
                 studio_.engine().cancelMasterExport();
             else if(fileView)fileView->chooseExport();
@@ -2927,6 +2928,25 @@ void AppUi::drawMenuBar()
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu(ui::labelId(L("Piste", "Track"), "menuTrack").c_str())) {
+        if (state_.selectedTrack) {
+            const auto track = *state_.selectedTrack;
+            if (track.midi && ImGui::BeginMenu(L("Bounce en WAV", "Bounce to WAV"), !studio_.engine().isMasterExporting())) {
+                ImGui::SetNextItemWidth(dp(130.0f));
+                ImGui::DragFloat(L("Queue (s)", "Tail (s)"), &midiBounceTailSeconds_, 0.1f, 0.0f, 120.0f, "%.1f",
+                                 ImGuiSliderFlags_AlwaysClamp);
+                const auto pre = ImGui::MenuItem(L("Pré-fader", "Pre-fader"));
+                const auto post = ImGui::MenuItem(L("Post-fader", "Post-fader"));
+                if (pre || post) {
+                    const auto result = studio_.bounceMidiTrack(track, pre, midiBounceTailSeconds_);
+                    state_.status = result.wasOk() ? ui::Ls("Bounce en cours…", "Bouncing…") : result.getErrorMessage();
+                    state_.statusTime = ImGui::GetTime();
+                }
+                ImGui::EndMenu();
+            }
+            if (studio_.midiSourceOfBounce(track) && ImGui::MenuItem(L("Revenir au MIDI", "Return to MIDI")))
+                if (const auto original = studio_.returnToMidi(track))
+                    state_.selectTrack(*original);
+        }
         if (ImGui::MenuItem(L("Nouvelle piste audio", "New audio track")))
             if (const auto track = studio_.addAudioTrack())
                 state_.selectedTrack = track;
@@ -3672,7 +3692,7 @@ void AppUi::drawStatusBar()
         }
         if (studio_.engine().isMasterExporting()) {
             ImGui::SameLine(0.0f, dp(18.0f));
-            ImGui::TextColored(theme::vec(p.accent), "%s %d %%", L("Export", "Export"),
+            ImGui::TextColored(theme::vec(p.accent), "%s %d %%", studio_.bouncingMidi() ? "Bounce" : "Export",
                                static_cast<int>(std::round(studio_.engine().masterExportProgress() * 100.0)));
             host_.wake(2);
         }

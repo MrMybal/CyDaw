@@ -3453,6 +3453,15 @@ GraphDocument::instrumentVoiceBoundary() const {
   const auto *envelope = firstOf(is("core.adsr"));
   const auto *amplifier = firstOf(is("core.gain"));
   const auto *filter = firstOf(is("core.lowpass"));
+  if (allocator != nullptr && source != nullptr &&
+      graph::hasCompleteVoice(primitiveProcessorKeyForType(source->typeKey).toStdString()) &&
+      (envelope == nullptr || !std::ranges::any_of(connections_, [&](const Connection &wire) {
+        return wire.source == allocator->id && wire.destination == envelope->id;
+      }))) {
+    boundary.voiceNodes = {allocator->id, source->id};
+    boundary.outputNodeId = source->id;
+    return boundary;
+  }
   if (allocator == nullptr || source == nullptr || envelope == nullptr ||
       amplifier == nullptr || filter == nullptr)
     return boundary;
@@ -4054,6 +4063,9 @@ cydaw::base::Result GraphDocument::compilePolySynthGraph(
   const auto *envelope = firstNodeOfType("envelope");
   const auto *amplifier = firstNodeOfType("gain");
   const auto *filter = firstNodeOfType("voice-filter");
+  const auto compactVoice = allocator != nullptr && oscillator != nullptr
+      && graph::hasCompleteVoice(detail::primitiveProcessorKeyForType(oscillator->typeKey).toStdString())
+      && (envelope == nullptr || !reaches(allocator->id, envelope->id));
   const auto *output = firstNodeOfType("master");
   if (output == nullptr) {
     const auto found = std::find_if(
@@ -4083,26 +4095,28 @@ cydaw::base::Result GraphDocument::compilePolySynthGraph(
     return cydaw::base::Result::ok();
   }
 
-  if (midiInput == nullptr || allocator == nullptr || oscillator == nullptr ||
-      envelope == nullptr || filter == nullptr || output == nullptr)
+  if (midiInput == nullptr || allocator == nullptr || oscillator == nullptr || output == nullptr ||
+      (!compactVoice && (envelope == nullptr || filter == nullptr)))
     return cydaw::base::Result::fail(
         "Poly synth graph requires MIDI Input, Voice Allocator, a sound "
         "source (Poly Oscillator, Wavetable or String), Envelope, Voice "
         "Filter and Master Output nodes.");
 
+  const auto directSignalFlow = compactVoice && reaches(midiInput->id, allocator->id)
+      && reaches(allocator->id, oscillator->id) && reaches(oscillator->id, output->id);
   const auto typedSignalFlow =
-      amplifier != nullptr && reaches(midiInput->id, allocator->id) &&
+      !compactVoice && amplifier != nullptr && reaches(midiInput->id, allocator->id) &&
       reaches(allocator->id, oscillator->id) &&
       reaches(allocator->id, envelope->id) &&
       reaches(oscillator->id, amplifier->id) &&
       reaches(envelope->id, amplifier->id) &&
       reaches(amplifier->id, filter->id) && reaches(filter->id, output->id);
   const auto legacySignalFlow =
-      amplifier == nullptr && reaches(midiInput->id, allocator->id) &&
+      !compactVoice && amplifier == nullptr && reaches(midiInput->id, allocator->id) &&
       reaches(allocator->id, oscillator->id) &&
       reaches(oscillator->id, envelope->id) &&
       reaches(envelope->id, filter->id) && reaches(filter->id, output->id);
-  if (!typedSignalFlow && !legacySignalFlow)
+  if (!directSignalFlow && !typedSignalFlow && !legacySignalFlow)
     return cydaw::base::Result::fail(
         "Connect Pitch and Gate from the Voice Allocator, then route "
         "Oscillator "
@@ -4114,7 +4128,7 @@ cydaw::base::Result GraphDocument::compilePolySynthGraph(
   // Published graph inputs/outputs are boundaries, not DSP processors.  The
   // typed factory instrument itself contains allocator, oscillator, ADSR,
   // VCA, filter and its two published boundaries.
-  destination.graphNodeCount = typedSignalFlow ? 7 : 6;
+  destination.graphNodeCount = compactVoice ? 4 : typedSignalFlow ? 7 : 6;
   destination.voiceCount = 16;
   if (allocator != nullptr) {
     destination.voiceMode = base::limit(
@@ -4194,7 +4208,8 @@ cydaw::base::Result GraphDocument::compilePolySynthGraph(
       0.0f,
       cydaw::engine::playsRecordingLevel(destination.waveform) ? 1.0f : 0.5f,
       oscillator->parameters.oscillatorLevel);
-  destination.attackSeconds = base::limit(
+  if (!compactVoice) {
+    destination.attackSeconds = base::limit(
       0.0001f, 5.0f, envelope->parameters.attackMilliseconds * 0.001f);
   destination.decaySeconds = base::limit(
       0.0001f, 5.0f, envelope->parameters.decayMilliseconds * 0.001f);
@@ -4202,8 +4217,9 @@ cydaw::base::Result GraphDocument::compilePolySynthGraph(
       base::limit(0.0f, 1.0f, envelope->parameters.sustainLevel);
   destination.releaseSeconds = base::limit(
       0.0001f, 10.0f, envelope->parameters.releaseMilliseconds * 0.001f);
-  destination.filterCutoffHz =
-      base::limit(20.0f, 20'000.0f, filter->parameters.cutoffHz);
+    destination.filterCutoffHz =
+        base::limit(20.0f, 20'000.0f, filter->parameters.cutoffHz);
+  }
   for (const auto &node : flatNodes) {
     if (!reaches(midiInput->id, node.id) || !reaches(node.id, allocator->id))
       continue;

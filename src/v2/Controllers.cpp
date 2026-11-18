@@ -77,6 +77,8 @@ std::optional<control::Modifier> modifierFrom(const cydaw::base::Value& value)
     auto modifier = control::defaultModifier(*kind);
     modifier.a = number(value, "a", modifier.a);
     modifier.b = number(value, "b", modifier.b);
+    if (!std::isfinite(modifier.a) || !std::isfinite(modifier.b))
+        return std::nullopt;
     if(const auto* points=value.getProperty("points",{}).getArray();points && points->size()==int(modifier.points.size()))
         for(int i=0;i<points->size();++i){const auto p=static_cast<double>((*points)[i]);if(std::isfinite(p))modifier.points[std::size_t(i)]=std::clamp(p,0.0,1.0);}
     return modifier;
@@ -109,6 +111,8 @@ cydaw::base::Value assignmentVar(const control::Assignment& assignment)
     set(item, "minimum", assignment.minimum);
     set(item, "maximum", assignment.maximum);
     set(item, "takeover", assignment.takeover);
+    if (!assignment.transfer.graph.empty())
+        set(item, "graph", cydaw::base::Text(assignment.transfer.graph));
     return item;
 }
 
@@ -124,6 +128,7 @@ std::optional<control::Assignment> assignmentFrom(const cydaw::base::Value& valu
     assignment.maximum = std::clamp(number(value, "maximum", 1.0), 0.0, 1.0);
     assignment.takeover = static_cast<bool>(value.getProperty("takeover", false));
     assignment.project = project;
+    assignment.transfer.graph = text(value, "graph").toStdString();
     return assignment;
 }
 
@@ -484,6 +489,7 @@ void Controllers::Impl::refreshGate()
     const auto fingerprint=cydaw::base::JSON::toString(globalState(),true).toStdString()+cydaw::base::JSON::toString(projectAssignments(),true).toStdString();
     if (fingerprint != directFingerprint) {
         directFingerprint=fingerprint;
+        rebuildMath();
         std::set<std::string> disabled;
         for (const auto& device:raw) if(!device->enabled) disabled.insert(device->id);
         directMidi.configure(router,std::move(disabled));
@@ -500,6 +506,69 @@ void Controllers::Impl::refreshGate()
     const std::scoped_lock hold(gateLock);
     silentDevices = std::move(silent);
     takenAddresses = std::move(taken);
+}
+
+std::optional<std::vector<control::Modifier>> Controllers::Impl::compileMath(const std::string& id) const
+{
+    std::vector<control::Modifier> functions;
+    std::set<std::string> open;
+    int visited = 0;
+    const auto visit = [&](auto&& self, const std::string& key) -> bool {
+        const auto graph = mathGraphs.find(key);
+        if (graph == mathGraphs.end() || open.size() >= 16 || !open.insert(key).second)
+            return false;
+        for (const auto& node : graph->second.nodes) {
+            if (++visited > 256)
+                return false;
+            if (const auto* modifier = std::get_if<control::Modifier>(&node)) {
+                if (modifier->kind == control::ModifierKind::toggle || modifier->kind == control::ModifierKind::relative)
+                    return false;
+                functions.push_back(*modifier);
+            } else if (!self(self, std::get<std::string>(node))) {
+                return false;
+            }
+        }
+        open.erase(key);
+        return true;
+    };
+    if (!id.empty() && !visit(visit, id))
+        return std::nullopt;
+    return functions;
+}
+
+void Controllers::Impl::rebuildMath()
+{
+    const auto prepare = [this](control::Transfer& transfer) {
+        const auto compiled = compileMath(transfer.graph);
+        transfer.functions = compiled.value_or(std::vector<control::Modifier>());
+    };
+    for (auto& device : router.devices)
+        for (auto& control : device.controls)
+            prepare(control.transfer);
+    for (auto& assignment : router.assignments)
+        prepare(assignment.transfer);
+}
+
+cydaw::base::Value Controllers::Impl::mathGraphList() const
+{
+    cydaw::base::Array<cydaw::base::Value> graphs;
+    for (const auto& [id, graph] : mathGraphs) {
+        auto entry = object();
+        set(entry, "id", cydaw::base::Text(id));
+        set(entry, "name", cydaw::base::Text(graph.name));
+        cydaw::base::Array<cydaw::base::Value> nodes;
+        for (const auto& node : graph.nodes)
+            if (const auto* modifier = std::get_if<control::Modifier>(&node)) {
+                nodes.add(modifierVar(*modifier));
+            } else {
+                auto reference = object();
+                set(reference, "graph", cydaw::base::Text(std::get<std::string>(node)));
+                nodes.add(reference);
+            }
+        set(entry, "nodes", nodes);
+        graphs.add(entry);
+    }
+    return graphs;
 }
 
 bool Controllers::Impl::gatePasses(const cydaw::base::Text& identifier, const cydaw::midi::Message& message)
@@ -1228,6 +1297,7 @@ cydaw::base::Value Controllers::Impl::globalState() const
         devices.add(item);
     }
     set(state, "raw", devices);
+    set(state, "mathGraphs", mathGraphList());
     cydaw::base::Array<cydaw::base::Value> virtualDevices;
     for (const auto& device : router.devices) {
         auto item = object();
@@ -1246,6 +1316,8 @@ cydaw::base::Value Controllers::Impl::globalState() const
             set(entry, "feedbackDevice", cydaw::base::Text(control.feedbackDevice));
             set(entry, "feedbackAddress", cydaw::base::Text(control.feedbackAddress));
             set(entry, "chain", chainVar(control.chain));
+            if (!control.transfer.graph.empty())
+                set(entry, "graph", cydaw::base::Text(control.transfer.graph));
             controls.add(entry);
         }
         set(item, "controls", controls);
@@ -1262,6 +1334,21 @@ cydaw::base::Value Controllers::Impl::globalState() const
 
 void Controllers::Impl::restoreGlobal(const cydaw::base::Value& state)
 {
+    if (const auto* graphs = state.getProperty("mathGraphs", {}).getArray())
+        for (const auto& entry : *graphs) {
+            const auto id = text(entry, "id").toStdString();
+            if (id.empty() || mathGraphs.contains(id))
+                continue;
+            auto& graph = mathGraphs[id];
+            graph.name = text(entry, "name", cydaw::base::Text(id)).toStdString();
+            if (const auto* nodes = entry.getProperty("nodes", {}).getArray())
+                for (const auto& node : *nodes) {
+                    if (const auto child = text(node, "graph").toStdString(); !child.empty())
+                        graph.nodes.emplace_back(child);
+                    else if (const auto modifier = modifierFrom(node))
+                        graph.nodes.emplace_back(*modifier);
+                }
+        }
     if (!state.isObject())
         return;
     if (const auto* list = state.getProperty("raw", {}).getArray())
@@ -1307,6 +1394,7 @@ void Controllers::Impl::restoreGlobal(const cydaw::base::Value& state)
                     control.feedbackDevice = text(entry, "feedbackDevice").toStdString();
                     control.feedbackAddress = text(entry, "feedbackAddress").toStdString();
                     control.chain = chainFrom(entry.getProperty("chain", {}));
+                    control.transfer.graph = text(entry, "graph").toStdString();
                     device.controls.push_back(control);
                 }
             // Settings made before a device had its own hardware.
@@ -1408,7 +1496,9 @@ cydaw::base::Value Controllers::Impl::describe() const
             set(entry, "feedbackDevice", cydaw::base::Text(control.feedbackDevice));
             set(entry, "feedbackAddress", cydaw::base::Text(control.feedbackAddress));
             set(entry, "chain", chainVar(control.chain));
-            set(entry, "value", control.value);
+            set(entry, "value", control::evaluateTransfer(control.transfer.functions, control.value));
+            if (!control.transfer.graph.empty())
+                set(entry, "graph", cydaw::base::Text(control.transfer.graph));
             controls.add(entry);
         }
         set(item, "controls", controls);
@@ -1424,6 +1514,7 @@ cydaw::base::Value Controllers::Impl::describe() const
         assignments.add(item);
     }
     set(result, "assignments", assignments);
+    set(result, "mathGraphs", mathGraphList());
     cydaw::base::Array<cydaw::base::Value> loaded;
     for (const auto& plugin : plugins) {
         auto item = object();
@@ -1440,7 +1531,7 @@ cydaw::base::Value Controllers::Impl::describe() const
     set(result, "learnHardware", cydaw::base::Text(learnHardware));
     set(result, "learnControls", cydaw::base::Text(learnControls));
     set(result, "learnStatus", learnStatus);
-    set(result, "tab", tab == 1 ? "hardware" : tab == 2 ? "assignments" : tab == 3 ? "keyboard" : "devices");
+    set(result, "tab", tab == 1 ? "hardware" : tab == 2 ? "assignments" : tab == 3 ? "keyboard" : tab == 4 ? "graphs" : "devices");
     set(result, "nativeInputActive", nativeInput && nativeInput->available());
     set(result, "directMidiMessages", static_cast<std::int64_t>(directMidi.sent()));
     return result;
@@ -1458,7 +1549,7 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
             centreWindow = true;
         const auto tabName = text(request, "tab");
         if (tabName.isNotEmpty())
-            requestedTab = tabName == "hardware" ? 1 : tabName == "assignments" ? 2 : tabName == "keyboard" ? 3 : 0;
+            requestedTab = tabName == "hardware" ? 1 : tabName == "assignments" ? 2 : tabName == "keyboard" ? 3 : tabName == "graphs" ? 4 : 0;
         if (router.findDevice(device) != nullptr) {
             selectedDevice = device;
             selectedControl = router.findControl(device, controlId) != nullptr ? controlId : std::string();
@@ -1474,6 +1565,42 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
     }
     if (action == "status")
         return describe();
+    if (action == "set_math_graph" || action == "simulate_math_graph") {
+        const auto id = text(request, "graph").toStdString();
+        if (id.empty())
+            return fail("a graph needs an identifier");
+        if (action == "simulate_math_graph") {
+            const auto functions = compileMath(id);
+            if (!functions)
+                return fail("invalid graph");
+            auto result = object();
+            set(result, "value", control::evaluateTransfer(*functions, number(request, "value", .5)));
+            return result;
+        }
+        MathGraph graph { text(request, "name", cydaw::base::Text(id)).toStdString(), {} };
+        if (const auto* nodes = request.getProperty("nodes", {}).getArray())
+            for (const auto& node : *nodes) {
+                if (const auto child = text(node, "graph").toStdString(); !child.empty()) {
+                    graph.nodes.emplace_back(child);
+                } else if (const auto modifier = modifierFrom(node)) {
+                    graph.nodes.emplace_back(*modifier);
+                } else {
+                    return fail("unknown math node");
+                }
+            }
+        const auto previous = mathGraphs.contains(id) ? std::optional<MathGraph>(mathGraphs.at(id)) : std::nullopt;
+        mathGraphs[id] = std::move(graph);
+        if (!compileMath(id)) {
+            if (previous)
+                mathGraphs[id] = *previous;
+            else
+                mathGraphs.erase(id);
+            return fail("invalid, circular or too large math graph");
+        }
+        selectedMathGraph = id;
+        changed(true, false);
+        return describe();
+    }
     if (action == "scan") {
         scanMidi();
         return describe();
@@ -1579,6 +1706,9 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
         return describe();
     }
     if (action == "add_control" || action == "set_control") {
+        const auto graph = text(request, "graph").toStdString();
+        if (request.hasProperty("graph") && !compileMath(graph))
+            return fail("unknown or invalid math graph");
         std::string id = controlId;
         if (action == "add_control") {
             const auto kind = control::controlKindNamed(text(request, "kind", "knob").toStdString());
@@ -1604,6 +1734,8 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
             control->feedbackAddress = text(request, "feedbackAddress").toStdString();
         if (request.hasProperty("chain"))
             control->chain = chainFrom(request.getProperty("chain", {}));
+        if (request.hasProperty("graph"))
+            control->transfer.graph = graph;
         changed(true, false);
         auto result = object();
         set(result, "device", cydaw::base::Text(device));
@@ -1616,6 +1748,9 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
     }
     if (action == "assign") {
         const auto target = text(request, "target").toStdString();
+        const auto graph = text(request, "graph").toStdString();
+        if (!compileMath(graph))
+            return fail("unknown or invalid math graph");
         if (router.findControl(device, controlId) == nullptr)
             return fail("no control \"" + cydaw::base::Text(controlId) + "\" on \"" + cydaw::base::Text(device) + "\"");
         if (!targets.describe(target))
@@ -1626,6 +1761,7 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
         assignment.maximum = std::clamp(number(request, "maximum", 1.0), 0.0, 1.0);
         assignment.takeover = static_cast<bool>(request.getProperty("takeover", false));
         assignment.caught = !assignment.takeover;
+        assignment.transfer.graph = graph;
         changed(!assignment.project, assignment.project);
         return describe();
     }
@@ -1703,7 +1839,7 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
         set(result, "messages", list);
         return result;
     }
-    return fail("action is status, scan, add_osc, set_raw, remove_raw, inject, add_virtual, set_virtual, duplicate_virtual, "
+    return fail("action is status, scan, set_math_graph, simulate_math_graph, add_osc, set_raw, remove_raw, inject, add_virtual, set_virtual, duplicate_virtual, "
                 "remove_virtual, learn_hardware, learn_controls, add_control, set_control, remove_control, assign, unassign, learn, "
                 "targets, value, apply, feedback or monitor");
 }

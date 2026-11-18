@@ -216,12 +216,14 @@ bool VirtualControl::relative() const noexcept
     return std::any_of(chain.begin(), chain.end(), [](const Modifier& m) { return m.kind == ModifierKind::relative; });
 }
 
-double applyChain(VirtualControl& control, const double raw) noexcept
+namespace {
+double applyFunctions(std::span<const Modifier> functions, double raw, VirtualControl* state) noexcept
 {
     auto x = std::isfinite(raw) ? raw : 0.0;
-    const auto previousRaw = control.lastRaw;
-    control.lastRaw = x;
-    for (const auto& m : control.chain) {
+    const auto previousRaw = state != nullptr ? state->lastRaw : 0.0;
+    if (state != nullptr)
+        state->lastRaw = x;
+    for (const auto& m : functions) {
         switch (m.kind) {
         case ModifierKind::range:
             x = m.b != m.a ? clamp01((x - m.a) / (m.b - m.a)) : clamp01(x);
@@ -239,13 +241,17 @@ double applyChain(VirtualControl& control, const double raw) noexcept
             break;
         }
         case ModifierKind::relative: {
-            const auto tick = ticks(midi7(x), static_cast<int>(std::lround(m.a)));
-            x = clamp01((control.known ? control.value : half) + tick * m.b);
+            if (state != nullptr) {
+                const auto tick = ticks(midi7(x), static_cast<int>(std::lround(m.a)));
+                x = clamp01((state->known ? state->value : half) + tick * m.b);
+            }
             break;
         }
         case ModifierKind::toggle: {
-            const auto now = control.known ? control.value : 0.0;
-            x = x >= half && previousRaw < half ? (now >= half ? 0.0 : 1.0) : now;
+            if (state != nullptr) {
+                const auto now = state->known ? state->value : 0.0;
+                x = x >= half && previousRaw < half ? (now >= half ? 0.0 : 1.0) : now;
+            }
             break;
         }
         case ModifierKind::threshold:
@@ -268,15 +274,27 @@ double applyChain(VirtualControl& control, const double raw) noexcept
             break;
         }
     }
-    control.value = clamp01(x);
-    control.known = true;
-    return control.value;
+    return clamp01(x);
+}
+} // namespace
+
+double evaluateTransfer(std::span<const Modifier> functions, const double value) noexcept
+{
+    return applyFunctions(functions, value, nullptr);
 }
 
-double feedbackValue(const VirtualControl& control, const double value) noexcept
+double applyChain(VirtualControl& control, const double raw) noexcept
+{
+    // Keep the control's state in the input range of its transfer graph.
+    control.value = applyFunctions(control.chain, raw, &control);
+    control.known = true;
+    return evaluateTransfer(control.transfer.functions, control.value);
+}
+
+double invertTransfer(std::span<const Modifier> functions, const double value) noexcept
 {
     auto x = clamp01(value);
-    for (auto m = control.chain.rbegin(); m != control.chain.rend(); ++m) {
+    for (auto m = functions.rbegin(); m != functions.rend(); ++m) {
         switch (m->kind) {
         case ModifierKind::range:
             x = clamp01(m->a + x * (m->b - m->a));
@@ -316,6 +334,11 @@ double feedbackValue(const VirtualControl& control, const double value) noexcept
     return x;
 }
 
+double feedbackValue(const VirtualControl& control, const double value) noexcept
+{
+    return invertTransfer(control.chain, invertTransfer(control.transfer.functions, value));
+}
+
 // ---- The router -----------------------------------------------------------------------------
 
 VirtualDevice* Router::findDevice(const std::string_view id) noexcept
@@ -353,7 +376,7 @@ std::vector<Router::Moved> Router::receive(const std::string_view rawDevice, con
             auto& control = devices[d].controls[c];
             if (control.sourceDevice != rawDevice || control.sourceAddress != message.address)
                 continue;
-            const auto previous = control.known ? control.value : 0.0;
+            const auto previous = control.known ? evaluateTransfer(control.transfer.functions, control.value) : 0.0;
             const auto value = applyChain(control, message.value);
             moved.push_back({ d, c, previous, value });
         }
@@ -372,11 +395,14 @@ std::vector<Router::Order> Router::orders(const std::vector<Moved>& moved,
         for (auto& assignment : assignments) {
             if (assignment.device != device.id || assignment.control != control.id)
                 continue;
-            const auto mapped = assignment.minimum + item.value * (assignment.maximum - assignment.minimum);
+            const auto now = evaluateTransfer(assignment.transfer.functions, item.value);
+            const auto previous = evaluateTransfer(assignment.transfer.functions, item.previous);
+            const auto span = assignment.maximum - assignment.minimum;
+            const auto mapped = assignment.minimum + now * span;
             if (assignment.takeover && !assignment.caught && !control.momentary() && !control.relative()) {
                 // Caught when it reaches the target, or crosses it.
                 const auto there = current ? current(assignment.target) : std::nullopt;
-                const auto before = assignment.minimum + item.previous * (assignment.maximum - assignment.minimum);
+                const auto before = assignment.minimum + previous * span;
                 if (!there || std::abs(mapped - *there) < 0.03 || (before - *there) * (mapped - *there) <= 0.0)
                     assignment.caught = true;
                 else
@@ -386,8 +412,8 @@ std::vector<Router::Order> Router::orders(const std::vector<Moved>& moved,
             order.target = assignment.target;
             order.value = std::clamp(mapped, std::min(assignment.minimum, assignment.maximum),
                                      std::max(assignment.minimum, assignment.maximum));
-            order.pressed = item.previous < half && item.value >= half;
-            order.released = item.previous >= half && item.value < half;
+            order.pressed = previous < half && now >= half;
+            order.released = previous >= half && now < half;
             order.momentary = control.momentary();
             result.push_back(std::move(order));
         }
@@ -405,15 +431,19 @@ std::vector<Router::Feedback> Router::targetMoved(const std::string_view target,
         if (control == nullptr)
             continue;
         const auto span = assignment.maximum - assignment.minimum;
-        const auto position = span != 0.0 ? clamp01((value - assignment.minimum) / span) : 0.0;
+        const auto normalised = span != 0.0 ? clamp01((value - assignment.minimum) / span) : 0.0;
+        const auto position = invertTransfer(assignment.transfer.functions, normalised);
+        const auto controlState = invertTransfer(control->transfer.functions, position);
         // Moved otherwise: an encoder goes on from there, a takeover waits
         // to be caught again.
         if (!byThisRouter) {
             if (control->relative() || control->kind == ControlKind::toggle) {
-                control->value = position;
+                control->value = controlState;
                 control->known = true;
             } else if (assignment.takeover && control->known) {
-                assignment.caught = std::abs(control->value - position) < 0.03;
+                const auto mapped = evaluateTransfer(assignment.transfer.functions,
+                                                     evaluateTransfer(control->transfer.functions, control->value));
+                assignment.caught = std::abs(mapped - normalised) < 0.03;
             }
         }
         if (!control->feedbackDevice.empty() && !control->feedbackAddress.empty())

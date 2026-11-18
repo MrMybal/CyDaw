@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "delay",
+ "name": "Near Wall",
+ "state": {
+  "type": "delay",
+  "parameters": {
+   "delay.time": 47,
+   "delay.feedback": 0.16,
+   "delay.mix": 0.18
+  }
+ },
+ "description": "A short, low-mix repeat for percussive sources."
+}

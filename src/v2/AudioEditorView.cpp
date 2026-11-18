@@ -6,6 +6,7 @@
 #include <cydaw/base/Text.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "AudioEditorView.h"
+#include "ClipReference.h"
 
 #include "Icons.h"
 #include "ImGuiHost.h"
@@ -797,6 +798,10 @@ void AudioEditorView::drawToolbar(const TrackRef& track, const AudioClip& clip, 
     ImGui::SameLine();
     const auto where = launcher() ? ui::Ls("lanceur, scène ", "launcher, scene ") + cydaw::base::Text(scene_ + 1) : ui::Ls("arrangement", "arrangement");
     ImGui::TextDisabled("%s  |  %s", studio_.trackName(track).toRawUTF8(), where.toRawUTF8());
+    if (!launcher()) {
+        ImGui::SameLine();
+        clip_reference::button(studio_, state_, track);
+    }
     ImGui::SameLine(0.0f, dp(14.0f));
     // Heard: a launcher clip from its slot, an arrangement one as the track plays it.
     if (launcher()) {
@@ -1267,6 +1272,9 @@ void AudioEditorView::drawEvents(const TrackRef& track, const AudioClip& clip, c
         list->AddRectFilled(ImVec2(xOf(bounds.loopStart), origin.y), ImVec2(xOf(bounds.loopEnd), end.y), theme::alpha(p.accent, 0.035f));
     // The grid as seen (bars, beats, their parts), behind the sounds.
     drawGrid(list, origin, end);
+    if (!launcher())
+        clip_reference::draw(studio_, state_, track, waveforms_, host_, *list, origin, end,
+                             [&](const double seconds) { return xOf(seconds - clip.startSeconds); });
     list->AddLine(ImVec2(xOf(bounds.playStart), origin.y), ImVec2(xOf(bounds.playStart), end.y), theme::alpha(p.text, 0.5f));
     list->AddLine(ImVec2(xOf(bounds.playEnd), origin.y), ImVec2(xOf(bounds.playEnd), end.y), theme::alpha(p.text, 0.5f));
 

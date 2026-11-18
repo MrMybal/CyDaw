@@ -66,6 +66,7 @@ private:
         std::map<cydaw::base::Text, float>& modulated;
         const visual::Setter& setParameter;
         std::optional<std::uint64_t> removeNode;
+        std::optional<std::uint64_t> wrapFrom;
         std::optional<CardMove> moveCard;
     };
     // Where a card sits: the main chain (head 0) or a container's branch;

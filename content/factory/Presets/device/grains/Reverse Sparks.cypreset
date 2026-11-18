@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Reverse Sparks",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 340,
+   "grains.feedback": 0.24,
+   "grains.pitch": 12,
+   "grains.spray": 35,
+   "grains.density": 51,
+   "grains.pitchRandom": 0.0,
+   "grains.mix": 0.25,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 39,
+   "grains.stereo": 0.91,
+   "grains.reverseChance": 0.71,
+   "grains.freeze": 0.0,
+   "grains.highCut": 11000
+  }
+ },
+ "description": "Short upward grains scattered across a wide stereo field."
+}

@@ -207,6 +207,7 @@ struct UiState {
     // sound's.
     bool graphShowsModulation {};
     int libraryTab {};
+    std::set<std::uint64_t> clipReferences;
     std::optional<TrackRef> libraryTarget;
     bool libraryPick {};
     bool libraryFocus {};

@@ -425,6 +425,7 @@ public:
   cydaw::base::Result editorSetInterface(const ModuleInterfaceState &state,
                                          bool commit);
   [[nodiscard]] bool editorIsVoiceNode(std::uint64_t id) const;
+  [[nodiscard]] std::set<std::uint64_t> editorVoiceNodes() const;
   [[nodiscard]] std::optional<cydaw::engine::PolyVoiceTarget>
   editorVoiceTargetFor(const cydaw::base::Text &binding) const;
   [[nodiscard]] std::optional<cydaw::engine::PolyVoiceParameter>
@@ -507,6 +508,7 @@ public:
   editorPlaceOf(std::uint64_t node) const;
   std::uint64_t editorInsertContainer(const cydaw::base::Text &typeKey,
                                       std::uint64_t before);
+  std::uint64_t editorWrapEffectChain(std::uint64_t first);
   bool editorMoveCard(std::uint64_t id, std::uint64_t head, int branch,
                       std::uint64_t before);
   std::uint64_t editorInsertInBranch(std::uint64_t head, int branch,

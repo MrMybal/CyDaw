@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "flanger",
+ "name": "Jet Wash Slow",
+ "state": {
+  "type": "flanger",
+  "parameters": {
+   "flanger.rate": 0.08,
+   "flanger.depth": 0.42,
+   "flanger.delay": 3.6,
+   "flanger.feedback": -0.47,
+   "flanger.mix": 0.27
+  }
+ },
+ "description": "A shallow slow sweep with negative feedback to hollow out sustained sounds."
+}
