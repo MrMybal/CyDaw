@@ -4,6 +4,7 @@
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "IsolatedPluginHost.h"
+#include "OfflineRender.h"
 #include <cydaw/base/DispatchPause.h>
 #include "NativeHostedPlugin.h"
 #include <filesystem>
@@ -54,10 +55,10 @@ IsolatedPluginHost::~IsolatedPluginHost()
 cydaw::base::Result IsolatedPluginHost::startPlugin(const cydaw::base::File& pluginFile,
                                               const double sampleRate,
                                               const int maximumBlockSize,
-                                              const int channelCount)
+                                              const int channelCount, const bool instrument)
 {
     return startWorker(WindowsPluginBridge::workerLaunchFor(pluginFile),
-                       pluginFile, false, sampleRate, maximumBlockSize, channelCount);
+                       pluginFile, false, sampleRate, maximumBlockSize, channelCount, instrument);
 }
 
 cydaw::base::Result IsolatedPluginHost::startPassthroughForTest(const cydaw::base::File& workerExecutable,
@@ -87,7 +88,7 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
                                               const bool passthrough,
                                               const double sampleRate,
                                               const int maximumBlockSize,
-                                              const int channelCount)
+                                              const int channelCount, const bool instrument)
 {
     stop();
     if (!launch.isValid())
@@ -104,7 +105,9 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
 
     if (!passthrough && launch.runtime == PluginWorkerRuntime::native)
         return startNative(cydaw::base::File(launch.command[0]), pluginFile,
-                           sampleRate, maximumBlockSize, channelCount);
+                           sampleRate, maximumBlockSize, channelCount, instrument);
+    if (instrument || OfflineRender::current)
+        return cydaw::base::Result::fail("This operation requires a native plugin worker");
 
     // The file-backed bridge remains for the passthrough fixture and Linux
     // Wine/UMU guest path. Native plugins use only the SDK worker above.
@@ -209,7 +212,7 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
 }
 
 cydaw::base::Result IsolatedPluginHost::startNative(const cydaw::base::File& worker,
-    const cydaw::base::File& requested, double rate, int frames, int channels)
+    const cydaw::base::File& requested, double rate, int frames, int channels, bool instrument)
 {
     using namespace cydaw::base;
     auto file = requested;
@@ -243,7 +246,15 @@ cydaw::base::Result IsolatedPluginHost::startNative(const cydaw::base::File& wor
         instance->setWorkerExecutable(worker);
         Text error;
         if (!instance->load(file, id, format, name, error)) return Result::fail(error);
+        if (instrument) {
+            if (format != cyaudio::PluginFormat::vst3 && format != cyaudio::PluginFormat::clap)
+                return Result::fail("Choose a VST3 or CLAP instrument");
+            const auto& ports = instance->ports();
+            if (ports.noteInputs.empty() || ports.outputs.empty())
+                return Result::fail("The plugin requires a note input and an audio output");
+        }
         stage = "prepare";
+        instance->setOffline(OfflineRender::current != nullptr);
         instance->prepareToPlay(rate, frames);
         sampleRate_ = rate;
         blockSize_ = frames;
@@ -718,9 +729,25 @@ cydaw::base::Result IsolatedPluginHost::hideEditor()
     return sendCommand(cydaw::plugins::SharedPluginCommand::hideEditor);
 }
 
+std::vector<IsolatedPluginHost::AudioOutput> IsolatedPluginHost::audioOutputs() const
+{
+    std::vector<AudioOutput> outputs;
+    if (!native_)
+        return outputs;
+    int offset = 0;
+    for (const auto& port : native_->ports().outputs) {
+        outputs.push_back({ cydaw::base::Text(port.name), offset, int(port.channels), port.main });
+        offset += int(port.channels);
+    }
+    if (!outputs.empty() && std::ranges::none_of(outputs, &AudioOutput::main))
+        outputs.front().main = true;
+    return outputs;
+}
+
 bool IsolatedPluginHost::processBlock(cydaw::audio::SampleBuffer<float>& buffer,
                                       const int startSample,
-                                      const int numSamples, double timelineSeconds, double tempo, bool playing) noexcept
+                                      const int numSamples, double timelineSeconds, double tempo, bool playing,
+                                      const cydaw::midi::EventBuffer* midi) noexcept
 {
     callbacksInFlight_.fetch_add(1);
     if (auto* native = nativeActive_.load()) {
@@ -738,7 +765,7 @@ bool IsolatedPluginHost::processBlock(cydaw::audio::SampleBuffer<float>& buffer,
         time.numerator = std::uint16_t(sessionNumerator.load());
         time.denominator = std::uint16_t(sessionDenominator.load());
         time.hasSeconds = time.hasSongFrame = time.hasBeats = time.hasTempo = time.hasSignature = true;
-        const auto processed = native->processRealtime(buffer, startSample, numSamples, time);
+        const auto processed = native->processRealtime(buffer, startSample, numSamples, time, midi);
         missedBlocks_.store(native->missedBlocks(), std::memory_order_relaxed);
         callbacksInFlight_.fetch_sub(1);
         return processed;

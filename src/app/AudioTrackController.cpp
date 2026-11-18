@@ -15,6 +15,7 @@
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "MidiEffectsHost.h"
 #include "AudioTrackController.h"
+#include "OfflineRender.h"
 #include "PlanSynthesiser.h"
 #include "KeyLatencyProbe.h"
 #include "Localization.h"
@@ -1681,7 +1682,7 @@ void TrackMixer::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& o
     for (auto channel = 0; channel < masterChannels; ++channel)
         masterLanes[static_cast<std::size_t>(channel)] = output.buffer->getWritePointer(channel, output.startSample);
     const auto render = [&](const int index, RoutedInputReceiver* receiver, GainPanAudioSource* fader,
-                            const std::vector<Output>* outputs, const int ownChannels) {
+                            const std::vector<Output>* outputs, const int ownChannels, const int captureLatency) {
         const auto slot = static_cast<std::size_t>(index);
         const auto channels = cydaw::base::limit(1, maximumChannels, ownChannels);
         cydaw::audio::SampleBuffer<float> buffer(rendered_[slot].getArrayOfWritePointers(), channels, count);
@@ -1693,6 +1694,8 @@ void TrackMixer::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& o
         if (receiver != nullptr)
             receiver->setRoutedInputs(reaching.data(), count);
         inputs_[slot]->getNextAudioBlock(cydaw::audio::AudioSourceChannelInfo(&buffer, 0, count));
+        if (offlineTap_)
+            offlineTap_(inputs_[slot], buffer, captureLatency);
         if (receiver != nullptr)
             receiver->setRoutedInputs(nullptr, 0);
         done_[slot] = 1;
@@ -1704,21 +1707,26 @@ void TrackMixer::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& o
         const auto* beforeFader = fader != nullptr ? fader->preFader() : nullptr;
         for (const auto& out : *outputs) {
             const auto* source = out.preFader && beforeFader != nullptr ? beforeFader : &buffer;
-            const auto sourceChannels = std::min(channels, source->getNumChannels());
+            const auto extra = out.instrumentBus != 0 && receiver != nullptr && fader != nullptr && fader->sendsAudible()
+                ? receiver->instrumentOutput(out.instrumentBus, count) : std::span<const float* const> {};
+            const auto sourceChannels = out.instrumentBus == 0 ? std::min(channels, source->getNumChannels())
+                : std::min(maximumChannels, static_cast<int>(extra.size()));
             std::array<const float*, maximumChannels> from {};
+            if (sourceChannels == 0)
+                continue;
             for (auto channel = 0; channel < sourceChannels; ++channel)
-                from[static_cast<std::size_t>(channel)] = source->getReadPointer(channel);
+                from[static_cast<std::size_t>(channel)] = out.instrumentBus == 0 ? source->getReadPointer(channel) : extra[channel];
             if (out.delay != nullptr) {
                 // Lined up with the latest of what reaches its destination;
                 // fed every block, whatever follows.
                 cydaw::audio::SampleBuffer<float> held(delayed_.getArrayOfWritePointers(), sourceChannels, count);
                 for (auto channel = 0; channel < sourceChannels; ++channel)
-                    held.copyFrom(channel, 0, *source, channel, 0, count);
+                    held.copyFrom(channel, 0, from[static_cast<std::size_t>(channel)], count);
                 out.delay->process(held, 0, count);
                 for (auto channel = 0; channel < sourceChannels; ++channel)
                     from[static_cast<std::size_t>(channel)] = held.getReadPointer(channel);
             }
-            const auto spread = out.preFader ? 0.0f : pan;
+            const auto spread = out.preFader || out.instrumentBus != 0 ? 0.0f : pan;
             if (out.hardware >= 0) {
                 const auto at = static_cast<std::size_t>(out.hardware);
                 if (at >= maximumDirectOutputs)
@@ -1755,11 +1763,11 @@ void TrackMixer::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& o
     if (plan != nullptr)
         for (const auto& entry : plan->entries)
             if (const auto index = indexOf(entry.source); index >= 0 && done_[static_cast<std::size_t>(index)] == 0)
-                render(index, entry.receiver, entry.fader, &entry.outputs, entry.channels);
+                render(index, entry.receiver, entry.fader, &entry.outputs, entry.channels, entry.captureLatency);
     // What the routing does not name (the simulator, a track just added).
     for (auto index = std::size_t {}; index < inputs_.size(); ++index)
         if (done_[index] == 0)
-            render(static_cast<int>(index), nullptr, nullptr, nullptr, 2);
+            render(static_cast<int>(index), nullptr, nullptr, nullptr, 2, 0);
     directSamples_ = count;
 }
 
@@ -1942,7 +1950,16 @@ void MasterOutputAudioSource::getNextAudioBlock(
     // DSP transport is intentionally per render thread (independent plugin
     // instances can have different hosts). Publish this session on its actual
     // callback thread, rather than changing only the UI thread's TLS values.
-    NativeDspRuntime::setSessionTempo(tempo_.load(std::memory_order_relaxed));
+    {
+        const auto map = tempo_.read();
+        if (map) {
+            const auto& point = map->atBeat(map->beatAt(clock_.load(std::memory_order_relaxed)));
+            NativeDspRuntime::setSessionTempo(point.bpm);
+            IsolatedPluginHost::setSessionMetre(point.numerator, point.denominator);
+        } else {
+            NativeDspRuntime::setSessionTempo(120.0);
+        }
+    }
     NativeDspRuntime::setSessionPlaying(clockRunning_.load(std::memory_order_acquire));
     input_.getNextAudioBlock(bufferToFill);
     // Where this block starts on the master's clock (none while stopped:
@@ -2735,8 +2752,14 @@ private:
              const int readAheadSamples = 131'072)
         {
             segment = std::make_unique<SegmentReaderSource>(std::move(reader));
-            buffer = std::make_unique<cydaw::audio::BufferingAudioSource>(
-                segment.get(), thread, false, readAheadSamples, channels, false);
+            if (!OfflineRender::current)
+                buffer = std::make_unique<cydaw::audio::BufferingAudioSource>(
+                    segment.get(), thread, false, readAheadSamples, channels, false);
+        }
+
+        [[nodiscard]] cydaw::audio::PositionableAudioSource& source() const noexcept
+        {
+            return buffer ? static_cast<cydaw::audio::PositionableAudioSource&>(*buffer) : *segment;
         }
 
         void configure(const std::int64_t offset,
@@ -2747,11 +2770,11 @@ private:
                        const double sampleRate)
         {
             if (prepared)
-                buffer->releaseResources();
+                source().releaseResources();
             segment->configure(offset, duration, looping);
-            buffer->setNextReadPosition(0);
+            source().setNextReadPosition(0);
             if (prepared)
-                buffer->prepareToPlay(blockSize, sampleRate);
+                source().prepareToPlay(blockSize, sampleRate);
         }
 
         void configureSeconds(const double sourceOffsetSeconds,
@@ -2767,24 +2790,24 @@ private:
                               std::shared_ptr<const std::vector<float>> pitchCurve = {})
         {
             if (prepared)
-                buffer->releaseResources();
+                source().releaseResources();
             segment->configureSeconds(sourceOffsetSeconds,
                                       sourceDurationSeconds,
                                       timelineDurationSeconds,
                                       looping, stretchMode, pitchSemitones, std::move(pitchCurve));
-            buffer->setNextReadPosition(0);
+            source().setNextReadPosition(0);
             if (prepared)
-                buffer->prepareToPlay(blockSize, sampleRate);
+                source().prepareToPlay(blockSize, sampleRate);
         }
 
         void prepare(const int blockSize, const double sampleRate)
         {
-            buffer->prepareToPlay(blockSize, sampleRate);
+            source().prepareToPlay(blockSize, sampleRate);
         }
-        void release() { buffer->releaseResources(); }
+        void release() { source().releaseResources(); }
         void setPosition(const std::int64_t position)
         {
-            buffer->setNextReadPosition(position);
+            source().setNextReadPosition(position);
         }
         void setLooping(const bool shouldLoop)
         {
@@ -2792,15 +2815,15 @@ private:
         }
         [[nodiscard]] std::int64_t position() const
         {
-            return buffer->getNextReadPosition();
+            return source().getNextReadPosition();
         }
         [[nodiscard]] bool ready(const int samples) const noexcept
         {
-            return segment->hasReadAhead(samples);
+            return !buffer || segment->hasReadAhead(samples);
         }
         void render(const cydaw::audio::AudioSourceChannelInfo& output)
         {
-            buffer->getNextAudioBlock(output);
+            source().getNextAudioBlock(output);
         }
 
         std::unique_ptr<SegmentReaderSource> segment;
@@ -4367,6 +4390,25 @@ private:
 };
 
 struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioSource, public RoutedInputReceiver {
+    struct HostedInstrument {
+        IsolatedPluginHost host;
+        std::vector<IsolatedPluginHost::AudioOutput> ports;
+        cydaw::audio::SampleBuffer<float> audio;
+        std::size_t main {};
+        int renderedSamples {};
+    };
+    std::unique_ptr<HostedInstrument> hosted;
+    std::atomic<bool> frozen {};
+
+    std::span<const float* const> instrumentOutput(std::uint32_t bus, int count) noexcept override
+    {
+        if (!hosted || frozen.load(std::memory_order_relaxed) || bus == 0
+            || bus > hosted->ports.size() || hosted->renderedSamples != count)
+            return {};
+        const auto& port = hosted->ports[bus - 1];
+        return { hosted->audio.getArrayOfReadPointers() + port.firstChannel, static_cast<std::size_t>(port.channels) };
+    }
+
     void setRoutedInputs(const cydaw::audio::SampleBuffer<float>* const* buses, const int numSamples) noexcept override
     {
         measureRoutedInputs(buses, numSamples);
@@ -4471,6 +4513,8 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
         output.clearActiveBufferRegion();
         if (output.buffer == nullptr || output.numSamples <= 0)
             return;
+        if (frozen.load(std::memory_order_acquire))
+            return;
 
         if (owner.modeTimelineEnabled_.load(std::memory_order_acquire)) {
             const auto at = owner.modePosition_.load(std::memory_order_relaxed);
@@ -4487,15 +4531,28 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
         // allocated on the audio thread for the notes it carries.
         auto& midi = blockMidi_;
         midi.clear();
+        // Reset old voices before accepting the first new key on this block.
+        // A panic queued after that key at the same sample would silence it.
+        if (needsAllNotesOff.exchange(false, std::memory_order_acq_rel)) {
+            for (int channel = 1; channel <= 16; ++channel)
+                midi.addEvent(cydaw::midi::Message::allNotesOff(channel), 0);
+            for (auto& held : liveHeld)
+                held.reset();
+            liveSustain.reset();
+        }
         // Where this block starts, for the automation of the effects.
         const auto automationSeconds = positionSeconds.load(std::memory_order_relaxed);
         // The notes heard live, apart from the clips', for the lights.
         auto liveNoteOns = 0;
         if (liveInput.load(std::memory_order_acquire)) {
-            collector.removeNextBlockOfMessages(midi, output.numSamples);
+            auto& incoming = incomingMidi_;
+            if (midi.isEmpty()) {
+                collector.removeNextBlockOfMessages(midi, output.numSamples);
+            } else {
+                collector.removeNextBlockOfMessages(incoming, output.numSamples);
+                midi.addEvents(incoming, 0, output.numSamples, 0);
+            }
             if (auto* extra = hardware.load(std::memory_order_acquire)) {
-                auto& incoming = incomingMidi_;
-                incoming.clear();
                 extra->removeNextBlockOfMessages(incoming, output.numSamples);
                 midi.addEvents(incoming, 0, output.numSamples, 0);
             }
@@ -4544,13 +4601,6 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
             }
         }
 
-        if (needsAllNotesOff.exchange(false, std::memory_order_acq_rel)) {
-            for (int channel = 1; channel <= 16; ++channel)
-                midi.addEvent(cydaw::midi::Message::allNotesOff(channel), 0);
-            for (auto& held : liveHeld)
-                held.reset();
-            liveSustain.reset();
-        }
         if (needsLiveNotesOff.exchange(false, std::memory_order_acq_rel)) {
             for (std::size_t channel = 0; channel < liveHeld.size(); ++channel) {
                 for (std::size_t note = 0; note < 128; ++note)
@@ -4786,9 +4836,23 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
                         event.size = static_cast<std::uint8_t>(metadata.numBytes);
                         (void) outQueue->ring.tryPush(event);
                     }
-            renderVoices(published.get(), *output.buffer, midi, output.startSample, output.numSamples);
-            // An instrument container's pads: each its instrument and its effects.
-            renderPads(published.get(), midi, output, automationSeconds);
+            if (hosted) {
+                instrumentPlays = true;
+                hosted->renderedSamples = 0;
+                if (output.numSamples <= hosted->audio.getNumSamples()) {
+                    hosted->audio.clear(0, output.numSamples);
+                    (void) hosted->host.processBlock(hosted->audio, 0, output.numSamples, automationSeconds,
+                        NativeDspRuntime::sessionTempo(), NativeDspRuntime::sessionPlaying(), &midi);
+                    hosted->renderedSamples = output.numSamples;
+                    const auto& main = hosted->ports[hosted->main];
+                    for (auto channel = 0; channel < output.buffer->getNumChannels(); ++channel)
+                        output.buffer->copyFrom(channel, output.startSample, hosted->audio,
+                            main.firstChannel + std::min(channel, main.channels - 1), 0, output.numSamples);
+                }
+            } else {
+                renderVoices(published.get(), *output.buffer, midi, output.startSample, output.numSamples);
+                renderPads(published.get(), midi, output, automationSeconds);
+            }
             // What the notes say, for the modulators (as the voices heard them).
             followNotes(midi);
         }
@@ -4821,21 +4885,60 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
 
     // Everything the graph places after the instrument. Compiled here, on the
     // message thread; the audio thread only ever reads the published plan.
+    static cydaw::engine::NativeDspGraph hostEffects(cydaw::engine::NativeDspGraph graph)
+    {
+        using Kind = cydaw::engine::NativeDspNodeKind;
+        if (std::ranges::any_of(graph.nodes, [](const auto& node) { return node.kind == Kind::input && node.inputBus == 0; }))
+            return graph;
+        if (graph.outputNodeId == 0)
+            return {};
+        std::uint64_t newId = 1;
+        for (const auto& node : graph.nodes)
+            newId = std::max(newId, node.id + 1);
+        std::vector<std::uint64_t> pending { graph.outputNodeId };
+        std::set<std::uint64_t> visited;
+        std::vector<std::uint64_t> roots;
+        while (!pending.empty()) {
+            const auto id = pending.back();
+            pending.pop_back();
+            if (!visited.insert(id).second)
+                continue;
+            bool hasInput = false;
+            for (const auto& wire : graph.connections)
+                if (wire.destination == id) {
+                    pending.push_back(wire.source);
+                    hasInput = true;
+                }
+            if (!hasInput) {
+                const auto node = std::ranges::find(graph.nodes, id, &cydaw::engine::NativeDspNode::id);
+                if (node != graph.nodes.end() && node->kind != Kind::input)
+                    roots.push_back(id);
+            }
+        }
+        if (roots.empty())
+            return graph;
+        graph.nodes.push_back({ newId, Kind::input });
+        for (const auto root : roots)
+            graph.connections.push_back({ newId, root, 0, 0 });
+        return graph;
+    }
+
     cydaw::base::Result setEffectGraph(const cydaw::engine::NativeDspGraph& graph)
     {
         effects.prepare(sampleRateHz.load(std::memory_order_acquire),
                         blockSize.load(std::memory_order_acquire), 2);
-        return effects.setGraph(graph);
+        return hosted ? effects.setGraph(hostEffects(graph)) : effects.setGraph(graph);
     }
 
     cydaw::base::Result updateEffectParameters(
         const cydaw::engine::NativeDspGraph& graph)
     {
-        return effects.updateParameters(graph);
+        return hosted ? effects.updateParameters(hostEffects(graph)) : effects.updateParameters(graph);
     }
 
     // How late what follows the instrument makes its sound.
-    [[nodiscard]] int effectLatencySamples() const noexcept { return effects.latencySamples(); }
+    [[nodiscard]] int instrumentLatencySamples() const noexcept { return hosted ? hosted->host.latencySamples() : 0; }
+    [[nodiscard]] int effectLatencySamples() const noexcept { return effects.latencySamples() + instrumentLatencySamples(); }
 
     void setSequence(std::shared_ptr<const std::vector<ScheduledNote>> notes,
                      const double lengthSeconds)
@@ -9193,6 +9296,53 @@ bool AudioTrackController::setAudioClipStretchSettings(
     return true;
 }
 
+bool AudioTrackController::applyAudioClipGroove(const std::size_t index, const std::uint64_t clipId,
+                                               std::vector<StretchMarker> markers)
+{
+    auto* track = findTrack(index);
+    if (!track || markers.empty())
+        return false;
+    const auto clip = std::ranges::find(track->audioClips, clipId, &AudioClip::id);
+    if (clip == track->audioClips.end() || clip->events.size() > 1 || !clip->comp.empty())
+        return false;
+    auto* event = clip->events.empty() ? nullptr : &clip->events.front();
+    auto& existing = event ? event->stretchMarkers : clip->stretchMarkers;
+    auto& mode = event ? event->stretchMode : clip->stretchMode;
+    const auto source = event ? event->sourceFile : clip->sourceFile;
+    const auto offset = event ? event->sourceOffsetSeconds : clip->sourceOffsetSeconds;
+    const auto sourceDuration = event ? event->sourceDurationSeconds : clip->sourceDurationSeconds;
+    const auto duration = event ? event->durationSeconds : clip->durationSeconds;
+    if (!existing.empty() || !source.existsAsFile())
+        return false;
+    auto lastSource = offset;
+    auto lastTime = 0.0;
+    for (auto& marker : markers) {
+        if (marker.sourceSeconds <= lastSource || marker.sourceSeconds >= offset + sourceDuration
+            || marker.timelineSeconds <= lastTime || marker.timelineSeconds >= duration)
+            return false;
+        marker.id = nextStretchMarkerId_++;
+        lastSource = marker.sourceSeconds;
+        lastTime = marker.timelineSeconds;
+    }
+    auto previous = track->audioClips;
+    const auto playing = track->transportSource.isPlaying();
+    if (playing)
+        track->transportSource.stop();
+    existing = std::move(markers);
+    if (mode == StretchMode::raw || mode == StretchMode::repitch)
+        mode = StretchMode::beats;
+    const auto result = rebuildArrangementPlan(*track);
+    if (result.failed()) {
+        track->audioClips = std::move(previous);
+        (void) rebuildArrangementPlan(*track);
+    } else {
+        recordArrangementEdit(*track, std::move(previous));
+    }
+    if (playing)
+        track->transportSource.start();
+    return result.wasOk();
+}
+
 std::uint64_t AudioTrackController::addAudioClipStretchMarker(
     const std::size_t index, const std::uint64_t clipId,
     const double sourceSeconds, const double timelineSeconds)
@@ -12800,6 +12950,18 @@ void AudioTrackController::pollPluginWorkers()
     }
     for (auto& track : tracks_)
         track->gainPanSource.pollPluginHealth();
+    for (auto& track : midiTracks_)
+        if (auto* plugin = midiTrackPlugin(track->id); plugin && plugin->isRunning()) {
+            const auto rate = track->synth.sampleRateHz.load();
+            const auto block = cydaw::base::limit(1, 2048, track->synth.blockSize.load());
+            if (rate > 0.0 && (plugin->preparedSampleRate() != rate || plugin->preparedBlockSize() != block)) {
+                cydaw::base::MemoryBlock state;
+                (void) plugin->getCachedState(state);
+                (void) setMidiTrackPlugin(track->id, plugin->pluginFile(), &state);
+            } else {
+                plugin->pollWorkerHealth();
+            }
+        }
     refreshLatencyCompensation();
 }
 
@@ -13807,7 +13969,7 @@ bool AudioTrackController::pollMidiRecording()
                 changed = closeRecordedMidiNote(channel, noteNumber,
                                                 event.timelineSeconds)
                           || changed;
-            const auto localBeat = event.timelineSeconds * tempoBpm_ / 60.0
+            const auto localBeat = beatAtTime(event.timelineSeconds)
                                    - clip->startBeats;
             if (localBeat < -0.000001)
                 continue;
@@ -13841,7 +14003,7 @@ bool AudioTrackController::pollMidiRecording()
             const auto noteNumber = static_cast<int>(index % 128);
             const auto adjustedNow = recordingLoopAdjustedTime(
                 now, active.startTimelineSeconds);
-            const auto endBeat = adjustedNow * tempoBpm_ / 60.0
+            const auto endBeat = beatAtTime(adjustedNow)
                                  - clip->startBeats;
             const auto quantisedEnd = quantiseRecordedBeat(
                 std::max(active.startBeats, endBeat));
@@ -14163,6 +14325,72 @@ bool AudioTrackController::setMidiTrackArmed(
     if (liveMidiTrackId_.load(std::memory_order_acquire) == trackId)
         liveMidiTrackId_.store(0, std::memory_order_release);
     return true;
+}
+
+cydaw::base::Result AudioTrackController::setMidiTrackPlugin(
+    const std::uint64_t trackId, const cydaw::base::File& file, const cydaw::base::MemoryBlock* state)
+{
+    auto* track = findMidiTrack(trackId);
+    if (!track)
+        return cydaw::base::Result::fail("MIDI instrument track not found");
+    auto instrument = std::make_unique<MidiSynthEngine::HostedInstrument>();
+    const auto rate = track->synth.sampleRateHz.load();
+    const auto bufferSize = track->synth.blockSize.load();
+    const auto block = cydaw::base::limit(1, 2048, bufferSize);
+    if (const auto result = instrument->host.startPlugin(file, rate > 0 ? rate : 48000.0, block, 2, true); result.failed())
+        return result;
+    instrument->ports = instrument->host.audioOutputs();
+    const auto main = std::ranges::find(instrument->ports, true, &IsolatedPluginHost::AudioOutput::main);
+    if (main == instrument->ports.end() || main->channels <= 0)
+        return cydaw::base::Result::fail("The instrument has no main audio output");
+    if (std::ranges::any_of(instrument->ports, [](const auto& port) { return port.channels > TrackMixer::maximumChannels; }))
+        return cydaw::base::Result::fail("The instrument has a bus wider than the mixer supports");
+    instrument->main = static_cast<std::size_t>(main - instrument->ports.begin());
+    const auto& last = instrument->ports.back();
+    instrument->audio.setSize(last.firstChannel + last.channels, std::max(bufferSize, 2048));
+    if (state && state->getSize() != 0)
+        if (const auto restored = instrument->host.setState(*state); restored.failed())
+            return restored;
+    mixerSource_.withIdleMixer([&] { track->synth.hosted.swap(instrument); });
+    // Project loading publishes the graph after restoring all track identities.
+    if (track->effectGraph.outputNodeId != 0) {
+        if (const auto applied = track->synth.setEffectGraph(track->effectGraph); applied.failed()) {
+            mixerSource_.withIdleMixer([&] { track->synth.hosted.swap(instrument); });
+            (void) track->synth.setEffectGraph(track->effectGraph);
+            return applied;
+        }
+    }
+    track->synth.needsAllNotesOff.store(true);
+    track->synth.needsChase.store(true);
+    refreshLatencyCompensation();
+    return cydaw::base::Result::ok();
+}
+
+void AudioTrackController::clearMidiTrackPlugin(const std::uint64_t trackId)
+{
+    if (auto* track = findMidiTrack(trackId)) {
+        std::unique_ptr<MidiSynthEngine::HostedInstrument> previous;
+        mixerSource_.withIdleMixer([&] { track->synth.hosted.swap(previous); });
+        (void) track->synth.setEffectGraph(track->effectGraph);
+        track->synth.needsAllNotesOff.store(true);
+        track->synth.needsChase.store(true);
+        refreshLatencyCompensation();
+    }
+}
+
+IsolatedPluginHost* AudioTrackController::midiTrackPlugin(const std::uint64_t trackId) const noexcept
+{
+    const auto* track = findMidiTrack(trackId);
+    return track && track->synth.hosted ? &track->synth.hosted->host : nullptr;
+}
+
+void AudioTrackController::setMidiTrackFrozen(const std::uint64_t trackId, const bool frozen) noexcept
+{
+    if (auto* track = findMidiTrack(trackId)) {
+        track->synth.needsAllNotesOff.store(true);
+        track->synth.needsChase.store(true);
+        track->synth.frozen.store(frozen, std::memory_order_release);
+    }
 }
 
 cydaw::base::Result AudioTrackController::setMidiTrackInstrumentGraph(
@@ -14655,7 +14883,7 @@ cydaw::base::Result AudioTrackController::selfTestMidiLauncherClip()
     return cydaw::base::Result::ok();
 }
 
-void AudioTrackController::setTimeSignature(const int numerator, const int denominator) noexcept
+void AudioTrackController::setTimeSignature(const int numerator, const int denominator)
 {
     timeSignatureNumerator_ = cydaw::base::limit(1, 32, numerator);
     timeSignatureDenominator_ = denominator == 1 || denominator == 2 || denominator == 8 || denominator == 16
@@ -14663,6 +14891,55 @@ void AudioTrackController::setTimeSignature(const int numerator, const int denom
                                     ? denominator
                                     : 4;
     IsolatedPluginHost::setSessionMetre(timeSignatureNumerator_, timeSignatureDenominator_);
+    publishTempoMap();
+}
+
+void AudioTrackController::publishTempoMap()
+{
+    tempoMap_ = std::make_shared<const cydaw::engine::TempoMap>(
+        TempoPoint { 0, tempoBpm_, timeSignatureNumerator_, timeSignatureDenominator_ }, tempoChanges_);
+    masterOutput_.setTempoMap(tempoMap_);
+}
+
+void AudioTrackController::setTempoChanges(std::vector<TempoPoint> changes)
+{
+    std::erase_if(changes, [](const auto& p) { return !std::isfinite(p.beat) || p.beat <= 0 || p.beat > 1.0e6
+                                               || !std::isfinite(p.bpm); });
+    for (auto& p : changes) {
+        p.bpm = std::clamp(p.bpm, 20.0, 400.0);
+        p.numerator = std::clamp(p.numerator, 1, 32);
+        if (p.denominator <= 0 || p.denominator > 32 || (p.denominator & (p.denominator - 1)) != 0)
+            p.denominator = 4;
+    }
+    std::stable_sort(changes.begin(), changes.end(), [](const auto& a, const auto& b) { return a.beat < b.beat; });
+    changes.erase(std::unique(changes.begin(), changes.end(), [](const auto& a, const auto& b) { return a.beat == b.beat; }),
+                  changes.end());
+    tempoChanges_ = std::move(changes);
+    publishTempoMap();
+    publishAllMidiSequences();
+}
+
+bool AudioTrackController::anchorTempoBeat(const double beat, const double seconds)
+{
+    if (!std::isfinite(beat) || !std::isfinite(seconds) || beat <= 0.0 || seconds <= 0.0)
+        return false;
+    auto changes = tempoChanges_;
+    auto next = std::ranges::lower_bound(changes, beat, {}, &TempoPoint::beat);
+    const auto previous = next == changes.begin() ? TempoPoint { 0, tempoBpm_, timeSignatureNumerator_, timeSignatureDenominator_ }
+                                                   : *std::prev(next);
+    const auto span = seconds - timeAtBeat(previous.beat);
+    const auto bpm = (beat - previous.beat) * 60.0 / span;
+    if (span <= 0 || bpm < 20 || bpm > 400)
+        return false;
+    const auto& current = tempoMap().atBeat(beat);
+    if (next != changes.begin())
+        std::prev(next)->bpm = bpm;
+    else
+        tempoBpm_ = bpm;
+    if (next == changes.end() || next->beat != beat)
+        changes.insert(next, TempoPoint { beat, current.bpm, current.numerator, current.denominator });
+    setTempoChanges(std::move(changes));
+    return true;
 }
 
 void AudioTrackController::setTempo(const double beatsPerMinute)
@@ -14670,7 +14947,7 @@ void AudioTrackController::setTempo(const double beatsPerMinute)
     const auto before = tempoBpm_;
     tempoBpm_ = cydaw::base::limit(20.0, 400.0, beatsPerMinute);
     NativeDspRuntime::setSessionTempo(tempoBpm_);
-    masterOutput_.setTempo(tempoBpm_);
+    publishTempoMap();
     // A loop auditioned at the tempo follows it.
     if (tempoPreview_.file != cydaw::base::File() && before != tempoBpm_)
         (void) startTempoPreview(tempoPreview_.file, samplePreviewPositionSeconds(), tempoPreview_.tempo);
@@ -16176,9 +16453,16 @@ double AudioTrackController::quantizedLaunchDelaySeconds(
 
 double AudioTrackController::launchDelaySeconds() const noexcept
 {
-    return isPlaying()
-               ? quantizedLaunchDelaySeconds(position(), tempoBpm_, launchQuantization_)
-               : 0.0;
+    if (!isPlaying() || launchQuantization_ == LaunchQuantization::none)
+        return 0.0;
+    const auto now = position();
+    const auto beat = beatAtTime(now);
+    const auto measure = tempoMap().measureAt(beat);
+    const auto interval = launchQuantization_ == LaunchQuantization::oneBar ? measure.end - measure.start
+        : launchQuantization_ == LaunchQuantization::oneBeat ? 1.0
+        : launchQuantization_ == LaunchQuantization::halfBeat ? 0.5 : 0.25;
+    const auto target = measure.start + std::ceil((beat - measure.start) / interval - 1.0e-7) * interval;
+    return std::max(0.0, timeAtBeat(std::min(target, measure.end)) - now);
 }
 
 bool AudioTrackController::scheduleLauncherClip(const std::size_t trackIndex,
@@ -16532,6 +16816,114 @@ cydaw::base::Result AudioTrackController::startMasterExport(
     return cydaw::base::Result::ok();
 }
 
+void AudioTrackController::prepareOfflineSession()
+{
+    if (OfflineRender::current && !deviceManager_.getCurrentAudioDevice())
+        masterOutput_.prepareToPlay(512, 48000.0);
+}
+
+cydaw::base::Result AudioTrackController::renderOfflineWaves(const std::vector<OfflineTarget>& targets,
+                                                            const double from, const double to)
+{
+    using cydaw::base::File;
+    using cydaw::base::Result;
+    auto* context = OfflineRender::current;
+    if (!context || deviceManager_.getCurrentAudioDevice() || targets.empty()
+        || !std::isfinite(from) || !std::isfinite(to) || from < 0 || to <= from || to > 86400.0)
+        return Result::fail("Invalid offline render request");
+
+    constexpr int blockSize = 512;
+    constexpr double rate = 48000.0;
+    struct Destination {
+        const cydaw::audio::AudioSource* source {};
+        std::unique_ptr<cydaw::base::TemporaryFile> temp;
+        std::unique_ptr<cydaw::audio::AudioFormatWriter> writer;
+        std::int64_t frames {};
+    };
+    std::vector<Destination> files;
+    files.reserve(targets.size());
+    for (const auto& target : targets) {
+        const auto isMediaSource = [&](const auto& item) { return item.sourceFile == target.file; };
+        for (const auto& track : tracks_)
+            if (track->file == target.file || std::ranges::any_of(track->audioClips, [&](const auto& clip) {
+                    return isMediaSource(clip) || std::ranges::any_of(clip.events, isMediaSource)
+                        || std::ranges::any_of(clip.takes, isMediaSource)
+                        || std::ranges::any_of(clip.versions, [&](const auto& version) { return version.file == target.file; });
+                }))
+                return Result::fail("The WAV destination is a source file of the current project");
+        Destination output;
+        auto channels = 2;
+        if (target.track) {
+            if (target.track->midi) {
+                const auto* track = findMidiTrack(target.track->id);
+                if (!track)
+                    return Result::fail("An instrument track to render is missing");
+                output.source = &track->latencySource;
+            } else {
+                const auto* track = findTrack(target.track->index);
+                if (!track)
+                    return Result::fail("An audio track to render is missing");
+                output.source = &track->latencySource;
+                channels = track->channelCount;
+            }
+        }
+        output.temp = std::make_unique<cydaw::base::TemporaryFile>(target.file);
+        auto stream = output.temp->getFile().createOutputStream();
+        std::unique_ptr<cydaw::base::OutputStream> bytes { std::move(stream) };
+        cydaw::integration::WaveFormat wav;
+        output.writer = wav.createWriterFor(bytes, cydaw::audio::AudioFormatWriterOptions()
+            .withNumChannels(channels).withSampleRate(rate).withBitsPerSample(24));
+        if (!output.writer)
+            return Result::fail("Cannot create " + target.file.getFullPathName());
+        files.push_back(std::move(output));
+    }
+    const auto first = static_cast<std::int64_t>(std::llround(from * rate));
+    const auto last = static_cast<std::int64_t>(std::llround(to * rate));
+    const auto masterLatency = mixLatencySamples() + masterOutput_.chainLatencySamples();
+    constexpr auto maximumLatency = 2 * LatencyCompensatingAudioSource::maximumDelaySamples;
+    std::int64_t position = 0;
+    auto writeFailed = false;
+    const auto write = [&](Destination& target, const cydaw::audio::SampleBuffer<float>& audio, const int latency) {
+        const auto begin = std::max(position, first + latency);
+        const auto end = std::min(position + audio.getNumSamples(), last + latency);
+        if (end > begin) {
+            writeFailed |= !target.writer->writeFromAudioSampleBuffer(audio, static_cast<int>(begin - position),
+                                                                      static_cast<int>(end - begin));
+            target.frames += end - begin;
+        }
+    };
+    mixerSource_.setOfflineTap([&](const auto* source, const auto& audio, const int latency) {
+        for (auto& target : files)
+            if (target.source == source)
+                write(target, audio, latency);
+    });
+    setArrangementPlaybackEnabled(true);
+    setLooping(false);
+    setPosition(0);
+    play();
+    cydaw::audio::SampleBuffer<float> audio(2, blockSize);
+    for (; position < last + maximumLatency && !writeFailed && !context->pluginFailed; position += blockSize) {
+        masterOutput_.getNextAudioBlock({ &audio, 0, blockSize });
+        for (auto& target : files)
+            if (target.source == nullptr)
+                write(target, audio, masterLatency);
+        if (std::ranges::all_of(files, [&](const auto& target) { return target.frames == last - first; }))
+            break;
+    }
+    mixerSource_.setOfflineTap({});
+    stop();
+    if (context->pluginFailed)
+        return Result::fail("A hosted plug-in could not process the offline render");
+    if (writeFailed || std::ranges::any_of(files, [&](const auto& target) { return target.frames != last - first; }))
+        return Result::fail("The offline render could not write all audio frames");
+    for (auto& target : files) {
+        target.writer.reset();
+        if (!target.temp->overwriteTargetFileWithTemporary())
+            return Result::fail("Cannot install one of the rendered WAV files");
+    }
+    return Result::ok();
+}
+
 cydaw::base::Result AudioTrackController::startMidiBounce(const std::uint64_t trackId,
                                                          const cydaw::base::File& destination,
                                                          const double from, const double duration,
@@ -16691,7 +17083,7 @@ double AudioTrackController::contentLength() const noexcept
         if (clip != nullptr)
             longest = std::max(
                 longest,
-                (clip->startBeats + clip->lengthBeats) * 60.0 / tempoBpm_);
+                timeAtBeat(clip->startBeats + clip->lengthBeats));
     }
     return longest;
 }
@@ -16989,7 +17381,7 @@ bool AudioTrackController::closeRecordedMidiNote(
     }
     const auto adjustedEnd = recordingLoopAdjustedTime(
         timelineSeconds, active.startTimelineSeconds);
-    const auto localEndBeat = adjustedEnd * tempoBpm_ / 60.0
+    const auto localEndBeat = beatAtTime(adjustedEnd)
                               - clip->startBeats;
     const auto endBeat = quantiseRecordedBeat(
         std::max(active.startBeats, localEndBeat));
@@ -17121,7 +17513,6 @@ void AudioTrackController::publishMidiSequence(MidiPlaybackTrack& track)
         if (clip.launcherScene < 0)
             noteCount += clip.notes.size();
     scheduled->reserve(noteCount);
-    const auto secondsPerBeat = 60.0 / tempoBpm_;
     double lengthSeconds = 0.0;
     for (const auto& clip : track.clips) {
         if (clip.launcherScene >= 0)
@@ -17133,8 +17524,8 @@ void AudioTrackController::publishMidiSequence(MidiPlaybackTrack& track)
                 clippedStartBeats,
                 clip.lengthBeats,
                 note.startBeats + note.durationBeats);
-            const auto start = (clip.startBeats + clippedStartBeats) * secondsPerBeat;
-            const auto end = (clip.startBeats + clippedEndBeats) * secondsPerBeat;
+            const auto start = timeAtBeat(clip.startBeats + clippedStartBeats);
+            const auto end = timeAtBeat(clip.startBeats + clippedEndBeats);
             scheduled->push_back({ note.noteNumber, start, end, note.velocity, 1, curvesOf(note), std::clamp(note.chance, 0.0f, 1.0f) });
             lengthSeconds = std::max(lengthSeconds, end);
         }
@@ -17293,6 +17684,7 @@ cydaw::base::Result AudioTrackController::setTrackRouting(const std::vector<Trac
             output.preFader = out.preFader;
             output.hardwareBus = out.hardwareBus;
             output.hardwareAfterEffects = out.hardwareAfterEffects;
+            output.instrumentBus = track->midi != 0 ? out.instrumentBus : 0;
             if (out.hardwareBus != 0) {
                 const auto bus = virtualBusRouter_.bus(out.hardwareBus);
                 if (!bus || bus->direction != VirtualBusDirection::output)
@@ -17325,6 +17717,7 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
         bool preFader {};
         std::uint64_t hardware {};     // an output bus of the sound card
         bool hardwareAfterEffects {};  // joining it after its effects
+        std::uint32_t instrumentBus {};
     };
     struct Node {
         RoutingKey key;
@@ -17380,16 +17773,16 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
                 // A bus removed since: that output went with it.
                 if (const auto bus = virtualBusRouter_.bus(out.hardwareBus); bus && bus->direction == VirtualBusDirection::output)
                     nodes[*from].outputs.push_back({ std::nullopt, gain, 0, out.preFader, out.hardwareBus,
-                                                     out.hardwareAfterEffects });
+                                                     out.hardwareAfterEffects, out.instrumentBus });
                 continue;
             }
             if (!out.destination) {
-                nodes[*from].outputs.push_back({ std::nullopt, gain, 0, out.preFader });
+                nodes[*from].outputs.push_back({ std::nullopt, gain, 0, out.preFader, 0, false, out.instrumentBus });
                 continue;
             }
             // A destination removed since: that output went with it.
             if (const auto to = nodeOf(*out.destination); to && *to != *from)
-                nodes[*from].outputs.push_back({ *to, gain, out.inputBus, out.preFader });
+                nodes[*from].outputs.push_back({ *to, gain, out.inputBus, out.preFader, 0, false, out.instrumentBus });
         }
     }
     // Senders before what they are routed into; a loop has no such order.
@@ -17419,6 +17812,11 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
     // its plugins'), and the latest path into the master.
     std::vector<int> arrival(nodes.size(), 0);
     std::vector<int> leaving(nodes.size(), 0);
+    const auto routeArrival = [&](std::size_t index, const NodeOutput& out) {
+        if (out.instrumentBus != 0 && nodes[index].midi)
+            return std::min(maximumDelay, nodes[index].midi->synth.instrumentLatencySamples());
+        return leaving[index];
+    };
     auto masterArrival = 0;
     for (const auto index : order) {
         leaving[index] = std::min(maximumDelay, arrival[index] + std::max(0, nodes[index].latency));
@@ -17426,9 +17824,9 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
             masterArrival = std::max(masterArrival, leaving[index]);
         for (const auto& out : nodes[index].outputs) {
             if (out.to)
-                arrival[*out.to] = std::max(arrival[*out.to], leaving[index]);
+                arrival[*out.to] = std::max(arrival[*out.to], routeArrival(index, out));
             else
-                masterArrival = std::max(masterArrival, leaving[index]);
+                masterArrival = std::max(masterArrival, routeArrival(index, out));
         }
     }
 
@@ -17438,7 +17836,8 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
     // delay line of their own, kept while its length holds.
     std::vector<EdgeDelay> delays;
     const auto delayFor = [&](const cydaw::audio::AudioSource* from, const cydaw::audio::AudioSource* to, const std::uint32_t bus,
-                              const bool preFader, const int samples, const int channels) -> std::shared_ptr<AudioDelayLine> {
+                              const bool preFader, const int samples, const int channels,
+                              const std::uint32_t instrumentBus) -> std::shared_ptr<AudioDelayLine> {
         if (samples <= 0)
             return {};
         const auto taken = [&delays](const std::shared_ptr<AudioDelayLine>& line) {
@@ -17446,6 +17845,7 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
         };
         for (const auto& existing : edgeDelays_)
             if (existing.from == from && existing.to == to && existing.bus == bus && existing.preFader == preFader
+                && existing.instrumentBus == instrumentBus
                 && existing.line->delaySamples() == samples && existing.line->channelCount() >= channels
                 && !taken(existing.line)) {
                 delays.push_back(existing);
@@ -17454,7 +17854,7 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
         auto line = std::make_shared<AudioDelayLine>();
         line->prepare(samples, channels);
         line->setDelaySamples(samples);
-        delays.push_back({ from, to, bus, preFader, line });
+        delays.push_back({ from, to, bus, preFader, line, instrumentBus });
         return line;
     };
     const auto formatOf = [](const Node& node) { return node.audio != nullptr ? node.audio->channelCount : 2; };
@@ -17476,11 +17876,11 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
     for (const auto index : order) {
         auto& node = nodes[index];
         const auto cableDelay = [&](const NodeOutput& out) {
-            return std::max(0, (out.to ? arrival[*out.to] : masterArrival) - leaving[index]);
+            return std::max(0, (out.to ? arrival[*out.to] : masterArrival) - routeArrival(index, out));
         };
         auto shared = node.outputs.empty() ? masterArrival - leaving[index] : -1;
         for (const auto& out : node.outputs)
-            if (!out.preFader)
+            if (!out.preFader && out.instrumentBus == 0)
                 shared = shared < 0 ? cableDelay(out) : std::min(shared, cableDelay(out));
         shared = std::max(0, shared);
         node.output->setDelaySamples(shared);
@@ -17494,11 +17894,12 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
         entry.receiver = node.receiver;
         entry.fader = node.fader;
         entry.channels = formatOf(node);
+        entry.captureLatency = leaving[index] + shared;
         std::vector<const cydaw::audio::AudioSource*> destinations;
         auto preFader = false;
         for (const auto& out : node.outputs) {
             auto* to = out.to ? nodes[*out.to].source : nullptr;
-            const auto own = cableDelay(out) - (out.preFader ? 0 : shared);
+            const auto own = cableDelay(out) - (out.preFader || out.instrumentBus != 0 ? 0 : shared);
             auto channels = out.to ? formatOf(nodes[*out.to]) : 2;
             auto hardware = -1;
             if (out.hardware != 0) {
@@ -17507,9 +17908,11 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
                     continue;
             }
             entry.outputs.push_back({ to, out.gain, out.bus, out.preFader,
-                                      delayFor(node.source, to, out.bus, out.preFader, own, entry.channels), channels,
-                                      hardware });
-            preFader = preFader || out.preFader;
+                                      delayFor(node.source, to, out.bus, out.preFader, own,
+                                               out.instrumentBus != 0 ? TrackMixer::maximumChannels : entry.channels,
+                                               out.instrumentBus),
+                                      channels, hardware, out.instrumentBus });
+            preFader = preFader || (out.preFader && out.instrumentBus == 0);
             if (to != nullptr)
                 destinations.push_back(to);
         }

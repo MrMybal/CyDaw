@@ -199,7 +199,7 @@ struct LibraryWindow::Facets {
 };
 
 struct LibraryWindow::InstrumentRow {
-    enum Kind { factory, native, mine };
+    enum Kind { factory, native, mine, external };
     Kind kind { factory };
     cydaw::base::Text key;
     cydaw::base::Text name;
@@ -1257,9 +1257,14 @@ void LibraryWindow::drawInstruments()
         selectedInstrument_ = -1;
     }
     const auto download = studio_.banks().progress();
+    if (!plugins_->done() && !plugins_->scanning())
+        plugins_->start(cydaw::base::TextList::fromLines(studio_.samples().setting("pluginFolders", cydaw::base::Text()).toString()));
+    static int instrumentPluginGeneration = -1;
     // Read again now and then (a download ends, a device saved).
-    if (ImGui::GetTime() - instrumentsTime_ > 5.0 || (downloading_ && !download.running)) {
+    if (ImGui::GetTime() - instrumentsTime_ > 5.0 || (downloading_ && !download.running)
+        || instrumentPluginGeneration != plugins_->generation()) {
         instrumentsTime_ = ImGui::GetTime();
+        instrumentPluginGeneration = plugins_->generation();
         instruments_.clear();
         for (const auto& instrument : studio_.factoryInstruments()) {
             InstrumentRow row;
@@ -1311,6 +1316,20 @@ void LibraryWindow::drawInstruments()
             row.bank = plainText("Mes périphériques", "My devices");
             row.description = device.description;
             row.file = device.file;
+            instruments_.push_back(std::move(row));
+        }
+        for (const auto& plugin : plugins_->plugins()) {
+            if (plugin.kind != "Instrument" || (plugin.format != "VST3" && plugin.format != "CLAP"))
+                continue;
+            InstrumentRow row;
+            row.kind = InstrumentRow::external;
+            row.name = plugin.name;
+            row.category = plainText("Plug-ins", "Plug-ins");
+            row.genre = plugin.format;
+            row.state = plainText("Prêt", "Ready");
+            row.bank = plugin.vendor;
+            row.description = plugin.file.getFullPathName();
+            row.file = plugin.file;
             instruments_.push_back(std::move(row));
         }
         facets.begin();
@@ -1378,6 +1397,21 @@ void LibraryWindow::drawInstruments()
             if (row.missing && !studio_.banks().busy())
                 (void) studio_.downloadFactoryInstrument(row.key, error);
             track = studio_.addFactoryInstrument(row.key, error, model);
+        } else if (row.kind == InstrumentRow::external) {
+            const auto selected = target();
+            const auto existing = selected && selected->midi && selected->pad < 0;
+            track = existing ? selected : studio_.addMidiTrack(row.name);
+            if (track) {
+                const auto inserted = studio_.engine().setMidiTrackPlugin(track->midiId, row.file);
+                if (inserted.failed()) {
+                    error = inserted.getErrorMessage();
+                    if (!existing)
+                        (void) studio_.removeTrack(*track);
+                    track.reset();
+                } else {
+                    studio_.markDirty();
+                }
+            }
         } else if ((track = studio_.addMidiTrack(row.name))) {
             const auto inserted = row.kind == InstrumentRow::native ? studio_.insertDevice(*track, row.key)
                                                                   : studio_.insertLibraryDevice(*track, row.file);
@@ -1479,7 +1513,10 @@ void LibraryWindow::drawInstruments()
             ImGui::TextColored(theme::vec(p.accent), "%s",
                                (row.state + " : " + ui::sizeText(row.missingBytes) + " (" + row.banks.joinIntoString(", ") + ")").toRawUTF8());
         ImGui::Spacing();
-        if (ui::primaryButton(L("Nouvelle piste", "New track"), ImVec2(-1.0f, 0.0f)))
+        const auto selected = target();
+        const auto onto = row.kind == InstrumentRow::external && selected && selected->midi && selected->pad < 0;
+        if (ui::primaryButton(onto ? L("Charger sur la piste MIDI", "Load on MIDI track") : L("Nouvelle piste", "New track"),
+                              ImVec2(-1.0f, 0.0f)))
             add(row, false);
         if (row.model && ImGui::Button(L("Nouvelle piste (modèle de son)", "New track (sound model)"), ImVec2(-1.0f, 0.0f)))
             add(row, true);
@@ -1678,7 +1715,9 @@ void LibraryWindow::drawEffects()
         const auto before = state_.deviceInsertBefore && state_.deviceInsertBefore->first == *track ? state_.deviceInsertBefore->second
                                                                                                       : std::uint64_t {};
         if (row.kind == EffectRow::vst3) {
-            if (track->midi || track->master)
+            if (track->midi && track->pad < 0 && row.soundSource)
+                result = studio_.engine().setMidiTrackPlugin(track->midiId, row.file);
+            else if (track->midi || track->master)
                 result = cydaw::base::Result::fail(ui::Ls("Les plug-ins externes vont sur les pistes audio", "External plug-ins go on audio tracks"));
             else
                 result = studio_.engine().setTrackPlugin(track->audioIndex, row.file);

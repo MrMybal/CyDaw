@@ -1,5 +1,7 @@
 #pragma once
+#include <array>
 #include <atomic>
+#include <bitset>
 #include <cyaudio/plugins/Plugin.h>
 #include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/File.h>
@@ -99,6 +101,9 @@ class NativeHostedPlugin {
   void beginControl();
   void endControl();
   unsigned streamFill_{};
+  std::array<std::bitset<128>, 16> heldNotes_;
+  std::array<std::bitset<128>, 16> pedalNotes_;
+  std::bitset<16> pedals_;
   bool streamReady_{};
   cyaudio::PluginTransport streamTransport_;
   std::atomic<std::uint64_t> streamMissed_{};
@@ -157,7 +162,9 @@ public:
   // Prepared fixed-latency streaming: no wait, allocation or throw. Partial
   // application blocks share one maximumFrames-sized SDK quantum.
   bool processRealtime(audio::SampleBuffer<float> &, int start, int count,
-                       const cyaudio::PluginTransport &) noexcept;
+                       const cyaudio::PluginTransport &,
+                       const midi::EventBuffer * = nullptr) noexcept;
+  const cyaudio::PluginDescription &ports() const { return *plugin_.description(); }
   cyaudio::PluginSleepInfo sleepInfo() const noexcept { return plugin_.sleepInfo(); }
   std::uint64_t missedBlocks() const noexcept { return streamMissed_.load(); }
   cyaudio::Status realtimeFailure() const noexcept {

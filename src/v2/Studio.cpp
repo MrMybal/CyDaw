@@ -13,6 +13,8 @@
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "Studio.h"
+#include "OfflineRender.h"
+#include <cydaw/base/DispatchPause.h>
 
 #include <cydaw/engine/Containers.h>
 #include <cydaw/engine/EffectCatalogue.h>
@@ -844,6 +846,154 @@ std::optional<TrackRef> Studio::addBusTrack(const cydaw::base::Text& name)
     return track;
 }
 
+cydaw::base::Result Studio::addInstrumentReturns(const TrackRef& track)
+{
+    auto* plugin = track.midi && track.pad < 0 ? engine_.midiTrackPlugin(track.midiId) : nullptr;
+    if (!plugin)
+        return cydaw::base::Result::fail(ui::Ls("Sélectionnez un instrument externe", "Select an external instrument"));
+    auto routes = trackOutputs(track);
+    const auto ports = plugin->audioOutputs();
+    bool failed = false;
+    for (std::size_t i = 0; i < ports.size(); ++i) {
+        if (ports[i].main || ports[i].channels == 0
+            || std::ranges::any_of(routes, [i](const auto& route) { return route.instrumentBus == i + 1; }))
+            continue;
+        const auto name = ports[i].name.isNotEmpty() ? ports[i].name : cydaw::base::Text(static_cast<int>(i + 1));
+        const auto added = addBusTrack(trackName(track) + " · " + name);
+        if (!added) {
+            failed = true;
+            break;
+        }
+        (void) setTrackChannels(*added, ports[i].channels);
+        TrackOutput route;
+        route.destination = routingKey(*added);
+        route.instrumentBus = static_cast<std::uint32_t>(i + 1);
+        route.preFader = true;
+        routes.push_back(route);
+    }
+    const auto result = setTrackOutputs(track, std::move(routes));
+    return result.failed() || !failed ? result
+        : cydaw::base::Result::fail(ui::Ls("Impossible de créer tous les retours", "Could not create every return"));
+}
+
+cydaw::base::Result Studio::renderArrangement(const cydaw::base::File& destination, const double from,
+                                                const double to, const bool stems, const std::optional<TrackRef> onlyTrack)
+{
+    using Result = cydaw::base::Result;
+    using Engine = app::AudioTrackController;
+    if (engine_.isRecording() || engine_.isMidiRecording() || engine_.isMasterExporting())
+        return Result::fail(ui::Ls("Un enregistrement ou un rendu est en cours", "Recording or rendering is in progress"));
+    if (to <= from || destination == cydaw::base::File {})
+        return Result::fail(ui::Ls("Sélectionnez une plage à rendre", "Select a range to render"));
+    const auto visible = tracks();
+    const auto selected = onlyTrack ? std::find(visible.begin(), visible.end(), *onlyTrack) : visible.end();
+    if (onlyTrack && selected == visible.end())
+        return Result::fail(ui::Ls("Piste de rendu introuvable", "Render track not found"));
+    if (stems && !destination.isDirectory())
+        return Result::fail(ui::Ls("Choisissez un dossier de destination", "Choose a destination folder"));
+
+    const cydaw::base::ScopedEventDispatchPause pause;
+    const auto document = project_io::buildDocument(*this, {}, true);
+    app::OfflineRender offline;
+    Studio copy(true);
+    copy.engine().prepareOfflineSession();
+    cydaw::base::TextList warnings;
+    if (const auto loaded = project_io::applyDocument(copy, document, {}, warnings); loaded.failed())
+        return loaded;
+    if (!warnings.isEmpty())
+        return Result::fail(warnings.joinIntoString("\n"));
+    const auto copied = copy.tracks();
+    if (copied.size() != visible.size())
+        return Result::fail("The offline workspace has a different track layout");
+    std::vector<Engine::OfflineTarget> targets;
+    if (stems || onlyTrack) {
+        for (std::size_t i = 0; i < copied.size(); ++i) {
+            if (onlyTrack && visible[i] != *onlyTrack)
+                continue;
+            const auto& track = copied[i];
+            auto file = destination;
+            if (stems) {
+                const auto name = cydaw::base::Text(static_cast<int>(i + 1)).paddedLeft('0', 2)
+                                    + " - " + cydaw::base::File::createLegalFileName(copy.trackName(track));
+                file = destination.getNonexistentChildFile(name, ".wav", false);
+            }
+            targets.push_back({ Engine::TrackRoute { track.midi, track.audioIndex, track.midiId }, file });
+        }
+    } else {
+        targets.push_back({ std::nullopt, destination });
+    }
+    return copy.engine().renderOfflineWaves(targets, from, to);
+}
+
+namespace {
+void collectAudioPaths(cydaw::base::Value& entry, std::map<cydaw::base::Text, std::vector<cydaw::base::Value*>>& paths)
+{
+    if (auto* list = entry.getArray()) {
+        for (auto& child : *list)
+            collectAudioPaths(child, paths);
+    } else if (auto* object = entry.getDynamicObject()) {
+        auto& properties = object->getProperties();
+        for (int i = 0; i < properties.size(); ++i) {
+            const auto key = properties.getName(i).toString();
+            if (key == "nodeGraph" || key == "plugins" || key == "rackPads" || key == "externalInstrument")
+                continue;
+            auto& value = *properties.getVarPointerAt(i);
+            if (value.isString() && (key == "source" || key == "audioFile" || key == "file")) {
+                const auto path = value.toString();
+                if (cydaw::base::File::isAbsolutePath(path)
+                    && cydaw::base::File(path).hasFileExtension("wav;wave;flac;aif;aiff;ogg;opus;mp3;w64;mp4;m4a;aac;caf;au"))
+                    paths[path].push_back(&value);
+            } else if (!value.isString()) {
+                collectAudioPaths(value, paths);
+            }
+        }
+    }
+}
+}
+
+cydaw::base::Result Studio::collectSessionMedia(const cydaw::base::File& destinationFolder)
+{
+    using Result = cydaw::base::Result;
+    if (!destinationFolder.isDirectory())
+        return Result::fail(ui::Ls("Choisissez un dossier de destination", "Choose a destination folder"));
+    auto document = project_io::buildDocument(*this, {}, true);
+    auto arrangement = document.getProperty("tracks");
+    std::map<cydaw::base::Text, std::vector<cydaw::base::Value*>> paths;
+    collectAudioPaths(arrangement, paths);
+    for (const auto& [path, _] : paths)
+        if (!cydaw::base::File(path).existsAsFile())
+            return Result::fail(ui::Ls("Média introuvable · ", "Missing media · ") + path);
+    const auto name = projectFile_ == cydaw::base::File {} ? cydaw::base::Text("CyDaw") : projectFile_.getFileNameWithoutExtension();
+    const auto destination = destinationFolder.getNonexistentChildFile(name, ".cydaw", false);
+    const auto mediaFolder = destinationFolder.getNonexistentChildFile(destination.getFileNameWithoutExtension() + " Audio", {}, false);
+    if (!paths.empty())
+        if (const auto created = mediaFolder.createDirectory(); created.failed())
+            return created;
+    std::vector<cydaw::base::File> created;
+    const auto rollback = [&] {
+        for (const auto& file : created)
+            (void) file.deleteFile();
+        if (mediaFolder.isDirectory())
+            (void) mediaFolder.deleteFile();
+    };
+    for (auto& [path, references] : paths) {
+        const cydaw::base::File source(path);
+        const auto target = mediaFolder.getNonexistentChildFile(source.getFileNameWithoutExtension(), source.getFileExtension(), false);
+        created.push_back(target);
+        if (!source.copyFileTo(target)) {
+            rollback();
+            return Result::fail(ui::Ls("Impossible de copier · ", "Could not copy · ") + path);
+        }
+        const auto relative = target.getRelativePathFrom(destinationFolder);
+        for (auto* reference : references)
+            *reference = relative;
+    }
+    const auto result = app::ProjectRecovery::writeDocumentAtomically(destination, document);
+    if (result.failed())
+        rollback();
+    return result;
+}
+
 void Studio::restoreTrackRouting(const TrackRef& track, std::vector<TrackOutput> outputs, const bool bus)
 {
     if (auto* stored = outputsOf(track))
@@ -1076,6 +1226,7 @@ void Studio::publishRouting()
             out.preFader = output.preFader;
             out.hardwareBus = output.hardware;
             out.hardwareAfterEffects = output.hardwareAfterEffects;
+            out.instrumentBus = output.instrumentBus;
             if (output.hardware == 0 && output.destination != 0) {
                 const auto destination = trackForKey(output.destination);
                 if (!destination)
@@ -5836,12 +5987,11 @@ cydaw::base::Result Studio::bounceMidiTrack(const TrackRef& track, const bool pr
         return cydaw::base::Result::fail(ui::Ls("Un rendu est déjà en cours", "A render is already in progress"));
     auto start = std::numeric_limits<double>::infinity();
     auto end = 0.0;
-    const auto beat = 60.0 / engine_.tempo();
     if (const auto* clips = engine_.midiClipsView(track.midiId))
         for (const auto& clip : *clips)
             if (clip.launcherScene < 0 && !clip.notes.empty()) {
-                start = std::min(start, clip.startBeats * beat);
-                end = std::max(end, (clip.startBeats + clip.lengthBeats) * beat);
+                start = std::min(start, engine_.timeAtBeat(clip.startBeats));
+                end = std::max(end, engine_.timeAtBeat(clip.startBeats + clip.lengthBeats));
             }
     if (!(end > start))
         return cydaw::base::Result::fail(ui::Ls("La piste n’a aucune note dans l’arrangement", "This track has no notes in the arrangement"));
@@ -5856,6 +6006,44 @@ cydaw::base::Result Studio::bounceMidiTrack(const TrackRef& track, const bool pr
     if (result.wasOk())
         pendingMidiBounce_ = PendingMidiBounce { routingKey(track), file, start, preFader };
     return result;
+}
+
+cydaw::base::Result Studio::freezeMidiTrack(const TrackRef& track, const double tailSeconds)
+{
+    using Result = cydaw::base::Result;
+    if (!track.midi || !isValid(track) || isCompanion(track) || companionOf(track))
+        return Result::fail(ui::Ls("Sélectionnez une piste MIDI simple", "Select a MIDI track with no companion"));
+    if (engine_.isPlaying() || pendingMidiBounce_ || !std::isfinite(tailSeconds) || tailSeconds < 0 || tailSeconds > 120)
+        return Result::fail(ui::Ls("Arrêtez le transport et vérifiez la durée de la queue", "Stop playback and check the tail length"));
+    if (trackMix(track).muted || std::ranges::any_of(tracks(), [&](const auto& other) {
+            return other != track && trackMix(other).solo && !trackMix(track).solo;
+        }))
+        return Result::fail(ui::Ls("La piste doit être audible pour être gelée", "The track must be audible to freeze it"));
+    if (std::ranges::any_of(trackOutputs(track), [](const auto& out) { return out.instrumentBus != 0; }))
+        return Result::fail(ui::Ls("Exportez des stems pour un instrument avec des retours", "Export stems for an instrument with returns"));
+    const auto* clips = engine_.midiClipsView(track.midiId);
+    auto first = std::numeric_limits<double>::infinity();
+    auto last = 0.0;
+    if (clips)
+        for (const auto& clip : *clips)
+            if (clip.launcherScene < 0 && !clip.notes.empty()) {
+                first = std::min(first, engine_.timeAtBeat(clip.startBeats));
+                last = std::max(last, engine_.timeAtBeat(clip.startBeats + clip.lengthBeats));
+            }
+    if (!(last > first))
+        return Result::fail(ui::Ls("La piste n’a aucune note dans l’arrangement", "This track has no notes in the arrangement"));
+    const auto folder = projectFile_ == cydaw::base::File {}
+        ? locations::folder(Location::mixes).getChildFile("Bounces")
+        : projectFile_.getParentDirectory().getChildFile(projectFile_.getFileNameWithoutExtension() + " Audio").getChildFile("Bounces");
+    if (const auto created = folder.createDirectory(); created.failed())
+        return created;
+    const auto file = folder.getNonexistentChildFile(cydaw::base::File::createLegalFileName(trackName(track) + " - Freeze"), ".wav", false);
+    const auto result = renderArrangement(file, first, last + tailSeconds, false, track);
+    if (result.failed())
+        return result;
+    pendingMidiBounce_ = PendingMidiBounce { routingKey(track), file, first, false, true };
+    finishMidiBounce(result);
+    return Result::ok();
 }
 
 void Studio::finishMidiBounce(const cydaw::base::Result& result)
@@ -5887,10 +6075,12 @@ void Studio::finishMidiBounce(const cydaw::base::Result& result)
     setTrackMix(*rendered, mix);
     (void) setTrackOutputs(*rendered, trackOutputs(*source));
     const auto renderedKey = routingKey(*rendered);
-    midiBounces_[renderedKey] = { pending->source, original.muted };
+    midiBounces_[renderedKey] = { pending->source, original.muted, pending->frozen };
     original.muted = true;
     original.solo = false;
     setTrackMix(*source, original);
+    if (pending->frozen)
+        engine_.setMidiTrackFrozen(source->midiId, true);
     std::erase(trackOrder_, renderedKey);
     const auto position = std::find(trackOrder_.begin(), trackOrder_.end(), pending->source);
     trackOrder_.insert(position == trackOrder_.end() ? position : std::next(position), renderedKey);
@@ -5914,23 +6104,36 @@ std::optional<TrackRef> Studio::returnToMidi(const TrackRef& track)
     original.solo = render.solo;
     render.muted = true;
     render.solo = false;
+    if (isFrozenBounce(track)) {
+        engine_.setMidiTrackFrozen(source->midiId, false);
+        midiBounces_[routingKey(track)].frozen = false;
+    }
     setTrackMix(track, render);
     setTrackMix(*source, original);
     return source;
 }
 
-void Studio::restoreBounceLink(const std::uint64_t rendered, const std::uint64_t source, const bool wasMuted)
+void Studio::restoreBounceLink(const std::uint64_t rendered, const std::uint64_t source, const bool wasMuted, const bool frozen)
 {
     const auto audio = trackForKey(rendered);
     const auto midi = trackForKey(source);
-    if (audio && !audio->midi && midi && midi->midi)
-        midiBounces_[rendered] = { source, wasMuted };
+    if (audio && !audio->midi && midi && midi->midi) {
+        midiBounces_[rendered] = { source, wasMuted, frozen };
+        if (frozen)
+            engine_.setMidiTrackFrozen(midi->midiId, true);
+    }
 }
 
 bool Studio::bounceSourceWasMuted(const TrackRef& rendered) const
 {
     const auto found = midiBounces_.find(routingKey(rendered));
     return found != midiBounces_.end() && found->second.wasMuted;
+}
+
+bool Studio::isFrozenBounce(const TrackRef& rendered) const
+{
+    const auto found = midiBounces_.find(routingKey(rendered));
+    return found != midiBounces_.end() && found->second.frozen;
 }
 
 bool Studio::removeTrack(const TrackRef& track)
@@ -5952,6 +6155,8 @@ bool Studio::removeTrack(const TrackRef& track)
     // The indices of the tracks after it move.
     clipsAtStop_.clear();
     const auto removedKey = routingKey(track);
+    if (isFrozenBounce(track))
+        (void) returnToMidi(track);
     std::erase_if(midiBounces_, [removedKey](const auto& entry) {
         return entry.first == removedKey || entry.second.source == removedKey;
     });
@@ -6061,6 +6266,7 @@ void Studio::newProject()
     setControllerAssignments({}, true);
     if (const auto* factory = factoryAudioGraph_.getDynamicObject())
         sharedNodeModules_ = app::cloneJsonValue(factory->getProperty("modules"));
+    engine_.setTempoChanges({});
     engine_.setTempo(120.0);
     engine_.setTimeSignature(4, 4);
     engine_.resetLoopRange();

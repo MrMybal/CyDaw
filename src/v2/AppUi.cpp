@@ -977,6 +977,63 @@ void AppUi::chooseExportMix()
                           });
 }
 
+void AppUi::chooseOfflineRender(const bool stems)
+{
+    auto& engine = studio_.engine();
+    auto from = 0.0;
+    auto to = engine.length() + 2.0;
+    std::optional<TrackRef> onlyTrack;
+    if (engine.hasExplicitLoopRange()) {
+        from = engine.loopStart();
+        to = engine.loopEnd();
+    }
+    if (!stems && state_.selectedClips.size() == 1) {
+        const auto& selected = state_.selectedClips.front();
+        if (selected.scene < 0 && selected.track.midi) {
+            if (const auto* clips = engine.midiClipsView(selected.track.midiId))
+                if (const auto clip = std::ranges::find(*clips, selected.clipId, &app::AudioTrackController::MidiClip::id);
+                    clip != clips->end() && clip->launcherScene < 0) {
+                    from = engine.timeAtBeat(clip->startBeats);
+                    to = engine.timeAtBeat(clip->startBeats + clip->lengthBeats);
+                    onlyTrack = selected.track;
+                }
+        } else if (selected.scene < 0 && !selected.track.master) {
+            if (const auto* clips = engine.audioClipsView(selected.track.audioIndex))
+                if (const auto clip = std::ranges::find(*clips, selected.clipId, &app::AudioTrackController::AudioClip::id);
+                    clip != clips->end()) {
+                    from = clip->startSeconds;
+                    to = from + clip->durationSeconds;
+                    onlyTrack = selected.track;
+                }
+        }
+    }
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
+        stems ? L("Exporter les stems", "Export stems") : L("Rendu WAV hors ligne", "Offline WAV render"),
+        studio_.projectFile().getParentDirectory(), stems ? "*" : "*.wav");
+    using Flags = cydaw::base::FileDialogFlags;
+    chooser_->launchAsync(stems ? Flags::openMode | Flags::canSelectDirectories
+                                : Flags::saveMode | Flags::canSelectFiles | Flags::warnAboutOverwriting,
+        [this, stems, from, to, onlyTrack](const auto& dialog) {
+            if (const auto file = dialog.getResult(); file != cydaw::base::File {}) {
+                const auto result = studio_.renderArrangement(stems ? file : file.withFileExtension(".wav"), from, to, stems, onlyTrack);
+                notify(result.wasOk() ? ui::Ls("Rendu terminé", "Render complete") : result.getErrorMessage(), result.failed());
+            }
+        });
+}
+
+void AppUi::chooseCollectMedia()
+{
+    using Flags = cydaw::base::FileDialogFlags;
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Rassembler les médias de l’arrangement", "Collect arrangement media"),
+        studio_.projectFile().getParentDirectory(), "*");
+    chooser_->launchAsync(Flags::openMode | Flags::canSelectDirectories, [this](const auto& dialog) {
+        if (const auto folder = dialog.getResult(); folder != cydaw::base::File {}) {
+            const auto result = studio_.collectSessionMedia(folder);
+            notify(result.wasOk() ? ui::Ls("Copie du projet enregistrée", "Project copy saved") : result.getErrorMessage(), result.failed());
+        }
+    });
+}
+
 void AppUi::chooseImportMidi()
 {
     chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Importer un fichier MIDI", "Import a MIDI file"), cydaw::base::File {}, "*.mid;*.midi");
@@ -2906,6 +2963,14 @@ void AppUi::drawMenuBar()
             else
                 chooseExportMix();
         }
+        if (!fileView && state_.mode == AppMode::studio) {
+            if (ImGui::MenuItem(L("Rendu WAV hors ligne…", "Offline WAV render…"), nullptr, false, !exporting))
+                chooseOfflineRender(false);
+            if (ImGui::MenuItem(L("Exporter les stems…", "Export stems…"), nullptr, false, !exporting))
+                chooseOfflineRender(true);
+            if (ImGui::MenuItem(L("Rassembler les médias et enregistrer une copie…", "Collect media and save a copy…")))
+                chooseCollectMedia();
+        }
         ImGui::Separator();
         if (ImGui::MenuItem(L("Quitter", "Quit"), "Ctrl+Q") && onQuit)
             onQuit();
@@ -2936,6 +3001,10 @@ void AppUi::drawMenuBar()
                                  ImGuiSliderFlags_AlwaysClamp);
                 const auto pre = ImGui::MenuItem(L("Pré-fader", "Pre-fader"));
                 const auto post = ImGui::MenuItem(L("Post-fader", "Post-fader"));
+                if (ImGui::MenuItem(L("Geler hors ligne (post-fader)", "Freeze offline (post-fader)"))) {
+                    const auto result = studio_.freezeMidiTrack(track, midiBounceTailSeconds_);
+                    notify(result.wasOk() ? ui::Ls("Piste gelée", "Track frozen") : result.getErrorMessage(), result.failed());
+                }
                 if (pre || post) {
                     const auto result = studio_.bounceMidiTrack(track, pre, midiBounceTailSeconds_);
                     state_.status = result.wasOk() ? ui::Ls("Bounce en cours…", "Bouncing…") : result.getErrorMessage();
@@ -2943,7 +3012,8 @@ void AppUi::drawMenuBar()
                 }
                 ImGui::EndMenu();
             }
-            if (studio_.midiSourceOfBounce(track) && ImGui::MenuItem(L("Revenir au MIDI", "Return to MIDI")))
+            if (studio_.midiSourceOfBounce(track) && ImGui::MenuItem(studio_.isFrozenBounce(track)
+                ? L("Dégeler et revenir au MIDI", "Unfreeze and return to MIDI") : L("Revenir au MIDI", "Return to MIDI")))
                 if (const auto original = studio_.returnToMidi(track))
                     state_.selectTrack(*original);
         }
@@ -3375,15 +3445,14 @@ void AppUi::drawTransportBar()
 
             ui::toolbarSeparator();
             const auto seconds = simulation ? studio_.simulationSeconds() : engine.position();
-            const auto tempo = std::max(1.0, engine.tempo());
-            const auto beats = seconds * tempo / 60.0;
+            const auto beats = engine.beatAtTime(seconds);
             // Bars as the metre counts them; beats in its own value (an eighth in 7/8).
-            const auto barLength = engine.beatsPerBar();
-            const auto bar = static_cast<int>(std::floor(beats / barLength + 1.0e-9)) + 1;
-            const auto inBar = beats - (bar - 1) * barLength;
-            const auto beatLength = 4.0 / engine.timeSignatureDenominator();
+            const auto measure = engine.tempoMap().measureAt(beats);
+            const auto bar = measure.number;
+            const auto inBar = beats - measure.start;
+            const auto beatLength = 4.0 / measure.denominator;
             const auto beat = static_cast<int>(std::floor(inBar / beatLength + 1.0e-9)) + 1;
-            const auto sixteenth = static_cast<int>(std::fmod(beats * 4.0, 4.0)) + 1;
+            const auto sixteenth = static_cast<int>(std::fmod(inBar, beatLength) * 4.0) + 1;
             char position[64];
             std::snprintf(position, sizeof(position), "%3d.%d.%d", bar, beat, sixteenth);
             char clock[64];

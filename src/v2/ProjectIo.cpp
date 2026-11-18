@@ -351,6 +351,8 @@ cydaw::base::Value outputsToVar(Studio& studio, const TrackRef& track)
     for (const auto& output : studio.trackOutputs(track)) {
         auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
         value->setProperty("gainDb", output.gainDb);
+        if (output.instrumentBus != 0)
+            value->setProperty("instrumentBus", static_cast<std::int64_t>(output.instrumentBus));
         if (output.preFader)
             value->setProperty("preFader", true);
         // The destination's input: its graph node, kept with the graph.
@@ -523,6 +525,7 @@ void restoreRouting(Studio& studio, const cydaw::base::Object& root, const BusId
                                                   app::VirtualBusDirection::output);
                     output.gainDb = static_cast<float>(static_cast<double>(item.getProperty("gainDb", 0.0)));
                     output.preFader = static_cast<bool>(item.getProperty("preFader", false));
+                    output.instrumentBus = static_cast<std::uint32_t>(std::clamp(static_cast<int>(item.getProperty("instrumentBus", 0)), 0, 64));
                     output.hardwareAfterEffects = static_cast<bool>(item.getProperty("hardwareAfterEffects", false));
                     if (const auto bus = engine.virtualBus(output.hardware);
                         output.hardware != 0 && bus && bus->direction == app::VirtualBusDirection::output)
@@ -533,6 +536,7 @@ void restoreRouting(Studio& studio, const cydaw::base::Object& root, const BusId
                     output.gainDb = static_cast<float>(static_cast<double>(item.getProperty("gainDb", 0.0)));
                     output.input = *key != 0 ? static_cast<std::uint64_t>(static_cast<std::int64_t>(item.getProperty("input", 0))) : 0;
                     output.preFader = static_cast<bool>(item.getProperty("preFader", false));
+                    output.instrumentBus = static_cast<std::uint32_t>(std::clamp(static_cast<int>(item.getProperty("instrumentBus", 0)), 0, 64));
                     outputs.push_back(output);
                 }
         if (outputs.size() == 1 && outputs.front() == TrackOutput {})
@@ -562,7 +566,8 @@ void restoreRouting(Studio& studio, const cydaw::base::Object& root, const BusId
             const auto audio = keyOf(item.getProperty("audio", {}));
             const auto midi = keyOf(item.getProperty("midi", {}));
             if (audio && midi)
-                studio.restoreBounceLink(*audio, *midi, static_cast<bool>(item.getProperty("wasMuted", false)));
+                studio.restoreBounceLink(*audio, *midi, static_cast<bool>(item.getProperty("wasMuted", false)),
+                                         static_cast<bool>(item.getProperty("frozen", false)));
         }
     // Its groups: each group's track, its tracks, folded or not.
     if (const auto* groups = root.getProperty("groups").getArray())
@@ -1625,7 +1630,8 @@ void restoreMidiClip(Engine& engine, const std::uint64_t trackId, const cydaw::b
 
 // Returns the armed track's id, 0 when none is.
 // One MIDI track of the file; its id when it is armed, else 0.
-std::uint64_t restoreMidiTrack(Studio& studio, const cydaw::base::Object& saved, cydaw::base::TextList& warnings)
+std::uint64_t restoreMidiTrack(Studio& studio, const cydaw::base::Object& saved,
+                              const cydaw::base::File& projectFile, cydaw::base::TextList& warnings)
 {
     auto& engine = studio.engine();
     const auto trackName = saved.getProperty(keys::name).toString();
@@ -1660,6 +1666,14 @@ std::uint64_t restoreMidiTrack(Studio& studio, const cydaw::base::Object& saved,
         engine.replaceMidiAutomationPoints(trackId, std::move(points));
     const auto graph = saved.getProperty(keys::nodeGraph);
     auto& state = studio.adoptMidiTrack(trackId, graph.getDynamicObject() != nullptr ? graph : cydaw::base::Value());
+    if (const auto* external = saved.getProperty("externalInstrument").getDynamicObject()) {
+        const auto path = external->getProperty(keys::file).toString();
+        const auto file = resolveAsset(path, projectFile);
+        cydaw::base::MemoryBlock pluginState;
+        (void) cydaw::base::decodeLegacyStateBytes(external->getProperty(keys::state).toString(), pluginState);
+        if (const auto result = engine.setMidiTrackPlugin(trackId, file, &pluginState); result.failed())
+            warn(warnings, trackName + " — " + path + ": " + result.getErrorMessage());
+    }
     // CyDAW 2's own keys; CyDAW 1 ignores them.
     if (const auto savedColour = colourOf(saved); savedColour != 0)
         state.colour = savedColour;
@@ -1870,6 +1884,15 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
         track->setProperty(keys::solo, info.solo);
         track->setProperty(keys::armed, info.armed);
         // What it hears, where its notes also go.
+        if (auto* plugin = engine.midiTrackPlugin(info.id)) {
+            auto instrument = makeObject();
+            instrument->setProperty(keys::file, projectAssetPath(plugin->pluginFile(), projectFile));
+            cydaw::base::MemoryBlock stateBytes;
+            const auto read = refreshPluginState ? plugin->getState(stateBytes) : plugin->getCachedState(stateBytes);
+            if (read.wasOk())
+                instrument->setProperty(keys::state, stateBytes.toBase64Encoding());
+            track->setProperty("externalInstrument", cydaw::base::Value(instrument.get()));
+        }
         {
             cydaw::base::Array<cydaw::base::Value> inputs;
             for (const auto& input : engine.midiTrackInputs(info.id))
@@ -1981,6 +2004,8 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
                 value->setProperty("audio", placeOf(track));
                 value->setProperty("midi", placeOf(*source));
                 value->setProperty("wasMuted", studio.bounceSourceWasMuted(track));
+                if (studio.isFrozenBounce(track))
+                    value->setProperty("frozen", true);
                 bounces.add(cydaw::base::Value(value.get()));
             }
         if (!bounces.isEmpty())
@@ -1992,6 +2017,12 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
     document->setProperty(keys::tempo, engine.tempo());
     document->setProperty("timeSignatureNumerator", engine.timeSignatureNumerator());
     document->setProperty("timeSignatureDenominator", engine.timeSignatureDenominator());
+    if (!engine.tempoChanges().empty()) {
+        cydaw::base::Array<cydaw::base::Value> changes;
+        for (const auto& point : engine.tempoChanges())
+            changes.add(cydaw::base::Array<cydaw::base::Value> { point.beat, point.bpm, point.numerator, point.denominator });
+        document->setProperty("tempoChanges", changes);
+    }
     auto masterArrangement = makeObject();
     masterArrangement->setProperty(keys::parameterAutomation, parameterLanesToVar(studio.masterArrangementLanes()));
     masterArrangement->setProperty(keys::shownAutomation, studio.masterArrangementLanes().shown);
@@ -2233,6 +2264,13 @@ bool DocumentLoad::next()
                                 root.hasProperty("timeSignatureDenominator") ? static_cast<int>(root.getProperty("timeSignatureDenominator")) : 4);
         s.tempo = projectTempo > 0.0 ? projectTempo : 120.0;
         engine.setTempo(s.tempo);
+        std::vector<Engine::TempoPoint> tempoChanges;
+        if (const auto* changes = root.getProperty("tempoChanges").getArray())
+            for (const auto& value : *changes)
+                if (const auto* row = value.getArray(); row && row->size() == 4)
+                    tempoChanges.push_back({ static_cast<double>((*row)[0]), static_cast<double>((*row)[1]),
+                                             static_cast<int>((*row)[2]), static_cast<int>((*row)[3]) });
+        engine.setTempoChanges(std::move(tempoChanges));
         engine.setLaunchQuantization(
             root.hasProperty(keys::launchQuantization)
                 ? static_cast<Engine::LaunchQuantization>(
@@ -2334,7 +2372,7 @@ bool DocumentLoad::next()
         if (s.midiTracks != nullptr && !s.midiTracks->isEmpty()) {
             if (s.index < static_cast<std::size_t>(s.midiTracks->size())) {
                 if (const auto* track = s.midiTracks->getReference(static_cast<int>(s.index)).getDynamicObject())
-                    if (const auto armed = restoreMidiTrack(studio, *track, s.warnings); armed != 0)
+                    if (const auto armed = restoreMidiTrack(studio, *track, s.projectFile, s.warnings); armed != 0)
                         s.armedTrack = armed;
                 ++s.index;
             }

@@ -194,7 +194,9 @@ void outputsEditor(Studio& studio, const TrackRef& track, const float labelWidth
     for (std::size_t index = 0; index < outputs.size(); ++index) {
         ImGui::PushID(static_cast<int>(index));
         ImGui::AlignTextToFramePadding();
-        ImGui::TextColored(theme::vec(p.textDim), "%s", index == 0 ? L("Sortie", "Output") : L("Envoi", "Send"));
+        const auto auxiliary = outputs[index].instrumentBus != 0;
+        ImGui::TextColored(theme::vec(p.textDim), "%s", auxiliary ? L("Retour", "Return")
+            : index == 0 ? L("Sortie", "Output") : L("Envoi", "Send"));
         ImGui::SameLine(labelWidth);
         const auto room = ImGui::GetContentRegionAvail().x;
         const auto levelWidth = dp(64.0f);
@@ -223,9 +225,11 @@ void outputsEditor(Studio& studio, const TrackRef& track, const float labelWidth
         } else {
             ImGui::SameLine(0.0f, dp(2.0f));
         }
+        ImGui::BeginDisabled(auxiliary);
         changed |= ui::toggle("PRE", &outputs[index].preFader, p.accent, ImVec2(preWidth, ImGui::GetFrameHeight()),
                               L("Avant le fader : ce qu'il envoie ne suit pas son fader (il suit encore muet et solo).",
                                 "Before the fader: what it sends does not follow its fader (it still follows mute and solo)."));
+        ImGui::EndDisabled();
         ImGui::SameLine(0.0f, dp(2.0f));
         if (ui::dragNumber("##level", &outputs[index].gainDb, 0.1f, -60.0f, 12.0f, "%.1f dB",
                            twoLines ? std::max(dp(48.0f), room - preWidth - dp(2.0f)) : levelWidth))

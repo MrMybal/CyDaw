@@ -432,6 +432,10 @@ if(CYDAW_BUILD_TESTS)
     target_include_directories(cydaw_plugin_sleep_fixture SYSTEM PRIVATE
         "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/clap/include")
     set_target_properties(cydaw_plugin_sleep_fixture PROPERTIES PREFIX "" SUFFIX ".clap")
+    add_library(cydaw_hosted_instrument_fixture MODULE tests/HostedInstrumentFixture.cpp)
+    target_include_directories(cydaw_hosted_instrument_fixture SYSTEM PRIVATE
+        "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/clap/include")
+    set_target_properties(cydaw_hosted_instrument_fixture PROPERTIES PREFIX "" SUFFIX ".clap")
     add_executable(cydaw_native_plugin_sleep_tests tests/NativePluginSleepTests.cpp)
     target_link_libraries(cydaw_native_plugin_sleep_tests PRIVATE cydaw_plugin_host)
     add_dependencies(cydaw_native_plugin_sleep_tests cydaw_plugin_sleep_fixture CyDAWPluginWorker)
@@ -1007,6 +1011,13 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_routing_check.py"
                                      --port 47828 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_routing_check PROPERTIES TIMEOUT 180)
+                    if(TARGET cydaw_hosted_instrument_fixture)
+                        add_test(NAME cydaw2_hosted_instrument_check
+                                 COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_hosted_instrument_check.py"
+                                         --exe "$<TARGET_FILE:CyDAW2>" --clap "$<TARGET_FILE:cydaw_hosted_instrument_fixture>"
+                                         --arrangement)
+                        set_tests_properties(cydaw2_hosted_instrument_check PROPERTIES TIMEOUT 180)
+                    endif()
                     # Sound banks downloaded from a local server into folders of
                     # the test's own, and the locations moved. Silent, offline.
                     add_test(NAME cydaw2_banks_check

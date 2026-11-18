@@ -209,6 +209,41 @@ void DevicesView::draw()
     if (slot == nullptr)
         return;
     auto& graph = slot->graph();
+    auto* externalInstrument = track.midi && track.pad < 0 ? studio_.engine().midiTrackPlugin(track.midiId) : nullptr;
+    if (externalInstrument) {
+        const auto report = [this](const cydaw::base::Result& result) {
+            if (result.failed()) {
+                state_.status = result.getErrorMessage();
+                state_.statusIsError = true;
+                state_.statusTime = ImGui::GetTime();
+            }
+        };
+        ImGui::TextUnformatted(externalInstrument->pluginName().toRawUTF8());
+        if (!externalInstrument->isRunning()) {
+            ImGui::SameLine();
+            if (ImGui::Button(L("Recharger le plug-in", "Reload plug-in"))) {
+                cydaw::base::MemoryBlock saved;
+                (void) externalInstrument->getCachedState(saved);
+                report(studio_.engine().setMidiTrackPlugin(track.midiId, externalInstrument->pluginFile(), &saved));
+            }
+            externalInstrument = studio_.engine().midiTrackPlugin(track.midiId);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(L("Ouvrir le plug-in", "Open plug-in")))
+            report(externalInstrument->showEditor());
+        const auto outputs = externalInstrument->audioOutputs();
+        if (std::ranges::any_of(outputs, [](const auto& port) { return !port.main && port.channels != 0; })) {
+            ImGui::SameLine();
+            if (ImGui::Button(L("Créer les retours dans le mixeur", "Create mixer returns")))
+                report(studio_.addInstrumentReturns(track));
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(L("Retirer le plug-in", "Remove plug-in"))) {
+            studio_.engine().clearMidiTrackPlugin(track.midiId);
+            studio_.markDirty();
+            externalInstrument = nullptr;
+        }
+    }
 
     // The cards in signal order: left to right as the graph lays them out.
     auto nodes = graph.editorNodes();
@@ -231,6 +266,7 @@ void DevicesView::draw()
     const auto voice = track.midi ? graph.editorVoiceNodes() : std::set<std::uint64_t>();
     for (const auto& node : nodes)
         if (!node.boundary && !(prismVoice && !wholeVoiceType(node.typeKey) && voice.contains(node.id))
+            && !(externalInstrument && voice.contains(node.id))
             && !modulators_->owned(node.id) && !inside.contains(node.id))
             chain.push_back(&node);
     std::stable_sort(chain.begin(), chain.end(), [](const auto* a, const auto* b) {

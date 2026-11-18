@@ -1,4 +1,6 @@
 #include "NativeHostedPlugin.h"
+#include "../app/OfflineRender.h"
+#include <cyaudio/plugins/ClapExtensions.h>
 #include <chrono>
 #include <cstring>
 #include <cydaw/base/DispatchPause.h>
@@ -357,7 +359,8 @@ void NativeHostedPlugin::processBlock(audio::SampleBuffer<float> &buffer,
 }
 bool NativeHostedPlugin::processRealtime(audio::SampleBuffer<float> &buffer,
                                          int start, int count,
-                                         const PluginTransport &time) noexcept {
+                                         const PluginTransport &time,
+                                         const midi::EventBuffer *midi) noexcept {
   if (start < 0 || count <= 0 || start > buffer.getNumSamples() - count)
     return false;
   if (!prepared_) {
@@ -368,13 +371,26 @@ bool NativeHostedPlugin::processRealtime(audio::SampleBuffer<float> &buffer,
   const auto quantum = options_.maximumFrames;
   bool allReady = true;
   int consumed = 0;
+  const auto *layout = plugin_.description();
+  const auto notePort = layout && !layout->noteInputs.empty() ? &layout->noteInputs.front() : nullptr;
+  auto nextMidi = midi ? midi->begin() : midi::EventBuffer::Iterator(nullptr, 0);
+  const auto endMidi = midi ? midi->end() : nextMidi;
   while (consumed < count) {
     if (streamFill_ == 0) {
       streamReady_ = false;
       if (audioPending_) {
         PluginProcess<float> process{inputs_,  outputs_, quantum,
                                      &events_, &result_, &streamTransport_};
-        const auto status = plugin_.collect(process, audioTicket_);
+        auto status = plugin_.collect(process, audioTicket_);
+        if (offline_ && status == Status::would_block) {
+          const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+          do {
+            std::this_thread::sleep_for(std::chrono::microseconds(50));
+            status = plugin_.collect(process, audioTicket_);
+          } while (status == Status::would_block && std::chrono::steady_clock::now() < deadline);
+        }
+        if (status != Status::ok && app::OfflineRender::current)
+          app::OfflineRender::current->pluginFailed = true;
         if (status == Status::would_block) {
           // A late reply must never be played at a later timeline position.
           (void)plugin_.discard(audioTicket_);
@@ -419,6 +435,80 @@ bool NativeHostedPlugin::processRealtime(audio::SampleBuffer<float> &buffer,
           p->sent = value;
       }
     }
+    while (notePort && nextMidi != endMidi) {
+      const auto message = *nextMidi;
+      if (message.samplePosition >= consumed + int(frames))
+        break;
+      ++nextMidi;
+      if (message.samplePosition < consumed || message.numBytes <= 0)
+        continue;
+      PluginEvent event;
+      event.port = 0;
+      event.frame = streamFill_ + unsigned(message.samplePosition - consumed);
+      const auto status = message.data[0] & 0xf0;
+      const auto isClap = layout->plugin.format == PluginFormat::clap;
+      const auto acceptsMidi = isClap && (notePort->dialects & (clapMidi1 | clapMidiMpe)) != 0;
+      const auto nativeNotes = !isClap || ((notePort->dialects & clapNotes) != 0
+                                          && (!acceptsMidi || notePort->preferredDialect == clapNotes));
+      const auto note = message.numBytes == 3 && (status == 0x80 || status == 0x90);
+      const auto channel = message.data[0] & 15;
+      const auto panic = message.numBytes == 3 && status == 0xb0 && (message.data[1] == 120 || message.data[1] == 123);
+      auto& held = heldNotes_[channel];
+      auto& sustained = pedalNotes_[channel];
+      const auto release = [&](const std::bitset<128>& keys, const bool choke) {
+        auto off = event;
+        off.kind = choke ? PluginEventKind::noteChoke : PluginEventKind::noteOff;
+        off.channel = channel;
+        for (int key = 0; key < 128; ++key)
+          if (keys.test(key)) {
+            off.key = key;
+            (void)events_.add(off);
+          }
+      };
+      if (nativeNotes && panic) {
+        release(held | sustained, isClap && message.data[1] == 120);
+        held.reset();
+        sustained.reset();
+        pedals_.reset(channel);
+      }
+      if (nativeNotes && !acceptsMidi && message.numBytes == 3 && status == 0xb0 && message.data[1] == 64) {
+        const bool down = message.data[2] >= 64;
+        if (!down && pedals_.test(channel)) {
+          release(sustained, false);
+          sustained.reset();
+        }
+        pedals_.set(channel, down);
+      }
+      if (note && nativeNotes) {
+        const bool down = status == 0x90 && message.data[2] != 0;
+        const auto key = message.data[1];
+        if (!down && !acceptsMidi && pedals_.test(channel)) {
+          if (held.test(key))
+            sustained.set(key);
+          held.reset(key);
+          continue;
+        }
+        if (down && sustained.test(key)) {
+          std::bitset<128> retrigger;
+          retrigger.set(key);
+          release(retrigger, false);
+          sustained.reset(key);
+        }
+        event.kind = down ? PluginEventKind::noteOn : PluginEventKind::noteOff;
+        event.channel = channel;
+        event.key = key;
+        event.value = double(message.data[2]) / 127.0;
+        if (events_.add(event) == Status::ok)
+          held.set(key, down);
+      } else if (acceptsMidi || (!isClap && (status == 0xa0 || message.data[0] == 0xf0))) {
+        // An unmapped VST3 CC fails the entire Core process block. The
+        // public host API has no CC assignment query, so only send events
+        // with a guaranteed VST3 translation here.
+        event.kind = message.data[0] == 0xf0 ? PluginEventKind::sysex : PluginEventKind::midi1;
+        event.bytes = {message.data, std::size_t(message.numBytes)};
+        (void)events_.add(event);
+      }
+    }
     unsigned channel = 0;
     for (auto &storage : inputStorage_) {
       auto bus = storage.block(quantum);
@@ -456,6 +546,8 @@ bool NativeHostedPlugin::processRealtime(audio::SampleBuffer<float> &buffer,
       const auto status = plugin_.submit(process, audioTicket_);
       audioPending_ = status == Status::ok;
       if (!audioPending_) {
+        if (app::OfflineRender::current)
+          app::OfflineRender::current->pluginFailed = true;
         streamMissed_.fetch_add(1, std::memory_order_relaxed);
         if (status != Status::would_block)
           streamFailure_.store(int(status), std::memory_order_relaxed);
@@ -468,6 +560,10 @@ bool NativeHostedPlugin::processRealtime(audio::SampleBuffer<float> &buffer,
   return allReady;
 }
 void NativeHostedPlugin::getStateInformation(base::MemoryBlock &block) {
+  if (!ports().state) {
+    block.reset();
+    return;
+  }
   base::ScopedEventDispatchPause pause;
   const bool resume = prepared_;
   const auto options = options_;

@@ -395,6 +395,10 @@ nettoyé) est l'icône de l'exécutable, de sa fenêtre et de la barre des tâch
 
 Le « 4/4 » de la barre de transport se change d'un clic : temps par mesure (1 à 32) et valeur du temps (2, 4, 8, 16), ou 3/4, 5/4, 6/8, 7/8, 12/8. Le tempo compte toujours des noires ; une mesure dure numérateur × 4 / dénominateur noires. La règle, la grille, le compteur (mesure.temps.double-croche), l'éditeur de clip, l'enregistrement et l'export MIDI la suivent ; elle est enregistrée dans le projet (`timeSignatureNumerator`, `timeSignatureDenominator` ; 4/4 pour les anciens). Port de contrôle : `set_tempo {bpm, numerator, denominator}`, `status` › `timeSignature`.
 
+Un clic droit sur la règle de l'arrangement ajoute ou modifie un changement de tempo ou de signature. Un changement de signature ouvre une mesure à ce point. **Caler le temps sur le clic** ajuste le tempo de la section précédente pour faire tomber la noire choisie sur l'instant cliqué. Les clips MIDI suivent la carte. Les clips audio conservent leurs positions et durées en secondes. Le menu **Groove** d'un clip MIDI permet de mémoriser ses écarts sur une grille de doubles croches. Appliquez un groove enregistré à un clip MIDI ou à un clip audio simple, avec l'intensité choisie. L'annulation restaure les notes ou les repères d'étirement.
+
+Dans Studio, **Fichier → Rendu WAV hors ligne** rend l'arrangement, la plage de boucle ou le clip sélectionné. **Exporter les stems** écrit un WAV 24 bits à 48 kHz par tranche, après son fader, sur une plage commune. **Rassembler les médias et enregistrer une copie** copie les fichiers des clips audio de l'arrangement avec une copie du projet. Les banques d'instruments et les plugins restent des dépendances de la machine. Le **gel hors ligne** d'une piste MIDI simple remplace sa lecture par le WAV rendu. **Dégeler et revenir au MIDI** restaure le jeu de la piste.
+
 ## Expressions par note et jeu legato
 
 **Expressions** : chaque note porte deux courbes dessinées sur elle, sa **hauteur**

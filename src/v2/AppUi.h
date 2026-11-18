@@ -179,6 +179,8 @@ public:
     void chooseSaveAs();
     void chooseImportProject();
     void chooseExportMix();
+    void chooseOfflineRender(bool stems);
+    void chooseCollectMedia();
     void chooseImportMidi();
 
     // ---- Control port (RemoteCommands) ----------------------------------------------

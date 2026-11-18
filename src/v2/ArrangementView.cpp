@@ -4,6 +4,7 @@
 #include "ArrangementView.h"
 #include "ControlTargets.h"
 #include "AddTrackMenu.h"
+#include "Locations.h"
 
 #include "Icons.h"
 #include "ImGuiHost.h"
@@ -85,15 +86,19 @@ ArrangementView::ArrangementView(Studio& studio, UiState& state, WaveformCache& 
 
 double ArrangementView::secondsPerBeat() const
 {
-    return 60.0 / std::max(1.0, studio_.engine().tempo());
+    const auto& engine = studio_.engine();
+    return 60.0 / engine.tempoMap().atBeat(engine.beatAtTime(state_.scrollSeconds)).bpm;
 }
 
 double ArrangementView::snap(const double seconds, const bool force) const
 {
     if ((state_.snapBeats <= 0.0 || !ui::snapping(state_.arrangementSnap)) && !force)
         return std::max(0.0, seconds);
-    const auto step = std::max(0.25, state_.snapBeats > 0.0 ? state_.snapBeats : 1.0) * secondsPerBeat();
-    return std::max(0.0, std::round(seconds / step) * step);
+    const auto& engine = studio_.engine();
+    const auto step = std::max(0.25, state_.snapBeats > 0.0 ? state_.snapBeats : 1.0);
+    const auto beat = engine.beatAtTime(seconds);
+    const auto bar = engine.tempoMap().measureAt(beat);
+    return std::max(0.0, engine.timeAtBeat(std::min(bar.end, bar.start + std::round((beat - bar.start) / step) * step)));
 }
 
 float ArrangementView::timeToX(const double seconds) const
@@ -126,7 +131,7 @@ double ArrangementView::contentEndSeconds() const
         if (const auto* clips = engine.midiClipsView(summary.id))
             for (const auto& clip : *clips)
                 if (clip.launcherScene < 0)
-                    end = std::max(end, (clip.startBeats + clip.lengthBeats) * secondsPerBeat());
+                    end = std::max(end, studio_.engine().timeAtBeat(clip.startBeats + clip.lengthBeats));
     for (const auto& [binding, points] : studio_.masterArrangementLanes().lanes)
         for (const auto& p : points) end = std::max(end, p.timeSeconds);
     return end;
@@ -359,7 +364,6 @@ void ArrangementView::drawCanvas()
             const auto members = studio_.groupMembers(lane.track);
             const auto rows = static_cast<float>(std::max<std::size_t>(1, members.size()));
             const auto rowHeight = (lane.clipBottom - lane.top - dp(4.0f)) / rows;
-            const auto beat = secondsPerBeat();
             for (std::size_t row = 0; row < members.size(); ++row) {
                 const auto shade = theme::alpha(theme::fromArgb(studio_.trackColour(members[row])), 0.45f);
                 const auto rowTop = lane.top + dp(2.0f) + static_cast<float>(row) * rowHeight;
@@ -380,7 +384,8 @@ void ArrangementView::drawCanvas()
                     } else if (const auto* clips = engine.midiClipsView(part.midiId)) {
                         for (const auto& clip : *clips)
                             if (clip.launcherScene < 0)
-                                shadow(clip.startBeats * beat, clip.lengthBeats * beat);
+                                shadow(engine.timeAtBeat(clip.startBeats),
+                                       engine.timeAtBeat(clip.startBeats + clip.lengthBeats) - engine.timeAtBeat(clip.startBeats));
                     }
                 }
             }
@@ -440,8 +445,8 @@ void ArrangementView::drawCanvas()
                     // The launcher's clips live in its slots, not here.
                     if (clip.launcherScene >= 0)
                         continue;
-                    const auto start = clip.startBeats * spb;
-                    const auto duration = clip.lengthBeats * spb;
+                    const auto start = engine.timeAtBeat(clip.startBeats);
+                    const auto duration = engine.timeAtBeat(clip.startBeats + clip.lengthBeats) - start;
                     const auto x0 = timeToX(start);
                     const auto x1 = timeToX(start + duration);
                     if (x1 < lanesMin_.x || x0 > lanesMax_.x)
@@ -478,8 +483,8 @@ void ArrangementView::drawCanvas()
                 hit.durationSeconds = clip->durationSeconds;
             }
         } else if (const auto* clip = findMidiClip(engine, hit.ref.track.midiId, hit.ref.clipId)) {
-            hit.startSeconds = clip->startBeats * spb;
-            hit.durationSeconds = clip->lengthBeats * spb;
+            hit.startSeconds = engine.timeAtBeat(clip->startBeats);
+            hit.durationSeconds = engine.timeAtBeat(clip->startBeats + clip->lengthBeats) - hit.startSeconds;
         }
         hit.min.x = timeToX(hit.startSeconds);
         hit.max.x = std::max(hit.min.x + 3.0f, timeToX(hit.startSeconds + hit.durationSeconds));
@@ -674,12 +679,13 @@ void ArrangementView::drawNavigator(ImDrawList* list, const ImVec2 min, const Im
     auto step = 1.0;
     while (beatPixels * step < 8.0)
         step *= 2.0;
-    const auto firstBeat = std::max(0.0, std::floor(xToTime(min.x) / spb / step) * step);
+    const auto& engine = studio_.engine();
+    const auto firstBeat = std::max(0.0, std::floor(engine.beatAtTime(xToTime(min.x)) / step) * step);
     for (auto beat = firstBeat;; beat += step) {
-        const auto x = timeToX(beat * spb);
+        const auto x = timeToX(engine.timeAtBeat(beat));
         if (x > max.x)
             break;
-        const auto bar = std::fmod(beat, studio_.engine().beatsPerBar()) < 1.0e-6;
+        const auto bar = std::abs(beat - engine.tempoMap().measureAt(beat).start) < 1.0e-6;
         list->AddLine(ImVec2(x, bar ? min.y + dp(3.0f) : (min.y + max.y) * 0.5f), ImVec2(x, max.y - dp(1.0f)),
                       theme::alpha(p.textFaint, bar ? 0.55f : 0.25f));
     }
@@ -700,14 +706,15 @@ void ArrangementView::drawGrid(ImDrawList* list, const ImVec2 min, const ImVec2 
         step *= 2.0;
     while (beatPixels * step > 80.0 && step > 0.25)
         step *= 0.5;
-    const auto firstBeat = std::floor(xToTime(min.x) / spb / step) * step;
+    const auto& engine = studio_.engine();
+    const auto firstBeat = std::max(0.0, std::floor(engine.beatAtTime(xToTime(min.x)) / step) * step);
     for (auto beat = firstBeat; ; beat += step) {
-        const auto x = timeToX(beat * spb);
+        const auto x = timeToX(engine.timeAtBeat(beat));
         if (x > max.x)
             break;
         if (x < min.x)
             continue;
-        const auto isBar = std::fmod(beat, studio_.engine().beatsPerBar()) < 1.0e-6;
+        const auto isBar = std::abs(beat - engine.tempoMap().measureAt(beat).start) < 1.0e-6;
         list->AddLine(ImVec2(x, min.y), ImVec2(x, max.y), isBar ? p.gridStrong : p.grid);
     }
 }
@@ -718,26 +725,36 @@ void ArrangementView::drawRuler(ImDrawList* list, const ImVec2 min, const ImVec2
     auto& engine = studio_.engine();
     list->AddRectFilled(min, max, p.bg1);
     list->AddLine(ImVec2(min.x, max.y - 0.5f), ImVec2(max.x, max.y - 0.5f), p.lineStrong);
-    const auto spb = secondsPerBeat();
-    const auto barBeats = engine.beatsPerBar();
-    const auto barPixels = barBeats * spb * state_.pixelsPerSecond;
-    auto labelEvery = 1;
-    while (barPixels * labelEvery < 44.0)
-        labelEvery *= 2;
     ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.82f);
-    const auto firstBar = std::max(0, static_cast<int>(std::floor(xToTime(min.x) / (barBeats * spb))));
-    for (auto bar = firstBar;; ++bar) {
-        const auto x = timeToX(bar * barBeats * spb);
+    auto lastLabel = min.x - dp(44.0f);
+    auto beat = engine.tempoMap().measureAt(std::max(0.0, engine.beatAtTime(xToTime(min.x)))).start;
+    const auto finalBeat = engine.beatAtTime(xToTime(max.x));
+    for (; beat <= finalBeat + 1.0e-8;) {
+        const auto measure = engine.tempoMap().measureAt(beat);
+        const auto x = timeToX(engine.timeAtBeat(beat));
         if (x > max.x)
             break;
-        const auto labelled = bar % labelEvery == 0;
-        list->AddLine(ImVec2(x, labelled ? min.y + (max.y - min.y) * 0.45f : max.y - dp(5.0f)), ImVec2(x, max.y),
-                      labelled ? p.textFaint : p.gridStrong);
+        const auto labelled = x >= lastLabel + dp(44.0f);
         if (labelled) {
             char text[16];
-            std::snprintf(text, sizeof(text), "%d", bar + 1);
+            std::snprintf(text, sizeof(text), "%d", measure.number);
             list->AddText(ImVec2(x + dp(3.0f), min.y + dp(2.0f)), p.textDim, text);
+            lastLabel = x;
         }
+        if (x >= min.x)
+            list->AddLine(ImVec2(x, max.y - dp(labelled ? 12.0f : 5.0f)), ImVec2(x, max.y), p.gridStrong);
+        // At very wide zooms skip bars hidden within a single pixel.
+        const auto visibleBeat = engine.beatAtTime(xToTime(x + 1.0f));
+        const auto next = visibleBeat > measure.end ? engine.tempoMap().measureAt(visibleBeat).start : measure.end;
+        if (next <= beat + 1.0e-9)
+            break;
+        beat = next;
+    }
+    for (const auto& change : engine.tempoChanges()) {
+        const auto x = timeToX(engine.timeAtBeat(change.beat));
+        if (x >= min.x && x <= max.x)
+            list->AddTriangleFilled(ImVec2(x - dp(3.0f), min.y), ImVec2(x + dp(3.0f), min.y),
+                                    ImVec2(x, min.y + dp(6.0f)), p.accent);
     }
     ImGui::PopFont();
 
@@ -760,6 +777,15 @@ void ArrangementView::drawRuler(ImDrawList* list, const ImVec2 min, const ImVec2
     ImGui::SetCursorScreenPos(min);
     ImGui::InvisibleButton("##ruler", ImVec2(std::max(1.0f, max.x - min.x), std::max(1.0f, max.y - min.y)));
     const auto& io = ImGui::GetIO();
+    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        tempoAnchorSeconds_ = xToTime(io.MousePos.x);
+        tempoEditBeat_ = std::max(0.0, engine.beatAtTime(snap(xToTime(io.MousePos.x), true)));
+        const auto& point = engine.tempoMap().atBeat(tempoEditBeat_);
+        tempoEditBpm_ = static_cast<float>(point.bpm);
+        tempoEditNumerator_ = point.numerator;
+        tempoEditDenominator_ = point.denominator;
+        ImGui::OpenPopup("##tempoPoint");
+    }
     if (ImGui::IsItemActivated()) {
         const auto inLoopBand = io.MousePos.y < min.y + (max.y - min.y) * 0.4f || io.KeyShift;
         drag_ = inLoopBand ? Drag::loop : Drag::seek;
@@ -780,6 +806,57 @@ void ArrangementView::drawRuler(ImDrawList* list, const ImVec2 min, const ImVec2
     if (ImGui::IsItemHovered())
         ui::tooltip(L("Clic : placer la tête de lecture. Haut de la règle ou Maj : tracer la boucle.",
                       "Click: place the playhead. Top of the ruler or Shift: draw the loop."));
+    if (ImGui::BeginPopup("##tempoPoint")) {
+        ImGui::Text("%s · %s", L("Tempo et signature", "Tempo and meter"),
+                    cydaw::base::Text(tempoEditBeat_, 2).toRawUTF8());
+        ImGui::SetNextItemWidth(dp(90.0f));
+        (void) ImGui::InputDouble(L("Position en noires", "Quarter-note position"), &tempoEditBeat_, 0.25, 1.0, "%.2f");
+        if (!std::isfinite(tempoEditBeat_))
+            tempoEditBeat_ = 0;
+        tempoEditBeat_ = std::clamp(tempoEditBeat_, 0.0, 1.0e6);
+        ui::dragNumber("BPM", &tempoEditBpm_, 0.1f, 20.0f, 400.0f, "%.2f", dp(90.0f));
+        ImGui::SetNextItemWidth(dp(90.0f));
+        ImGui::DragInt(L("Temps", "Beats"), &tempoEditNumerator_, 1.0f, 1, 32);
+        const auto denominator = std::clamp(static_cast<int>(std::log2(tempoEditDenominator_)), 0, 5);
+        auto choice = denominator;
+        ImGui::SetNextItemWidth(dp(90.0f));
+        if (ImGui::Combo(L("Valeur de temps", "Beat unit"), &choice, "1\0" "2\0" "4\0" "8\0" "16\0" "32\0"))
+            tempoEditDenominator_ = 1 << choice;
+        auto changes = engine.tempoChanges();
+        const auto existed = std::erase_if(changes, [&](const auto& p) { return std::abs(p.beat - tempoEditBeat_) < 1.0e-6; }) != 0;
+        if (ImGui::Button(L("Appliquer", "Apply"))) {
+            if (tempoEditBeat_ < 1.0e-6) {
+                engine.setTempo(tempoEditBpm_);
+                engine.setTimeSignature(tempoEditNumerator_, tempoEditDenominator_);
+            } else {
+                changes.push_back({ tempoEditBeat_, tempoEditBpm_, tempoEditNumerator_, tempoEditDenominator_ });
+                engine.setTempoChanges(std::move(changes));
+            }
+            studio_.markDirty();
+            ImGui::CloseCurrentPopup();
+        }
+        if (existed) {
+            ImGui::SameLine();
+            if (ImGui::Button(L("Supprimer le repère", "Remove marker"))) {
+                engine.setTempoChanges(std::move(changes));
+                studio_.markDirty();
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::BeginDisabled(tempoEditBeat_ <= 0 || tempoAnchorSeconds_ <= 0);
+        if (ImGui::Button(L("Caler le temps sur le clic", "Align beat to clicked time"))) {
+            if (engine.anchorTempoBeat(tempoEditBeat_, tempoAnchorSeconds_)) {
+                studio_.markDirty();
+                ImGui::CloseCurrentPopup();
+            } else {
+                state_.status = L("Cet ancrage demande un tempo hors plage", "This anchor would require an out-of-range tempo");
+                state_.statusIsError = true;
+                state_.statusTime = ImGui::GetTime();
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::EndPopup();
+    }
 }
 
 void ArrangementView::drawAudioClip(ImDrawList* list, const ClipHit& hit, const AudioClip& clip, const bool selected,
@@ -950,8 +1027,7 @@ void ArrangementView::drawMidiClip(ImDrawList* list, const ClipHit& hit, const M
         const auto bodyTop = hit.min.y + headerHeight + dp(2.0f);
         const auto bodyHeight = hit.max.y - dp(2.0f) - bodyTop;
         const auto noteHeight = std::max(1.5f, bodyHeight / static_cast<float>(range));
-        const auto spb = secondsPerBeat();
-        const auto clipStart = clip.startBeats * spb;
+        const auto& engine = studio_.engine();
         const auto loopLength = clip.looping && clip.loopEndBeats > clip.loopStartBeats
                                     ? clip.loopEndBeats - clip.loopStartBeats : 0.0;
         const auto noteColour = theme::brighter(colour, 0.3f);
@@ -961,8 +1037,8 @@ void ArrangementView::drawMidiClip(ImDrawList* list, const ClipHit& hit, const M
                 if (start >= clip.lengthBeats)
                     continue;
                 const auto end = std::min(clip.lengthBeats, start + note.durationBeats);
-                const auto x0 = timeToX(clipStart + start * spb);
-                const auto x1 = std::max(x0 + 1.5f, timeToX(clipStart + end * spb));
+                const auto x0 = timeToX(engine.timeAtBeat(clip.startBeats + start));
+                const auto x1 = std::max(x0 + 1.5f, timeToX(engine.timeAtBeat(clip.startBeats + end)));
                 const auto yy = bodyTop + static_cast<float>(high - note.noteNumber) / static_cast<float>(range) * bodyHeight;
                 list->AddRectFilled(ImVec2(x0, yy), ImVec2(x1, yy + noteHeight), noteColour, 1.0f);
             }
@@ -1306,7 +1382,6 @@ void ArrangementView::beginDrag(const Drag drag, const std::vector<ClipHit>&)
     if (drag == Drag::box)
         return;
     auto& engine = studio_.engine();
-    const auto spb = secondsPerBeat();
     for (const auto& ref : state_.selectedClips) {
         Origin origin;
         origin.ref = ref;
@@ -1324,8 +1399,8 @@ void ArrangementView::beginDrag(const Drag drag, const std::vector<ClipHit>&)
             const auto* clip = findMidiClip(engine, ref.track.midiId, ref.clipId);
             if (clip == nullptr)
                 continue;
-            origin.start = clip->startBeats * spb;
-            origin.duration = clip->lengthBeats * spb;
+            origin.start = engine.timeAtBeat(clip->startBeats);
+            origin.duration = engine.timeAtBeat(clip->startBeats + clip->lengthBeats) - origin.start;
             origin.lengthBeats = clip->lengthBeats;
         }
         dragOrigins_.push_back(origin);
@@ -1346,7 +1421,6 @@ void ArrangementView::applyDrag(const std::vector<LaneHit>& lanes)
 {
     auto& engine = studio_.engine();
     const auto& io = ImGui::GetIO();
-    const auto spb = secondsPerBeat();
     if (drag_ == Drag::box || dragOrigins_.empty())
         return;
     const auto& lead = dragOrigins_.front();
@@ -1361,7 +1435,7 @@ void ArrangementView::applyDrag(const std::vector<LaneHit>& lanes)
             if (!origin.ref.track.midi)
                 (void) engine.moveAudioClip(origin.ref.track.audioIndex, origin.ref.clipId, origin.start + delta);
             else
-                (void) engine.setMidiClipStartBeats(origin.ref.track.midiId, origin.ref.clipId, (origin.start + delta) / spb);
+                (void) engine.setMidiClipStartBeats(origin.ref.track.midiId, origin.ref.clipId, engine.beatAtTime(origin.start + delta));
         }
         // Any track's lane takes the clips (a hybrid track's companion the
         // other kind); a bus, its own kind only.
@@ -1377,7 +1451,7 @@ void ArrangementView::applyDrag(const std::vector<LaneHit>& lanes)
             (void) engine.updateAudioClip(lead.ref.track.audioIndex, lead.ref.clipId, lead.start, lead.offset, duration,
                                           -1.0, -1.0, duration * ratio);
         } else if (const auto* clip = findMidiClip(engine, lead.ref.track.midiId, lead.ref.clipId)) {
-            const auto beats = std::max(0.25, duration / spb);
+            const auto beats = std::max(0.25, engine.beatAtTime(end) - clip->startBeats);
             const auto loopEnd = clip->loopEndBeats > 0.0 ? std::min(clip->loopEndBeats, beats) : beats;
             (void) engine.setMidiClipTimelineBounds(lead.ref.track.midiId, lead.ref.clipId, beats,
                                                     std::min(clip->playStartBeats, beats - 0.25), beats,
@@ -1518,7 +1592,6 @@ void ArrangementView::deleteSelection()
 void ArrangementView::duplicateSelection()
 {
     auto& engine = studio_.engine();
-    const auto spb = secondsPerBeat();
     std::vector<ClipRef> copies;
     if (const auto tracks = pickedMidiTracks(); !tracks.empty())
         rememberMidiClips(tracks);
@@ -1548,7 +1621,6 @@ void ArrangementView::duplicateSelection()
         }
     }
     (void) engine.endArrangementEditBatch();
-    cydaw::base::ignoreUnused(spb);
     if (!copies.empty())
         state_.selectedClips = copies;
     studio_.markDirty();
@@ -1586,15 +1658,14 @@ void ArrangementView::selectAll()
 void ArrangementView::createMidiClipAt(const TrackRef& track, const double seconds)
 {
     auto& engine = studio_.engine();
-    const auto spb = secondsPerBeat();
-    const auto barBeats = studio_.engine().beatsPerBar();
-    const auto startBeats = std::floor(snap(seconds, true) / spb / barBeats) * barBeats;
+    const auto measure = engine.tempoMap().measureAt(engine.beatAtTime(snap(seconds, true)));
+    const auto startBeats = measure.start;
     // An audio track's: on its companion instrument (made: it becomes hybrid).
     const auto part = studio_.makePartFor(track, true);
     if (!part)
         return;
     rememberMidiClips({ *part });
-    const auto id = engine.addMidiClip(part->midiId, {}, std::max(0.0, startBeats), 4.0, false,
+    const auto id = engine.addMidiClip(part->midiId, {}, std::max(0.0, startBeats), measure.end - measure.start, false,
                                        studio_.trackColour(track));
     if (id == 0)
         return;
@@ -1607,11 +1678,13 @@ void ArrangementView::createMidiClipAt(const TrackRef& track, const double secon
 void ArrangementView::createAutomationClipAt(const TrackRef& track, const double seconds)
 {
     auto& engine = studio_.engine();
-    const auto spb = secondsPerBeat();
-    const auto bar = spb * std::max(1.0, static_cast<double>(engine.beatsPerBar()));
-    const auto start = std::max(0.0, std::floor(snap(seconds, true) / bar) * bar);
+    const auto measure = engine.tempoMap().measureAt(engine.beatAtTime(snap(seconds, true)));
+    const auto start = engine.timeAtBeat(measure.start);
+    auto end = measure.end;
+    for (int bar = 1; bar < 4; ++bar)
+        end = engine.tempoMap().measureAt(end).end;
     // No sound: a container of lanes alone.
-    const auto id = engine.addAudioClip(track.audioIndex, start, 0.0, bar * 4.0, ui::Ls("Automation", "Automation"), studio_.trackColour(track),
+    const auto id = engine.addAudioClip(track.audioIndex, start, 0.0, engine.timeAtBeat(end) - start, ui::Ls("Automation", "Automation"), studio_.trackColour(track),
                                         {}, 0.0, 0.0);
     if (id == 0)
         return;
@@ -1627,9 +1700,9 @@ void ArrangementView::createAudioClipAt(const TrackRef& track, const double seco
     const auto part = studio_.makePartFor(track, false);
     if (!part)
         return;
-    const auto spb = secondsPerBeat();
-    const auto bar = spb * std::max(1.0, static_cast<double>(engine.beatsPerBar()));
-    const auto start = std::max(0.0, std::floor(snap(seconds, true) / bar) * bar);
+    const auto measure = engine.tempoMap().measureAt(engine.beatAtTime(snap(seconds, true)));
+    const auto start = engine.timeAtBeat(measure.start);
+    const auto bar = engine.timeAtBeat(measure.end) - start;
     // No sound yet: a bar to record or paste into.
     const auto id = engine.addAudioClip(part->audioIndex, start, 0.0, bar, ui::Ls("Clip audio", "Audio clip"), studio_.trackColour(track),
                                         {}, 0.0, 0.0);
@@ -1693,6 +1766,97 @@ bool ArrangementView::dropFiles(const cydaw::base::TextList& files, const ImVec2
 
 // ---- Context menus -----------------------------------------------------------------------------
 
+void ArrangementView::grooveMenu(const ClipRef& ref)
+{
+    if (!ImGui::BeginMenu("Groove"))
+        return;
+    auto& engine = studio_.engine();
+    constexpr std::size_t steps = 16;
+    constexpr double step = 0.25;
+    const auto folder = locations::folder(Location::presets).getChildFile("Grooves");
+    const auto report = [&](const char* message, const bool error) {
+        state_.status = message;
+        state_.statusIsError = error;
+        state_.statusTime = ImGui::GetTime();
+    };
+    const auto* midi = ref.track.midi ? findMidiClip(engine, ref.track.midiId, ref.clipId) : nullptr;
+    const auto* audio = ref.track.midi ? nullptr : findAudioClip(engine, ref.track.audioIndex, ref.clipId);
+    if (midi && !midi->notes.empty() && ImGui::MenuItem(L("Créer un groove depuis ce clip", "Capture groove from clip"))) {
+        std::array<double, steps> sum {};
+        std::array<unsigned, steps> count {};
+        for (const auto& note : midi->notes) {
+            const auto grid = static_cast<std::size_t>(std::max(0.0, std::round(note.startBeats / step)));
+            sum[grid % steps] += note.startBeats - static_cast<double>(grid) * step;
+            ++count[grid % steps];
+        }
+        cydaw::base::Array<cydaw::base::Value> values;
+        for (std::size_t i = 0; i < steps; ++i)
+            values.add(count[i] == 0 ? 0.0 : std::clamp(sum[i] / count[i], -step * 0.49, step * 0.49));
+        const auto saved = folder.createDirectory().wasOk() && folder.getNonexistentChildFile(
+            cydaw::base::File::createLegalFileName(midi->name), ".cydawgroove", false).replaceWithText(
+                cydaw::base::JSON::toString(cydaw::base::Value(values)));
+        report(saved ? L("Groove enregistré", "Groove saved") : L("Groove non enregistré", "Could not save groove"), !saved);
+    }
+    ui::dragNumber(L("Intensité", "Amount"), &grooveStrength_, 1.0f, 0.0f, 100.0f, "%.0f %%", dp(90.0f));
+    const auto* event = audio && audio->events.size() == 1 ? &audio->events.front() : nullptr;
+    const auto compatibleAudio = audio && audio->events.size() <= 1 && audio->comp.empty()
+        && (event ? event->stretchMarkers.empty() && event->sourceDurationSeconds > 0 && event->durationSeconds > 0
+                  : audio->stretchMarkers.empty() && audio->sourceDurationSeconds > 0 && audio->durationSeconds > 0);
+    ImGui::BeginDisabled((!midi && !compatibleAudio) || grooveStrength_ <= 0.0f);
+    for (const auto& file : folder.findChildFiles(cydaw::base::File::findFiles, false, "*.cydawgroove")) {
+        if (!ImGui::MenuItem(file.getFileNameWithoutExtension().toRawUTF8()))
+            continue;
+        const auto document = cydaw::base::JSON::parse(file);
+        const auto* values = document.getArray();
+        if (!values || values->size() != static_cast<int>(steps)) {
+            report(L("Fichier de groove invalide", "Invalid groove file"), true);
+            continue;
+        }
+        std::array<double, steps> offsets {};
+        for (std::size_t i = 0; i < steps; ++i) {
+            const auto amount = static_cast<double>((*values)[static_cast<int>(i)]);
+            offsets[i] = std::isfinite(amount) ? std::clamp(amount, -step * 0.49, step * 0.49) : 0.0;
+        }
+        bool applied = false;
+        if (midi) {
+            const auto notes = midi->notes;
+            const auto length = midi->lengthBeats;
+            rememberMidiClips({ ref.track });
+            for (const auto& note : notes) {
+                const auto grid = static_cast<std::size_t>(std::max(0.0, std::round(note.startBeats / step)));
+                const auto target = static_cast<double>(grid) * step + offsets[grid % steps];
+                const auto at = std::clamp(std::lerp(note.startBeats, target, grooveStrength_ / 100.0),
+                                           0.0, std::max(0.0, length - 0.03125));
+                applied |= engine.updateMidiNote(ref.track.midiId, ref.clipId, note.id, note.noteNumber, at,
+                                                 std::min(note.durationBeats, length - at), note.velocity);
+            }
+        } else if (compatibleAudio) {
+            std::vector<app::AudioTrackController::StretchMarker> markers;
+            const auto origin = audio->startSeconds + (event ? event->startSeconds : 0.0);
+            const auto duration = event ? event->durationSeconds : audio->durationSeconds;
+            const auto sourceDuration = event ? event->sourceDurationSeconds : audio->sourceDurationSeconds;
+            const auto offset = event ? event->sourceOffsetSeconds : audio->sourceOffsetSeconds;
+            const auto start = engine.beatAtTime(origin);
+            for (std::size_t stepIndex = 1; stepIndex <= 4096; ++stepIndex) {
+                const auto beat = start + static_cast<double>(stepIndex) * step;
+                const auto straight = engine.timeAtBeat(beat) - origin;
+                if (straight >= duration)
+                    break;
+                const auto shifted = engine.timeAtBeat(beat + offsets[stepIndex % steps] * grooveStrength_ / 100.0) - origin;
+                if (shifted > 0.0 && shifted < duration)
+                    markers.push_back({ 0, offset + straight * sourceDuration / duration, shifted });
+            }
+            applied = engine.applyAudioClipGroove(ref.track.audioIndex, ref.clipId, std::move(markers));
+        }
+        if (applied)
+            studio_.markDirty();
+        else
+            report(L("Aucune modification de groove appliquée", "No groove edit was applied"), true);
+    }
+    ImGui::EndDisabled();
+    ImGui::EndMenu();
+}
+
 void ArrangementView::clipContextMenu()
 {
     if (!ImGui::BeginPopup("##clipContext"))
@@ -1704,6 +1868,7 @@ void ArrangementView::clipContextMenu()
         if (ImGui::MenuItem(contextClip_->track.midi ? L("Appliquer un traitement MIDI…", "Apply a MIDI processing…")
                                                      : L("Appliquer un traitement…", "Apply a processing…")))
             state_.processingRequest = *contextClip_;
+        grooveMenu(*contextClip_);
         if (!contextClip_->track.midi)
             if (const auto* clip = findAudioClip(engine, contextClip_->track.audioIndex, contextClip_->clipId)) {
                 const auto index = contextClip_->track.audioIndex;

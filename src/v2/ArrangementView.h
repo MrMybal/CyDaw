@@ -124,6 +124,7 @@ private:
     [[nodiscard]] ImRect laneLabelRect(const LaneHit& lane) const;
     void handleKeys();
     void clipContextMenu();
+    void grooveMenu(const ClipRef& clip);
     void trackContextMenu();
     void beginDrag(Drag drag, const std::vector<ClipHit>& clips);
     void applyDrag(const std::vector<LaneHit>& lanes);
@@ -173,6 +174,11 @@ private:
     TrackRef resizeTrack_ {};
     float resizeStartHeight_ {};
     double loopAnchor_ {};
+    double tempoEditBeat_ {};
+    double tempoAnchorSeconds_ {};
+    float tempoEditBpm_ { 120.0f };
+    float grooveStrength_ { 100.0f };
+    int tempoEditNumerator_ { 4 }, tempoEditDenominator_ { 4 };
     // The time grabbed in the navigator, kept under the pointer.
     double navigateAnchor_ {};
     // Following the playhead waits while the person moves through the song

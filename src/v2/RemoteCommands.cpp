@@ -640,6 +640,8 @@ private:
                 set(entry, "destination", to ? studio_.trackName(*to) : cydaw::base::Text("master"));
             }
             set(entry, "gainDb", output.gainDb);
+            if (output.instrumentBus != 0)
+                set(entry, "instrumentBus", static_cast<int>(output.instrumentBus));
             if (to && output.input != 0)
                 set(entry, "input", studio_.trackInputName(*to, output.input));
             if (output.preFader)
@@ -1090,11 +1092,59 @@ cydaw::base::Value Commands::run()
         return onTransport();
     if (command == "set_tempo")
         return onSetTempo();
+    if (command == "tempo_map") {
+        if (const auto points = request_.getProperty("points"); points.isArray()) {
+            std::vector<Engine::TempoPoint> changes;
+            for (const auto& point : *points.getArray())
+                changes.push_back({ numberOf(point, "beat", -1), numberOf(point, "bpm", engine_.tempo()),
+                                    static_cast<int>(numberOf(point, "numerator", engine_.timeSignatureNumerator())),
+                                    static_cast<int>(numberOf(point, "denominator", engine_.timeSignatureDenominator())) });
+            engine_.setTempoChanges(std::move(changes));
+            studio_.markDirty();
+        }
+        if (has("anchorSeconds")) {
+            if (!engine_.anchorTempoBeat(number("beat", -1), number("anchorSeconds", -1)))
+                return fail("The requested grid anchor is invalid or requires an out-of-range tempo");
+            studio_.markDirty();
+        }
+        auto result = object();
+        const auto beat = has("seconds") ? engine_.beatAtTime(number("seconds", 0)) : number("beat", 0);
+        const auto measure = engine_.tempoMap().measureAt(beat);
+        set(result, "beat", beat);
+        set(result, "seconds", engine_.timeAtBeat(beat));
+        set(result, "bar", measure.number);
+        set(result, "numerator", measure.numerator);
+        set(result, "denominator", measure.denominator);
+        set(result, "bpm", engine_.tempoMap().atBeat(beat).bpm);
+        return ok(result);
+    }
+    if (command == "render_arrangement" || command == "collect_media") {
+        if (!has("path") || text("path").trim().isEmpty())
+            return fail("A destination path is required");
+        const auto path = fileFor(text("path"));
+        std::optional<TrackRef> only;
+        if (has("track")) {
+            const auto track = resolveTrack(request_.getProperty("track"));
+            if (!track || track->master || track->bus)
+                return fail("The render track was not found");
+            only = track->ref();
+        }
+        const auto result = command == "collect_media" ? studio_.collectSessionMedia(path)
+            : studio_.renderArrangement(path, number("from", 0), number("to", engine_.length()), flag("stems", false), only);
+        return result.failed() ? fail(result.getErrorMessage()) : ok(object());
+    }
+    if (command == "play_midi_note") {
+        const auto note = static_cast<int>(number("note", -1));
+        if (note < 0 || note > 127)
+            return fail("A MIDI note must be between 0 and 127");
+        engine_.computerKeyboardNote(note, static_cast<float>(std::clamp(number("velocity", 0.8), 0.01, 1.0)), flag("on", true));
+        return ok(object());
+    }
     if (command == "set_loop")
         return onSetLoop();
     if (command == "set_master_gain")
         return onSetMasterGain();
-    if (command == "bounce_midi" || command == "return_to_midi") {
+    if (command == "bounce_midi" || command == "return_to_midi" || command == "freeze_midi") {
         std::optional<RemoteTrack> track;
         if (auto error = trackOrFail(track); !error.isVoid())
             return error;
@@ -1105,7 +1155,8 @@ cydaw::base::Value Commands::run()
             }
             return fail("this audio track has no MIDI bounce source");
         }
-        const auto result = studio_.bounceMidiTrack(track->ref(), flag("preFader", false), number("tail", 4.0));
+        const auto result = command == "freeze_midi" ? studio_.freezeMidiTrack(track->ref(), number("tail", 4.0))
+            : studio_.bounceMidiTrack(track->ref(), flag("preFader", false), number("tail", 4.0));
         return result.wasOk() ? ok(status()) : fail(result.getErrorMessage());
     }
     if (command == "add_midi_track")
@@ -2008,7 +2059,8 @@ cydaw::base::Value Commands::run()
         return onNodes();
     if (command == "list_plugins")
         return onListPlugins();
-    if (command == "add_plugin" || command == "remove_plugin" || command == "move_plugin"
+    if (command == "add_plugin" || command == "remove_plugin" || command == "move_plugin" || command == "instrument_returns"
+        || command == "instrument_ports"
         || command == "list_plugin_programs" || command == "select_plugin_program"
         || command == "list_plugin_parameters" || command == "set_plugin_parameter" || command == "show_plugin_editor")
         return onPlugins();
@@ -6612,7 +6664,46 @@ cydaw::base::Value Commands::onPlugins()
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
         return error;
-    if (track->midi || track->bus || track->master)
+    if (track->midi) {
+        const auto id = track->ref().midiId;
+        if (command_ == "add_plugin") {
+            if (const auto added = engine_.setMidiTrackPlugin(id, fileFor(text("file"))); added.failed())
+                return fail(added.getErrorMessage());
+            studio_.markDirty();
+        } else if (command_ == "remove_plugin") {
+            engine_.clearMidiTrackPlugin(id);
+            studio_.markDirty();
+            return ok(status());
+        } else if (command_ == "instrument_returns") {
+            if (const auto added = studio_.addInstrumentReturns(track->ref()); added.failed())
+                return fail(added.getErrorMessage());
+        } else if (command_ == "show_plugin_editor") {
+            auto* plugin = engine_.midiTrackPlugin(id);
+            if (!plugin)
+                return fail("No external instrument on this track");
+            if (const auto shown = plugin->showEditor(); shown.failed())
+                return fail(shown.getErrorMessage());
+        } else if (command_ != "instrument_ports") {
+            return fail("Unsupported external instrument command");
+        }
+        auto result = object();
+        set(result, "track", studio_.trackName(track->ref()));
+        if (auto* plugin = engine_.midiTrackPlugin(id)) {
+            set(result, "name", plugin->pluginName());
+            set(result, "status", plugin->statusMessage());
+            cydaw::base::Array<cydaw::base::Value> ports;
+            for (const auto& port : plugin->audioOutputs()) {
+                auto entry = object();
+                set(entry, "name", port.name);
+                set(entry, "channels", port.channels);
+                set(entry, "main", port.main);
+                ports.add(entry);
+            }
+            set(result, "ports", ports);
+        }
+        return ok(result);
+    }
+    if (track->bus || track->master)
         return fail("plugins sit on audio tracks in this version");
     const auto index = track->index;
     if (command_ == "add_plugin") {

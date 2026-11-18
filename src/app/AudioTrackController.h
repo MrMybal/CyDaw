@@ -24,6 +24,7 @@
 #include <cydaw/engine/AudioAnalysis.h>
 #include <cydaw/engine/NativeDspGraph.h>
 #include <cydaw/engine/PolySynthGraph.h>
+#include <cydaw/engine/TempoMap.h>
 #include <cydaw/engine/VoiceLive.h>
 #include <cydaw/realtime/RtPublisher.h>
 #include <cydaw/realtime/SpscRing.h>
@@ -128,6 +129,7 @@ public:
     // null. The main input's joins the track's own sound; the others are
     // the graph's extra audio inputs.
     virtual void setRoutedInputs(const cydaw::audio::SampleBuffer<float>* const* buses, int numSamples) noexcept = 0;
+    virtual std::span<const float* const> instrumentOutput(std::uint32_t, int) noexcept { return {}; }
     // What reaches each input lately: its peak, falling by half every
     // 0.2 s (at 48 kHz) when nothing comes, for the meters.
     [[nodiscard]] float inputLevel(const std::size_t bus) const noexcept
@@ -296,6 +298,7 @@ public:
     void setKeepPreFader(bool keep) noexcept { keepPreFader_.store(keep, std::memory_order_relaxed); }
     // A track muted (or out of the solo) sends nothing, before the fader either.
     void setSendsAudible(bool audible) noexcept { sendsAudible_.store(audible, std::memory_order_relaxed); }
+    [[nodiscard]] bool sendsAudible() const noexcept { return sendsAudible_.load(std::memory_order_relaxed); }
     // Its own sound held back by the latency of what is routed into it, so
     // the two meet in time (plugin latency compensation through buses).
     void setInputDelaySamples(int delaySamples) noexcept { inputDelay_.setDelaySamples(delaySamples); }
@@ -392,6 +395,7 @@ public:
         std::shared_ptr<AudioDelayLine> delay;
         int channels { 2 };                // the destination's format
         int hardware { -1 };               // a slot of the plan's hardware outputs
+        std::uint32_t instrumentBus {};    // 0: track output, otherwise a plugin output port
     };
     struct Entry {
         cydaw::audio::AudioSource* source {};
@@ -399,6 +403,7 @@ public:
         GainPanAudioSource* fader {};      // where its sound before the fader is kept
         std::vector<Output> outputs;       // empty: the master
         int channels { 2 };                // its own format
+        int captureLatency {};
     };
     // An output bus tracks go to directly: its channels, and whether they
     // join before its effects or after them.
@@ -416,6 +421,13 @@ public:
     void addInputSource(cydaw::audio::AudioSource* source, bool deleteWhenRemoved);
     void removeInputSource(cydaw::audio::AudioSource* source);
     void setPlan(std::shared_ptr<const Plan> plan);
+    using OfflineTap = std::function<void(const cydaw::audio::AudioSource*, const cydaw::audio::SampleBuffer<float>&, int)>;
+    void setOfflineTap(OfflineTap tap) { offlineTap_ = std::move(tap); }
+    void withIdleMixer(const std::function<void()>& operation)
+    {
+        const cydaw::base::ScopedLock lock(lock_);
+        operation();
+    }
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
@@ -428,6 +440,7 @@ private:
     [[nodiscard]] int indexOf(const cydaw::audio::AudioSource* source) const noexcept;
 
     cydaw::base::CriticalSection lock_;
+    OfflineTap offlineTap_;
     std::vector<cydaw::audio::AudioSource*> inputs_;
     // Each track's sound and what reaches each of its inputs, in buffers of
     // the widest format; the block reads them through views of its own.
@@ -609,7 +622,7 @@ public:
     // follows.
     void setClock(double seconds) noexcept { clock_.store(seconds, std::memory_order_relaxed); }
     void setClockRunning(bool running) noexcept { clockRunning_.store(running, std::memory_order_release); }
-    void setTempo(double bpm) noexcept { tempo_.store(bpm, std::memory_order_relaxed); }
+    void setTempoMap(const std::shared_ptr<const cydaw::engine::TempoMap>& tempo) { tempo_.store(tempo); }
     [[nodiscard]] double clock() const noexcept { return clock_.load(std::memory_order_relaxed); }
     [[nodiscard]] bool clockRunning() const noexcept { return clockRunning_.load(std::memory_order_acquire); }
     // How late the master's devices make the mix (look-aheads).
@@ -633,7 +646,7 @@ private:
     std::atomic<double> sampleRate_ {};
     std::atomic<double> clock_ {};
     std::atomic<bool> clockRunning_ {};
-    std::atomic<double> tempo_ { 120.0 };
+    cydaw::realtime::RtPublisher<cydaw::engine::TempoMap> tempo_;
     std::atomic<std::int64_t> targetSamples_ {};
     std::atomic<std::int64_t> capturedSamples_ {};
     std::atomic<std::int64_t> skipSamples_ {};
@@ -1317,6 +1330,8 @@ public:
     [[nodiscard]] std::uint64_t addAudioClipStretchMarker(
         std::size_t index, std::uint64_t clipId,
         double sourceSeconds, double timelineSeconds);
+    [[nodiscard]] bool applyAudioClipGroove(std::size_t index, std::uint64_t clipId,
+                                            std::vector<StretchMarker> markers);
     [[nodiscard]] bool updateAudioClipStretchMarker(
         std::size_t index, std::uint64_t clipId, std::uint64_t markerId,
         double timelineSeconds);
@@ -1746,6 +1761,11 @@ public:
         const cydaw::engine::PolySynthGraphPlan& graph);
     [[nodiscard]] cydaw::engine::PolySynthGraphPlan midiTrackInstrumentGraph(
         std::uint64_t trackId) const;
+    [[nodiscard]] cydaw::base::Result setMidiTrackPlugin(std::uint64_t trackId, const cydaw::base::File&,
+                                                       const cydaw::base::MemoryBlock* state = nullptr);
+    void clearMidiTrackPlugin(std::uint64_t trackId);
+    void setMidiTrackFrozen(std::uint64_t trackId, bool frozen) noexcept;
+    [[nodiscard]] IsolatedPluginHost* midiTrackPlugin(std::uint64_t trackId) const noexcept;
     // What the graph places after the instrument on a MIDI track: the chain
     // an Ableton or Bitwig user drops behind their synth.
     [[nodiscard]] cydaw::base::Result setMidiTrackEffectGraph(
@@ -1889,10 +1909,17 @@ public:
     [[nodiscard]] bool midiTrackVoiceLive(std::uint64_t trackId, cydaw::engine::VoiceLive& out) const noexcept;
     void setTempo(double beatsPerMinute);
     [[nodiscard]] double tempo() const noexcept;
+    using TempoPoint = cydaw::engine::TempoMap::Point;
+    [[nodiscard]] const std::vector<TempoPoint>& tempoChanges() const noexcept { return tempoChanges_; }
+    [[nodiscard]] const cydaw::engine::TempoMap& tempoMap() const noexcept { return *tempoMap_; }
+    [[nodiscard]] double beatAtTime(double seconds) const noexcept { return tempoMap().beatAt(seconds); }
+    [[nodiscard]] double timeAtBeat(double beat) const noexcept { return tempoMap().secondsAt(beat); }
+    void setTempoChanges(std::vector<TempoPoint> changes);
+    [[nodiscard]] bool anchorTempoBeat(double beat, double seconds);
     // The project's metre: how many beats a bar has (numerator) and their
     // value (denominator). The tempo counts quarter notes, so a bar lasts
     // numerator * 4 / denominator of them (5/4: five, 7/8: three and a half).
-    void setTimeSignature(int numerator, int denominator) noexcept;
+    void setTimeSignature(int numerator, int denominator);
     [[nodiscard]] int timeSignatureNumerator() const noexcept { return timeSignatureNumerator_; }
     [[nodiscard]] int timeSignatureDenominator() const noexcept { return timeSignatureDenominator_; }
     [[nodiscard]] double beatsPerBar() const noexcept
@@ -2163,11 +2190,18 @@ public:
         std::uint64_t hardwareBus {};
         // Into it after its effects (they skip them), rather than before.
         bool hardwareAfterEffects {};
+        std::uint32_t instrumentBus {};
     };
     struct TrackRouting {
         TrackRoute track;
         std::vector<TrackOutputRoute> outputs; // empty: the master
     };
+    struct OfflineTarget {
+        std::optional<TrackRoute> track; // none: the master mix
+        cydaw::base::File file;
+    };
+    void prepareOfflineSession();
+    [[nodiscard]] cydaw::base::Result renderOfflineWaves(const std::vector<OfflineTarget>& targets, double from, double to);
     // Every track's outputs at once: into the master, or into other tracks
     // (their sound joins the destination's own, before its devices). Fails,
     // changing nothing, on a loop.
@@ -2388,6 +2422,7 @@ private:
         bool preFader {};
         std::uint64_t hardwareBus {};
         bool hardwareAfterEffects {};
+        std::uint32_t instrumentBus {};
     };
     struct KeptRouting {
         RoutingKey track;
@@ -2405,6 +2440,7 @@ private:
         std::uint32_t bus {};
         bool preFader {};
         std::shared_ptr<AudioDelayLine> line;
+        std::uint32_t instrumentBus {};
     };
     std::vector<EdgeDelay> edgeDelays_;
     double modeRate_{48000};
@@ -2480,6 +2516,9 @@ private:
     };
     std::size_t midiRecordingNoteCount_ {};
     double tempoBpm_ { 120.0 };
+    void publishTempoMap();
+    std::vector<TempoPoint> tempoChanges_;
+    std::shared_ptr<const cydaw::engine::TempoMap> tempoMap_ { std::make_shared<const cydaw::engine::TempoMap>() };
     int timeSignatureNumerator_ { 4 };
     int timeSignatureDenominator_ { 4 };
     bool looping_ {};

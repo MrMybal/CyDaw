@@ -18,6 +18,7 @@
 #include <functional>
 
 namespace cydaw::plugins { class NativeHostedPlugin; class NativePluginEditor; }
+namespace cydaw::midi { class EventBuffer; }
 
 namespace cydaw::app {
 
@@ -48,13 +49,19 @@ public:
         float value {};
     };
 
+    struct AudioOutput {
+        cydaw::base::Text name;
+        int firstChannel {}, channels {};
+        bool main {};
+    };
+    [[nodiscard]] std::vector<AudioOutput> audioOutputs() const;
     IsolatedPluginHost();
     ~IsolatedPluginHost();
 
     [[nodiscard]] cydaw::base::Result startPlugin(const cydaw::base::File& pluginFile,
                                            double sampleRate,
                                            int maximumBlockSize,
-                                           int channelCount);
+                                           int channelCount, bool instrument = false);
     [[nodiscard]] cydaw::base::Result startPassthroughForTest(const cydaw::base::File& workerExecutable,
                                                        double sampleRate,
                                                        int maximumBlockSize,
@@ -87,7 +94,8 @@ public:
     // a stopped/crashed worker leaves input untouched for safety bypass.
     [[nodiscard]] bool processBlock(cydaw::audio::SampleBuffer<float>& buffer,
                                     int startSample,
-                                    int numSamples, double timelineSeconds = 0.0, double tempo = 120.0, bool playing = false) noexcept;
+                                    int numSamples, double timelineSeconds = 0.0, double tempo = 120.0, bool playing = false,
+                                    const cydaw::midi::EventBuffer* midi = nullptr) noexcept;
 
     [[nodiscard]] bool isRunning() const noexcept;
     [[nodiscard]] cydaw::base::File pluginFile() const;
@@ -101,7 +109,7 @@ public:
 
 private:
     cydaw::base::Result startNative(const cydaw::base::File& worker,
-        const cydaw::base::File& plugin, double rate, int frames, int channels);
+        const cydaw::base::File& plugin, double rate, int frames, int channels, bool instrument);
     cydaw::base::Result nativeControl(const std::function<void()>& operation);
     std::unique_ptr<cydaw::plugins::NativeHostedPlugin> native_;
     std::unique_ptr<cydaw::plugins::NativePluginEditor> nativeEditor_;
@@ -114,7 +122,7 @@ private:
                                            bool passthrough,
                                            double sampleRate,
                                            int maximumBlockSize,
-                                           int channelCount);
+                                           int channelCount, bool instrument = false);
     [[nodiscard]] cydaw::base::Result sendCommand(cydaw::plugins::SharedPluginCommand command,
                                            int timeoutMilliseconds = 2'000);
     // A command still running in the worker (one that timed out): its data in

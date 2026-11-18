@@ -98,6 +98,7 @@ struct TrackOutput {
     std::uint64_t hardware {};
     // Into it after its effects (skipping them), rather than through them.
     bool hardwareAfterEffects {};
+    std::uint32_t instrumentBus {};
     [[nodiscard]] bool operator==(const TrackOutput&) const = default;
 };
 
@@ -653,6 +654,10 @@ public:
     [[nodiscard]] bool canRoute(const TrackRef& from, const TrackRef& to) const;
     [[nodiscard]] bool isBusTrack(const TrackRef& track) const;
     std::optional<TrackRef> addBusTrack(const cydaw::base::Text& name = {});
+    cydaw::base::Result addInstrumentReturns(const TrackRef& track);
+    cydaw::base::Result renderArrangement(const cydaw::base::File& destination, double from, double to,
+                                          bool stems, std::optional<TrackRef> onlyTrack = {});
+    cydaw::base::Result collectSessionMedia(const cydaw::base::File& destinationFolder);
     // A project's routing, as read (no checks), then published.
     void restoreTrackRouting(const TrackRef& track, std::vector<TrackOutput> outputs, bool bus);
     // Hands every track's outputs to the engine.
@@ -1140,11 +1145,13 @@ public:
     std::optional<TrackRef> addMidiTrack(const cydaw::base::Text& name = {}, const cydaw::base::Text& instrumentKey = {});
     bool removeTrack(const TrackRef& track);
     cydaw::base::Result bounceMidiTrack(const TrackRef& track, bool preFader, double tailSeconds);
+    cydaw::base::Result freezeMidiTrack(const TrackRef& track, double tailSeconds);
     [[nodiscard]] bool bouncingMidi() const noexcept { return pendingMidiBounce_.has_value(); }
     [[nodiscard]] std::optional<TrackRef> midiSourceOfBounce(const TrackRef& track) const;
     [[nodiscard]] std::optional<TrackRef> returnToMidi(const TrackRef& track);
-    void restoreBounceLink(std::uint64_t rendered, std::uint64_t source, bool wasMuted);
+    void restoreBounceLink(std::uint64_t rendered, std::uint64_t source, bool wasMuted, bool frozen = false);
     [[nodiscard]] bool bounceSourceWasMuted(const TrackRef& rendered) const;
+    [[nodiscard]] bool isFrozenBounce(const TrackRef& rendered) const;
     bool moveTrack(const TrackRef& track, int delta);
     // Counts what makes a TrackRef kept aside stale (a track removed, the
     // session cleared): the undo histories holding refs drop theirs.
@@ -1280,10 +1287,12 @@ private:
         cydaw::base::File file;
         double start {};
         bool preFader {};
+        bool frozen {};
     };
     struct MidiBounceLink {
         std::uint64_t source {};
         bool wasMuted {};
+        bool frozen {};
     };
     std::optional<PendingMidiBounce> pendingMidiBounce_;
     std::map<std::uint64_t, MidiBounceLink> midiBounces_;
