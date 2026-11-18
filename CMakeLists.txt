@@ -823,6 +823,9 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
                 cydaw_configure_test(cydaw_project_file_association 30)
                 add_test(NAME cydaw_no_juce_production_graph COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/no_juce_build_check.py" "${CMAKE_BINARY_DIR}")
                 cydaw_configure_test(cydaw_no_juce_production_graph 30)
+                add_test(NAME cydaw_envelope_views COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_envelope_views_check.py"
+                    --exe "$<TARGET_FILE:CyDAW2>" --output "${CMAKE_BINARY_DIR}/envelope-views-check")
+                cydaw_configure_test(cydaw_envelope_views 90)
                 add_test(NAME cydaw_native_headless COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/native_headless_check.py"
                     --exe "$<TARGET_FILE:CyDAW2>" --output "${CMAKE_BINARY_DIR}/headless-check")
                 cydaw_configure_test(cydaw_native_headless 90)

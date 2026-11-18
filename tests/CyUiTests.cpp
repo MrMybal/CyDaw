@@ -2,6 +2,7 @@
 #include "Widgets.h"
 #include "SourceEditor.h"
 #include <cyui/modules/AudioViews.h>
+#include <cyui/modules/Plots.h>
 #include <cyui/modules/Images.h>
 #include <cyui/modules/Inspector.h>
 #include <cyui/modules/Nodes.h>
@@ -46,6 +47,134 @@ void frame(SourceEditor& editor, std::vector<char>& source) {
     cyui::oscilloscope("scope", view, {&series,1}, {500,100}, options);
     ImGui::Dummy({0,0}); ImGui::End(); cyui::renderNotifications(); ImGui::Render();
     check(ImGui::GetDrawData()->TotalVtxCount > 0, "migrated views generate drawing commands");
+}
+
+
+float triangleCross(const ImVec2 a, const ImVec2 b, const ImVec2 c)
+{
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+bool triangleContains(const ImVec2 p, const ImVec2 a, const ImVec2 b, const ImVec2 c)
+{
+    if (std::abs(triangleCross(a, b, c)) < 0.00001f)
+        return false;
+    const auto x = triangleCross(a, b, p), y = triangleCross(b, c, p), z = triangleCross(c, a, p);
+    return (x >= -0.0001f && y >= -0.0001f && z >= -0.0001f)
+        || (x <= 0.0001f && y <= 0.0001f && z <= 0.0001f);
+}
+void envelopeFill()
+{
+    ImGui::NewFrame();
+    ImGui::Begin("Envelope fill regression", nullptr, ImGuiWindowFlags_NoSavedSettings);
+    auto* list = ImGui::GetWindowDrawList();
+    const auto colour = theme::alpha(theme::palette().accent, 0.18f);
+    for (const float scale : { 0.75f, 1.0f, 1.5f, 2.0f })
+        for (const float sustain : { 0.0f, 0.35f, 1.0f })
+            for (const bool curved : { false, true }) {
+                const auto baseline = 140.0f * scale;
+                std::vector<ImVec2> points { { 0, baseline }, { 10.0f * scale, 0 }, { 10.0f * scale, 0 } };
+                for (int at = 1; at <= 24; ++at) {
+                    const auto t = float(at) / 24.0f;
+                    const auto decay = curved ? std::pow(1.0f - t, 5.0f) : 1.0f - t;
+                    points.emplace_back((10.0f + 100.0f * t) * scale, baseline * (1.0f - sustain - (1.0f - sustain) * decay));
+                }
+                points.emplace_back(160.0f * scale, baseline * (1.0f - sustain));
+                points.emplace_back(200.0f * scale, baseline);
+                points.push_back(points.back());
+                const auto first = list->IdxBuffer.Size;
+                const auto flags = list->Flags;
+                const auto item = ImGui::GetItemID();
+                const auto cursor = ImGui::GetCursorScreenPos();
+                cyui::drawCurveFill(points, baseline, { colour, 1.0f, false });
+                check(ImGui::GetItemID()==item && ImGui::GetCursorScreenPos().x==cursor.x
+                      && ImGui::GetCursorScreenPos().y==cursor.y,
+                      "common fill leaves host layout and existing interaction targets untouched");
+                check(list->Flags == flags, "curve fill restores the caller's anti-aliasing flags");
+                bool outside = false, missing = false, wrongColour = false;
+                for (float x = 1.0f * scale; x < 199.0f * scale; x += 4.0f * scale) {
+                    float curve = baseline;
+                    for (std::size_t at = 1; at < points.size(); ++at)
+                        if (points[at - 1].x <= x && points[at].x > x) {
+                            const auto a = points[at - 1], b = points[at];
+                            curve = a.y + (b.y - a.y) * ((x - a.x) / (b.x - a.x));
+                            break;
+                        }
+                    for (float y = 1.0f * scale; y < baseline; y += 4.0f * scale) {
+                        int covering = 0;
+                        for (int at = first; at + 2 < list->IdxBuffer.Size; at += 3) {
+                            const auto& a = list->VtxBuffer[list->IdxBuffer[at]];
+                            const auto& b = list->VtxBuffer[list->IdxBuffer[at + 1]];
+                            const auto& c = list->VtxBuffer[list->IdxBuffer[at + 2]];
+                            wrongColour |= a.col != colour || b.col != colour || c.col != colour;
+                            if (triangleContains({ x, y }, a.pos, b.pos, c.pos))
+                                ++covering;
+                        }
+                        outside |= y < curve - scale && covering > 0;
+                        missing |= y > curve + scale && covering == 0;
+                    }
+                }
+                check(!outside, "envelope fill never covers the area above a steep decay or zero sustain tail");
+                check(!missing, "envelope fill has no holes under curved, linear or fully sustained envelopes");
+                check(!wrongColour, "curve strips have no transparent internal anti-aliasing seams");
+            }
+    const auto beforeGap = list->IdxBuffer.Size;
+    const std::vector<ImVec2> gap { {0, 0}, {50, 0}, {60, std::numeric_limits<float>::quiet_NaN()}, {100, 0} };
+    cyui::drawCurveFill(gap, 100, { colour, 1.0f, false });
+    check(list->IdxBuffer.Size - beforeGap == 6, "nonfinite curve samples leave a gap instead of connecting across it");
+    const auto beforeCrossing = list->IdxBuffer.Size;
+    const ImVec2 crossing[] { {0, 0}, {100, 100} };
+    cyui::drawCurveFill({crossing, 2}, 50, { colour, 1.0f, false });
+    auto crossingCoverage = [&](ImVec2 point) {
+        int covering=0;
+        for(int at=beforeCrossing;at+2<list->IdxBuffer.Size;at+=3)
+            covering += triangleContains(point,list->VtxBuffer[list->IdxBuffer[at]].pos,
+                list->VtxBuffer[list->IdxBuffer[at+1]].pos,list->VtxBuffer[list->IdxBuffer[at+2]].pos);
+        return covering;
+    };
+    // CyUI may emit a quad with a degenerate triangle at each crossing endpoint.
+    // Test the actual coverage, not the previous helper's exact index count.
+    check(crossingCoverage({25,40})==1 && crossingCoverage({75,60})==1
+          && crossingCoverage({25,10})==0 && crossingCoverage({75,90})==0
+          && crossingCoverage({25,65})==0,
+          "a baseline crossing fills both lobes once without crossing the curve");
+    const auto beforeZero = list->IdxBuffer.Size;
+    const ImVec2 zero[] { {0,100}, {0,0}, {0,0}, {0,100}, {100,100}, {100,100} };
+    cyui::drawCurveFill({zero,6}, 100, {colour,1.0f,false});
+    check(list->IdxBuffer.Size == beforeZero, "zero stage durations and repeated zero tails generate no fill");
+    const auto beforeInf = list->IdxBuffer.Size;
+    const ImVec2 infinite[] { {0,0}, {20,0}, {30,std::numeric_limits<float>::infinity()}, {40,0}, {60,0} };
+    cyui::drawCurveFill({infinite,5}, 100, {colour,1.0f,false});
+    check(list->IdxBuffer.Size - beforeInf == 12, "infinite samples split independent runs");
+    ImGui::End();
+    ImGui::Render();
+}
+
+void envelopeDisplay()
+{
+    // This read-only component is available to standard layouts. Prisme/Synth
+    // retain their custom canvases: exact colours, margins and editable handles.
+    for (const float dpi : {0.75f,1.0f,1.5f,2.0f})
+        for (const double power : {0.6,1.0})
+            for (const bool zeroDurations : {false,true}) {
+                theme::useDpi(dpi);
+                ImGui::NewFrame();
+                ImGui::SetNextWindowPos({0,0}); ImGui::SetNextWindowSize({1000,740});
+                ImGui::Begin("Host envelope display",nullptr,ImGuiWindowFlags_NoSavedSettings);
+                const auto d=zeroDurations?0.0:0.2;
+                const cyui::Point points[] {{0,0},{d,1},{d,1},{2*d,0},{3*d,0},{4*d,0},{4*d,0}};
+                const cyui::EnvelopeStage stages[] {{{0,d},"A"},{{d,d},"H"},{{d,2*d},"D"},
+                                                     {{2*d,3*d},"S"},{{3*d,4*d},"R"}};
+                const cyui::EnvelopeData data{{points,7},{stages,5}};
+                cyui::EnvelopeOptions options;options.time={0,zeroDurations?1.0:4*d};
+                options.timePower=power;options.grid=true;
+                const auto view=cyui::envelope("zero sustain / hold",data,cyui::dp(400,110),options);
+                check(view.valid && view.bounds.size().x>0 && view.bounds.size().y>0,
+                      "host samples retain zero hold, zero sustain and zero-duration stages at each DPI");
+                check(points[1].x==d && points[1].y==1 && points[3].y==0,
+                      "common display leaves host interpolation and samples unchanged");
+                ImGui::End();ImGui::Render();
+            }
+    theme::useDpi(1);
 }
 
 void audioViews() {
@@ -140,6 +269,8 @@ int main() {
         auto zoomed=canvas; const auto before=canvas.world({100,50}); zoomed.zoomAt({100,50},17);
         check(std::abs(before.x-zoomed.world({100,50}).x)<1.e-6, "double-precision navigation retains pointer anchor");
     }
+    envelopeFill();
+    envelopeDisplay();
     audioViews();
     ImGui::DestroyContext(first);
     std::printf("CyDAW/CyUI checks: %d failures\n", failures);

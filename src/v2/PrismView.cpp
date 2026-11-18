@@ -8,6 +8,7 @@
 #include "InstrumentEffects.h"
 #include "Theme.h"
 #include "Widgets.h"
+#include <cyui/modules/Plots.h>
 
 #include <imgui_internal.h>
 
@@ -586,10 +587,7 @@ void PrismView::drawEnvelope(const int env, const ImVec2 origin, const ImVec2 si
         line.emplace_back(x(attack + hold + decay + held + release * t),
                           y(sustain * (1.0 - bend(t, value(base + prism::envReleaseCurve)))));
     }
-    std::vector<ImVec2> fill = line;
-    fill.emplace_back(line.back().x, bottom);
-    fill.emplace_back(line.front().x, bottom);
-    list->AddConcavePolyFilled(fill.data(), static_cast<int>(fill.size()), theme::alpha(sourceColour(1 + env), 0.18f));
+    cyui::drawCurveFill(line, bottom, { sourceColour(1 + env), 0.18f, false });
     list->AddPolyline(line.data(), static_cast<int>(line.size()), sourceColour(1 + env), dp(2.0f));
     // Where the newest note's envelope is now: a line at its level.
     if (card_.live && env >= 0 && static_cast<std::size_t>(env) < card_.heard.envelopes.size())

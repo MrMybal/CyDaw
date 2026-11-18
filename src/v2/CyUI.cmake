@@ -16,6 +16,15 @@ FetchContent_Declare(CyUI
     GIT_TAG 7a793e9281e78572818d85e9cf856d779a7792a1
     GIT_SHALLOW FALSE)
 FetchContent_MakeAvailable(CyUI)
+# Envelope geometry is owned by CyUI. Until its pending update is published,
+# select the working checkout with FETCHCONTENT_SOURCE_DIR_CYUI explicitly.
+file(READ "${cyui_SOURCE_DIR}/include/cyui/modules/Plots.h" cydaw_cyui_plots_api)
+file(READ "${cyui_SOURCE_DIR}/include/cyui/modules/AudioViews.h" cydaw_cyui_audio_views_api)
+if(NOT cydaw_cyui_plots_api MATCHES "drawCurveFill" OR
+   NOT cydaw_cyui_audio_views_api MATCHES "struct EnvelopeData")
+    message(FATAL_ERROR "CyDaw requires CyUI curve fill/envelope APIs. Select the updated checkout with -DFETCHCONTENT_SOURCE_DIR_CYUI=<path-to-CyUI>; see docs/CYUI_MIGRATION.md.")
+endif()
+
 # Runtime notices are copied by each UI target's packaging step.
 function(cydaw_copy_cyui_notices target)
     set(notices LICENSE THIRD_PARTY_NOTICES.md)

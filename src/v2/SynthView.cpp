@@ -6,6 +6,7 @@
 #include "InstrumentEffects.h"
 #include "Theme.h"
 #include "Widgets.h"
+#include <cyui/modules/Plots.h>
 
 #include <algorithm>
 #include <array>
@@ -1014,9 +1015,7 @@ void SynthView::drawEnvelope(ImDrawList* list, const char* prefix, const ImVec2 
         const auto u = static_cast<double>(at) / pieces;
         line.emplace_back(x3 + (x4 - x3) * static_cast<float>(u), yOf(level * std::exp(-4.6 * u)));
     }
-    for (std::size_t at = 1; at < line.size(); ++at)
-        list->AddQuadFilled(line[at - 1], line[at], ImVec2(line[at].x, bottom), ImVec2(line[at - 1].x, bottom),
-                            (colour & 0x00ffffffu) | 0x2a000000u);
+    cyui::drawCurveFill(line, bottom, { colour, 0.165f, false });
     list->AddPolyline(line.data(), static_cast<int>(line.size()), colour, dp(1.7f));
     list->AddLine(ImVec2(x2, yOf(level)), ImVec2(x3, yOf(level)), colour, dp(1.7f));
     // Where the newest note's envelope is now: a line at its level.
