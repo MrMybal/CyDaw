@@ -15,6 +15,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <unordered_map>
 #include <vector>
 namespace cydaw::app {
@@ -444,6 +445,15 @@ public:
                         std::uint64_t destination,
                         std::uint64_t destinationPort);
   bool editorSetParameter(const cydaw::base::Text &binding, double value);
+  // Explicit multi-parameter preview. Only a committed gesture enters history.
+  using ParameterValue = std::pair<cydaw::base::Text, double>;
+  void editorBeginParameterGesture(std::span<const ParameterValue> initial);
+  void editorPreviewParameters(std::span<const ParameterValue> values);
+  void editorEndParameterGesture(bool commit);
+  void editorInvalidateParameterGesture();
+  [[nodiscard]] std::uint64_t editorParameterRevision() const noexcept {
+    return parameterRevision_;
+  }
   struct EditorModulation {
     std::uint64_t source{};
     std::uint64_t sourcePort{};
@@ -1174,7 +1184,12 @@ private:
   bool parameterHistoryPending_{};
   std::map<cydaw::base::Text, std::uint64_t> parameterTouches_;
   std::uint64_t parameterTouchCount_{};
-  bool parameterGestureActive_{};
+  struct ParameterGestureValue {
+    ParameterValue initial;
+    double current{};
+  };
+  std::vector<ParameterGestureValue> parameterGesture_;
+  std::uint64_t parameterRevision_{};
   std::int64_t lastParameterUiChangeTimeMs_{};
   std::vector<cydaw::base::Value> undoHistory_;
   std::uint64_t historySteps_{};

@@ -13,15 +13,14 @@ endif()
 set(CYUI_MODULES "${CYDAW_UI_MODULES}")
 FetchContent_Declare(CyUI
     GIT_REPOSITORY https://github.com/MrMybal/CyUI.git
-    GIT_TAG 7a793e9281e78572818d85e9cf856d779a7792a1
+    GIT_TAG 6ef01cfcdb197f3a89d64618ce5ef8818c704728
     GIT_SHALLOW FALSE)
 FetchContent_MakeAvailable(CyUI)
-# Envelope geometry is owned by CyUI. Until its pending update is published,
-# select the working checkout with FETCHCONTENT_SOURCE_DIR_CYUI explicitly.
+# Check developer-provided source overrides as well as the published pin.
 file(READ "${cyui_SOURCE_DIR}/include/cyui/modules/Plots.h" cydaw_cyui_plots_api)
 file(READ "${cyui_SOURCE_DIR}/include/cyui/modules/AudioViews.h" cydaw_cyui_audio_views_api)
 if(NOT cydaw_cyui_plots_api MATCHES "drawCurveFill" OR
-   NOT cydaw_cyui_audio_views_api MATCHES "struct EnvelopeData")
+   NOT cydaw_cyui_audio_views_api MATCHES "struct EnvelopeEditState")
     message(FATAL_ERROR "CyDaw requires CyUI curve fill/envelope APIs. Select the updated checkout with -DFETCHCONTENT_SOURCE_DIR_CYUI=<path-to-CyUI>; see docs/CYUI_MIGRATION.md.")
 endif()
 

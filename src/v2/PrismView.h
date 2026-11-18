@@ -92,7 +92,7 @@ private:
 
     void drawWavetable(int osc, ImVec2 origin, ImVec2 size, bool compact);
     void drawFilterResponse(ImVec2 origin, ImVec2 size);
-    void drawEnvelope(int env, ImVec2 origin, ImVec2 size);
+    void drawEnvelope(int env, ImVec2 size);
     void drawLfo(int lfo, ImVec2 origin, ImVec2 size);
     // A drawn LFO's display, edited: drag to draw its points, right click
     // for shapes ready made.

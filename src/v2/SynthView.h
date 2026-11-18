@@ -9,9 +9,12 @@
 
 #include <cydaw/engine/SynthFamily.h>
 
+#include <cyui/modules/AudioViews.h>
 #include <imgui.h>
 
 #include <optional>
+#include <string_view>
+#include <unordered_map>
 
 // The faces of the synth family's models (Ambre and the ones after it), all
 // drawn from their parameter tables and their layouts (SynthLayouts.h): the
@@ -110,6 +113,10 @@ private:
     void drawWave(ImDrawList* list, const char* key, ImVec2 origin, ImVec2 size, ImU32 colour);
     void drawFilter(ImDrawList* list, const char* key, const char* second, ImVec2 origin, ImVec2 size, bool interactive);
     void drawEnvelope(ImDrawList* list, const char* prefix, ImVec2 origin, ImVec2 size, bool interactive);
+    void drawAmbreEnvelope(const char* prefix, ImVec2 origin, ImVec2 size, bool interactive,
+                           int attack, int decay, int sustain, int release);
+    [[nodiscard]] std::optional<float> envelopeLiveLevel(std::string_view prefix) const;
+    void finishHiddenEnvelopeGestures();
     void drawLfo(ImDrawList* list, const char* prefix, ImVec2 origin, ImVec2 size);
     void drawSteps(ImDrawList* list, const char* prefix, ImVec2 origin, ImVec2 size, bool interactive);
     void drawOrb(ImDrawList* list, const char* prefix, ImVec2 origin, ImVec2 size, bool interactive);
@@ -147,7 +154,15 @@ private:
     // knob writes "si …" under itself); not when its group has one note.
     void markGreyed(bool knob) const;
     bool quietGreyed_ {};
-    // The picture being dragged (its widget, 0 none) and which point.
+    struct EnvelopeWidget {
+        cyui::EnvelopeEditState edit;
+        TrackRef track;
+        app::GraphDocument* graph {};
+        int lastFrame {};
+        float initialDuration {};
+    };
+    std::unordered_map<ImGuiID, EnvelopeWidget> envelopeWidgets_;
+    // The legacy picture being dragged (its widget, 0 none) and which point.
     ImGuiID dragging_ {};
     int draggingPoint_ { -1 };
 };

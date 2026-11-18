@@ -28,6 +28,7 @@
 #include <limits>
 #include <tuple>
 #include <unordered_set>
+#include <utility>
 namespace cydaw::app {
 namespace {
 base::Point<float> clampedPosition(const base::Point<float> value) noexcept {
@@ -2344,6 +2345,8 @@ bool GraphDocument::editorRemoveContainer(const std::uint64_t head) {
 }
 bool GraphDocument::editorSetParameter(const cydaw::base::Text &binding,
                                        const double value) {
+  if (!parameterGesture_.empty())
+    editorInvalidateParameterGesture();
   if (!setGraphInterfaceParameter(binding, value))
     return false;
   parameterTouches_[binding] = ++parameterTouchCount_;
@@ -2355,6 +2358,60 @@ bool GraphDocument::editorSetParameter(const cydaw::base::Text &binding,
   ;
   return true;
 }
+void GraphDocument::editorBeginParameterGesture(
+    const std::span<const ParameterValue> initial) {
+  if (!parameterGesture_.empty())
+    editorInvalidateParameterGesture();
+  flushParameterNotification();
+  parameterGesture_.reserve(initial.size());
+  for (const auto &entry : initial)
+    parameterGesture_.push_back({entry, entry.second});
+}
+
+void GraphDocument::editorPreviewParameters(
+    const std::span<const ParameterValue> values) {
+  auto changed = false;
+  for (const auto &[binding, value] : values) {
+    const auto entry = std::ranges::find_if(parameterGesture_, [&](const auto &item) {
+      return item.initial.first == binding;
+    });
+    if (entry != parameterGesture_.end() && entry->current != value &&
+        setGraphInterfaceParameter(binding, value)) {
+      entry->current = value;
+      parameterTouches_[binding] = ++parameterTouchCount_;
+      changed = true;
+    }
+  }
+  if (changed)
+    dispatchParameterNotification();
+}
+
+void GraphDocument::editorEndParameterGesture(const bool commit) {
+  const auto differs = [](const auto &entry) { return entry.current != entry.initial.second; };
+  auto gesture = std::exchange(parameterGesture_, {});
+  if (commit) {
+    // A discrete gesture never coalesces with a preceding knob edit.
+    if (std::ranges::any_of(gesture, differs))
+      commitEditHistory(false);
+    return;
+  }
+  auto changed = false;
+  for (const auto &entry : gesture) {
+    const auto &[binding, value] = entry.initial;
+    if (differs(entry) && setGraphInterfaceParameter(binding, value)) {
+      parameterTouches_[binding] = ++parameterTouchCount_;
+      changed = true;
+    }
+  }
+  if (changed)
+    dispatchParameterNotification();
+}
+
+void GraphDocument::editorInvalidateParameterGesture() {
+  editorEndParameterGesture(false);
+  ++parameterRevision_;
+}
+
 std::uint64_t
 GraphDocument::editorParameterTouch(const cydaw::base::Text &binding) const {
   const auto found = parameterTouches_.find(binding);

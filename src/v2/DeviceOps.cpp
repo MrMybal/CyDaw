@@ -85,6 +85,7 @@ bool applyPreset(app::GraphDocument& graph, const std::uint64_t nodeId, const cy
         error = ui::Ls("Ce préréglage est celui d'un autre périphérique : ", "This preset is another device's: ") + type;
         return false;
     }
+    graph.editorInvalidateParameterGesture();
     // The card's own assets first (each its edit), then its knobs, which the
     // graph gathers into one undo step.
     if (const auto map = state.getProperty("sampler", {}); map.isObject() && !graph.setNodeSampler(nodeId, map, error))

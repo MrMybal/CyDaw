@@ -686,6 +686,10 @@ void SynthView::drawPicture(const Picture picture, const char* key, const char* 
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     const ImVec2 end(origin.x + size.x, origin.y + size.y);
+    if (picture == Picture::envelope && card_.model == synth::Model::ambre) {
+        drawEnvelope(list, key, origin, size, interactive);
+        return;
+    }
     list->AddRectFilled(origin, end, p.bg0, dp(4.0f));
     list->AddRect(origin, end, p.line, dp(4.0f));
     list->PushClipRect(origin, end, true);
@@ -973,6 +977,43 @@ void SynthView::drawFilter(ImDrawList* list, const char* key, const char* second
                                   "Drag: cutoff (left, right), resonance (up, down) · wheel: resonance · double click: default"));
 }
 
+namespace {
+
+template <class Append>
+void sampleSynthEnvelope(float x0, float x1, float x2, float x3, float x4, float level, Append append)
+{
+    constexpr int pieces = 24;
+    for (int at = 0; at <= pieces; ++at) {
+        const auto u = static_cast<double>(at) / pieces;
+        append(x0 + (x1 - x0) * static_cast<float>(u), 1.0 - (1.0 - u) * (1.0 - u));
+    }
+    for (int at = 1; at <= pieces; ++at) {
+        const auto u = static_cast<double>(at) / pieces;
+        append(x1 + (x2 - x1) * static_cast<float>(u), level + (1.0 - level) * std::exp(-4.6 * u));
+    }
+    append(x3, level);
+    for (int at = 1; at <= pieces; ++at) {
+        const auto u = static_cast<double>(at) / pieces;
+        append(x3 + (x4 - x3) * static_cast<float>(u), level * std::exp(-4.6 * u));
+    }
+}
+
+} // namespace
+
+std::optional<float> SynthView::envelopeLiveLevel(const std::string_view prefix) const
+{
+    if (!card_.live)
+        return std::nullopt;
+    const auto which = prefix == "amp" || prefix == "amp1" ? 0
+                     : prefix == "fenv" || prefix == "env2" || prefix == "fenv1" ? 1
+                     : prefix == "env3" || prefix == "amp2" ? 2
+                     : prefix == "fenv2" ? 3 : -1;
+    if (which < 0)
+        return std::nullopt;
+    const auto level = card_.heard.envelopes[static_cast<std::size_t>(which)];
+    return std::isfinite(level) ? std::optional(std::clamp(level, 0.0f, 1.0f)) : std::nullopt;
+}
+
 void SynthView::drawEnvelope(ImDrawList* list, const char* prefix, const ImVec2 origin, const ImVec2 size, const bool interactive)
 {
     const auto& p = theme::palette();
@@ -983,6 +1024,10 @@ void SynthView::drawEnvelope(ImDrawList* list, const char* prefix, const ImVec2 
     const auto release = synth::parameterIndex(card_.model, keyOf("release"));
     if (attack < 0 || decay < 0 || sustain < 0 || release < 0)
         return;
+    if (card_.model == synth::Model::ambre) {
+        drawAmbreEnvelope(prefix, origin, size, interactive, attack, decay, sustain, release);
+        return;
+    }
     const auto colour = colourOf(attack);
     const auto left = origin.x + dp(6.0f);
     const auto right = origin.x + size.x - dp(6.0f);
@@ -1001,39 +1046,17 @@ void SynthView::drawEnvelope(ImDrawList* list, const char* prefix, const ImVec2 
     const auto x4 = x3 + lengthOf(release);
     const auto yOf = [&](const double amount) { return bottom - static_cast<float>(amount) * height; };
     std::vector<ImVec2> line;
-    constexpr int pieces = 24;
-    for (int at = 0; at <= pieces; ++at) {
-        const auto u = static_cast<double>(at) / pieces;
-        line.emplace_back(x0 + (x1 - x0) * static_cast<float>(u), yOf(1.0 - (1.0 - u) * (1.0 - u)));
-    }
-    for (int at = 1; at <= pieces; ++at) {
-        const auto u = static_cast<double>(at) / pieces;
-        line.emplace_back(x1 + (x2 - x1) * static_cast<float>(u), yOf(level + (1.0 - level) * std::exp(-4.6 * u)));
-    }
-    line.emplace_back(x3, yOf(level));
-    for (int at = 1; at <= pieces; ++at) {
-        const auto u = static_cast<double>(at) / pieces;
-        line.emplace_back(x3 + (x4 - x3) * static_cast<float>(u), yOf(level * std::exp(-4.6 * u)));
-    }
+    sampleSynthEnvelope(x0, x1, x2, x3, x4, level, [&](float x, double amount) {
+        line.emplace_back(x, yOf(amount));
+    });
     cyui::drawCurveFill(line, bottom, { colour, 0.165f, false });
     list->AddPolyline(line.data(), static_cast<int>(line.size()), colour, dp(1.7f));
     list->AddLine(ImVec2(x2, yOf(level)), ImVec2(x3, yOf(level)), colour, dp(1.7f));
     // Where the newest note's envelope is now: a line at its level.
-    if (card_.live) {
-        const auto name = std::string(prefix != nullptr ? prefix : "");
-        const auto which = name == "amp" || name == "amp1"     ? 0
-                           : name == "fenv" || name == "env2" || name == "fenv1" ? 1
-                           : name == "env3" || name == "amp2"  ? 2
-                           : name == "fenv2"                   ? 3
-                                                               : -1;
-        if (which >= 0) {
-            const auto now = card_.heard.envelopes[static_cast<std::size_t>(which)];
-            if (std::isfinite(now)) {
-                const auto y = yOf(std::clamp(static_cast<double>(now), 0.0, 1.0));
-                list->AddLine(ImVec2(left, y), ImVec2(right, y), theme::alpha(p.modulation, 0.55f), dp(1.0f));
-                list->AddCircleFilled(ImVec2(right, y), dp(3.5f), p.modulation);
-            }
-        }
+    if (const auto now = envelopeLiveLevel(prefix != nullptr ? prefix : "")) {
+        const auto y = yOf(*now);
+        list->AddLine(ImVec2(left, y), ImVec2(right, y), theme::alpha(p.modulation, 0.55f), dp(1.0f));
+        list->AddCircleFilled(ImVec2(right, y), dp(3.5f), p.modulation);
     }
     if (!interactive)
         return;
@@ -1089,6 +1112,157 @@ void SynthView::drawEnvelope(ImDrawList* list, const char* prefix, const ImVec2 
             text += " \xc2\xb7 " + synth::displayValue(card_.model, sustain, value(sustain), ui::french());
         const auto& parameter = synth::parameter(card_.model, index);
         ImGui::SetTooltip("%s : %s", (ui::french() ? parameter.french : parameter.english).c_str(), text.c_str());
+    }
+}
+
+void SynthView::drawAmbreEnvelope(const char* prefix, const ImVec2 origin, const ImVec2 size, const bool interactive,
+                                  const int attack, const int decay, const int sustain, const int release)
+{
+    const auto& p = theme::palette();
+    auto& graph = *card_.graph;
+    constexpr auto stretch = 0.27f;
+    const auto width = std::max(1.0f, size.x - dp(12.0f));
+    const auto lengthOf = [&](int index) {
+        return std::max(dp(2.0f) / width, synth::normalise(card_.model, index, value(index)) * stretch);
+    };
+    const auto x1 = lengthOf(attack);
+    const auto x2 = x1 + lengthOf(decay);
+    const auto x3 = x2 + 0.16f;
+    const auto x4 = x3 + lengthOf(release);
+    const auto level = std::clamp(value(sustain), 0.0f, 1.0f);
+    std::vector<cyui::Point> points;
+    points.reserve(74);
+    sampleSynthEnvelope(0.0f, x1, x2, x3, x4, level, [&](float x, double y) { points.push_back({x, y}); });
+    cyui::EnvelopeData data { points, {} };
+    if (const auto now = envelopeLiveLevel(prefix))
+        data.level = *now;
+
+    cyui::EnvelopeOptions options;
+    options.margins = { 6, 8, 6, 5 };
+    options.backgroundColor = p.bg0;
+    options.borderColor = p.line;
+    options.frameRounding = 4;
+    options.curveColor = colourOf(attack);
+    options.curveWidth = 1.7f;
+    options.fillAlpha = 0.165f;
+    options.levelLineColor = theme::alpha(p.modulation, 0.55f);
+    options.levelDotColor = p.modulation;
+    options.levelDotRadius = 3.5f;
+    options.levelDotInset = 0;
+    options.phaseLines = options.phaseLabels = false;
+    options.readOnly = !interactive || graph.editorLocked();
+    options.revision = graph.editorParameterRevision();
+
+    constexpr cyui::ItemId attackHandle = 1, decayHandle = 2, releaseHandle = 3;
+    const cyui::EnvelopeHandle handles[] {
+        {attackHandle, {x1, 1}, cyui::EnvelopeAxes::time},
+        {decayHandle, {x2, level}, cyui::EnvelopeAxes::both},
+        {releaseHandle, {x4, 0}, cyui::EnvelopeAxes::time},
+    };
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::PushID(&graph);
+    ImGui::PushID(prefix);
+    auto& widget = envelopeWidgets_[ImGui::GetID("##ambreEnvelope")];
+    widget.track = card_.track;
+    widget.graph = &graph;
+    widget.lastFrame = ImGui::GetFrameCount();
+    const auto gestureRevision = widget.edit.revision;
+    const auto initialPosition = widget.edit.original.position;
+    const auto result = cyui::envelope("##ambreEnvelope", widget.edit, data, {handles, 3}, size, options);
+    ImGui::PopID();
+    ImGui::PopID();
+
+    if (result.valid) {
+        // Keep the short sustain line at the exact level below the sampled decay's endpoint.
+        const auto& bounds = result.bounds;
+        const auto room = bounds.size();
+        const auto y = bounds.max.y - level * room.y;
+        auto* list = ImGui::GetWindowDrawList();
+        list->PushClipRect(bounds.min, bounds.max, true);
+        list->AddLine({bounds.min.x + x2 * room.x, y}, {bounds.min.x + x3 * room.x, y}, *options.curveColor, dp(1.7f));
+        list->PopClipRect();
+    }
+
+    const auto parameterFor = [&](cyui::ItemId handle) {
+        return handle == attackHandle ? attack : handle == decayHandle ? decay : release;
+    };
+    using ParameterValue = app::GraphDocument::ParameterValue;
+    const auto& edit = result.edit;
+    switch (edit.phase) {
+    case cyui::EditPhase::begin: {
+        const auto index = parameterFor(edit.value.id);
+        const std::array<ParameterValue, 2> initial {{{bindingOf(index), value(index)}, {bindingOf(sustain), value(sustain)}}};
+        graph.editorBeginParameterGesture(std::span(initial).first(edit.value.id == decayHandle ? 2 : 1));
+        widget.initialDuration = value(index);
+        widget.edit.revision = graph.editorParameterRevision();
+        if (state_.selectedTrack != card_.track)
+            state_.selectTrack(card_.track);
+        state_.focused = Panel::devices;
+        break;
+    }
+    case cyui::EditPhase::update:
+    case cyui::EditPhase::commit: {
+        const auto index = parameterFor(edit.value.id);
+        const auto from = edit.value.id == decayHandle ? x1 : edit.value.id == releaseHandle ? x3 : 0.0f;
+        std::array<ParameterValue, 2> pending;
+        std::size_t count = 0;
+        const auto preview = [&](int parameter, float proposed) {
+            if (proposed != value(parameter)) {
+                pending[count++] = {bindingOf(parameter), proposed};
+                card_.values[static_cast<std::size_t>(parameter)] = proposed;
+            }
+        };
+        const auto fraction = static_cast<float>(std::clamp((edit.value.position.x - from) / stretch, 0.0, 1.0));
+        const auto duration = edit.value.position.x == initialPosition.x ? widget.initialDuration
+                            : synth::denormalise(card_.model, index, fraction);
+        preview(index, duration);
+        if (edit.value.id == decayHandle)
+            preview(sustain, static_cast<float>(edit.value.position.y));
+        graph.editorPreviewParameters(std::span(pending).first(count));
+        if (edit.committed())
+            graph.editorEndParameterGesture(true);
+        break;
+    }
+    case cyui::EditPhase::cancel:
+        // Preset loads already cancelled the preview before applying their values.
+        if (gestureRevision == graph.editorParameterRevision()) {
+            graph.editorEndParameterGesture(false);
+            if (const auto restored = graph.editorSynthValues(card_.nodeId))
+                card_.values = restored->second;
+        }
+        break;
+    case cyui::EditPhase::none:
+        break;
+    }
+    if (options.readOnly)
+        return;
+    const auto activeHandle = widget.edit.original.id;
+    if (activeHandle)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
+    if (const auto shown = activeHandle ? activeHandle : result.hoveredHandle) {
+        const auto index = parameterFor(shown);
+        auto text = synth::displayValue(card_.model, index, value(index), ui::french());
+        if (shown == decayHandle)
+            text += " \xc2\xb7 " + synth::displayValue(card_.model, sustain, value(sustain), ui::french());
+        const auto& parameter = synth::parameter(card_.model, index);
+        ImGui::SetTooltip("%s : %s", (ui::french() ? parameter.french : parameter.english).c_str(), text.c_str());
+    }
+}
+
+void SynthView::finishHiddenEnvelopeGestures()
+{
+    const auto frame = ImGui::GetFrameCount();
+    for (auto it = envelopeWidgets_.begin(); it != envelopeWidgets_.end();) {
+        const auto& widget = it->second;
+        if (widget.lastFrame == frame) {
+            ++it;
+            continue;
+        }
+        if (widget.edit.original.id)
+            if (auto* slot = studio_.graphFor(widget.track); slot != nullptr && &slot->graph() == widget.graph
+                && slot->graph().editorParameterRevision() == widget.edit.revision)
+                slot->graph().editorInvalidateParameterGesture();
+        it = envelopeWidgets_.erase(it);
     }
 }
 
@@ -1371,6 +1545,8 @@ void SynthView::drawEditor()
         editor_.reset();
         return open;
     });
+    // Cards were drawn before the editors. A widget absent from both must roll back its preview.
+    finishHiddenEnvelopeGestures();
 }
 
 bool SynthView::drawEditorWindow(const bool focus)

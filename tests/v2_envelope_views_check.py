@@ -1,4 +1,4 @@
-"""Capture native Prisme envelopes in a private profile with virtual audio only.
+"""Check Prisme display and Ambre gestures in a private profile with virtual audio only.
 No existing window/process/profile is touched. DPI geometry is tested by CyUiTests.
 """
 import argparse
@@ -78,6 +78,82 @@ with tempfile.TemporaryDirectory(prefix='profile-',dir=out) as temporary:
             report['liveSnapshot']=snapshot('live-envelope')
             q(cmd='transport',action='stop')
             wait(lambda:not q(cmd='status')['playing'])
+            q(cmd='new_project')
+            ambre=q(cmd='add_midi_track',name='Ambre QA',instrument='ambre-instrument')['name']
+            q(cmd='set_view',mode=3,track=ambre)
+
+            def ambre_state():
+                return q(cmd='synth',track=ambre,model='ambre',seconds=.1,tail=.1)
+
+            def mouse(*events):
+                q(cmd='ui_input',events=[*events,dict(type='wait',frames=3)])
+
+            def start_drag(start,end):
+                mouse(dict(type='move',x=start[0],y=start[1]),dict(type='down',button=0),
+                      dict(type='wait',frames=2),dict(type='move',x=end[0],y=end[1]))
+
+            def release_drag():
+                mouse(dict(type='up',button=0))
+
+            def undo():
+                mouse(dict(type='key',key='ctrl',down=True),dict(type='key',key='z'),
+                      dict(type='key',key='ctrl',down=False))
+
+            original=ambre_state()
+            initial=original['values']
+            ambre_report={'before':initial,'card':snapshot('ambre-card')}
+            changed={'amp.decay','amp.sustain'}
+            start_drag((638,730),(644,736))
+            card_preview=ambre_state()['values']
+            assert {key for key in initial if initial[key]!=card_preview[key]}==changed
+            release_drag()
+            assert ambre_state()['values']==card_preview
+            undo()
+            assert ambre_state()['values']==initial, 'one Ctrl+Z must restore the card gesture'
+            ambre_report['cardChanged']={key:[initial[key],card_preview[key]] for key in sorted(changed)}
+            q(cmd='show_dialog',name='ambre')
+            ambre_report['editor']=snapshot('ambre-before')
+            # The hidden QA window uses the same isolated layout for every run.
+            start,end=(134,623),(153,665)
+            start_drag(start,end)
+            time.sleep(.8)  # An idle pause during a gesture must not commit the preview.
+            preview=ambre_state()['values']
+            assert {key for key in initial if initial[key]!=preview[key]}==changed, (initial,preview)
+            ambre_report['preview']=snapshot('ambre-preview')
+            release_drag()
+            assert ambre_state()['values']==preview
+            undo()
+            assert ambre_state()['values']==initial, 'one Ctrl+Z must restore both values'
+
+            start_drag(start,end)
+            assert ambre_state()['values']==preview
+            mouse(dict(type='key',key='escape'))
+            assert ambre_state()['values']==initial, 'Escape must restore the parameters while the mouse is held'
+            release_drag()
+            assert ambre_state()['values']==initial, 'release after Escape must leave the original values'
+            q(cmd='redo',scope='graph')
+            assert ambre_state()['values']==preview, 'a cancelled preview must preserve the redo entry'
+            undo()
+            assert ambre_state()['values']==initial
+
+            start_drag(start,end)
+            mouse(dict(type='move',x=start[0],y=start[1]))
+            assert ambre_state()['values']==initial, 'returning the pointer to its start restores both values'
+            release_drag()
+            q(cmd='redo',scope='graph')
+            assert ambre_state()['values']==preview, 'a gesture with no final change must preserve redo'
+            undo()
+
+            start_drag(start,end)
+            q(cmd='presets',track=ambre,nodeId=original['nodeId'],action='load',name='Acid Bass')
+            preset_values=ambre_state()['values']
+            assert preset_values!=initial and preset_values!=preview
+            release_drag()
+            assert ambre_state()['values']==preset_values, 'a stale release must preserve the loaded preset'
+            ambre_report['preset']=snapshot('ambre-after-preset')
+            ambre_report['changed']={key:[initial[key],preview[key]] for key in sorted(changed)}
+            ambre_report['undo']=ambre_report['cancel']=ambre_report['presetInvalidatedDrag']=True
+            report['ambre']=ambre_report
             report['processId']=app.pid
             (out/'checks.json').write_text(json.dumps(report,indent=2),'utf-8')
             print(json.dumps(report))

@@ -8,7 +8,7 @@
 #include "InstrumentEffects.h"
 #include "Theme.h"
 #include "Widgets.h"
-#include <cyui/modules/Plots.h>
+#include <cyui/modules/AudioViews.h>
 
 #include <imgui_internal.h>
 
@@ -549,11 +549,9 @@ void PrismView::drawFilterResponse(const ImVec2 origin, const ImVec2 size)
     }
 }
 
-void PrismView::drawEnvelope(const int env, const ImVec2 origin, const ImVec2 size)
+void PrismView::drawEnvelope(const int env, const ImVec2 size)
 {
     const auto& p = theme::palette();
-    auto* list = ImGui::GetWindowDrawList();
-    list->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), p.bg0, dp(4.0f));
     const auto base = prism::envBase(env);
     const auto attack = std::max(0.0005, static_cast<double>(value(base + prism::envAttack)));
     const auto hold = static_cast<double>(value(base + prism::envHold));
@@ -563,40 +561,48 @@ void PrismView::drawEnvelope(const int env, const ImVec2 origin, const ImVec2 si
     // A stretch of sustain between the decay and the release.
     const auto held = std::max(0.25, (attack + hold + decay) * 0.35);
     const auto total = attack + hold + decay + held + release;
-    const auto top = origin.y + dp(6.0f);
-    const auto bottom = origin.y + size.y - dp(4.0f);
-    const auto x = [&](const double seconds) {
-        return origin.x + dp(4.0f) + (size.x - dp(8.0f)) * static_cast<float>(std::pow(seconds / total, 0.6));
-    };
-    const auto y = [&](const double level) { return bottom - (bottom - top) * static_cast<float>(level); };
-    std::vector<ImVec2> line;
     constexpr int steps = 24;
+    std::array<cyui::Point, 3 * steps + 3> points;
+    std::size_t at = 0;
+    const auto add = [&](double seconds, double level) { points[at++] = { seconds, level }; };
     for (int i = 0; i <= steps; ++i) {
         const auto t = static_cast<double>(i) / steps;
-        line.emplace_back(x(attack * t), y(bend(t, value(base + prism::envAttackCurve))));
+        add(attack * t, bend(t, value(base + prism::envAttackCurve)));
     }
-    line.emplace_back(x(attack + hold), y(1.0));
+    add(attack + hold, 1.0);
     for (int i = 1; i <= steps; ++i) {
         const auto t = static_cast<double>(i) / steps;
-        line.emplace_back(x(attack + hold + decay * t),
-                          y(sustain + (1.0 - sustain) * (1.0 - bend(t, value(base + prism::envDecayCurve)))));
+        add(attack + hold + decay * t, sustain + (1.0 - sustain) * (1.0 - bend(t, value(base + prism::envDecayCurve))));
     }
-    line.emplace_back(x(attack + hold + decay + held), y(sustain));
+    add(attack + hold + decay + held, sustain);
     for (int i = 1; i <= steps; ++i) {
         const auto t = static_cast<double>(i) / steps;
-        line.emplace_back(x(attack + hold + decay + held + release * t),
-                          y(sustain * (1.0 - bend(t, value(base + prism::envReleaseCurve)))));
+        add(attack + hold + decay + held + release * t, sustain * (1.0 - bend(t, value(base + prism::envReleaseCurve))));
     }
-    cyui::drawCurveFill(line, bottom, { sourceColour(1 + env), 0.18f, false });
-    list->AddPolyline(line.data(), static_cast<int>(line.size()), sourceColour(1 + env), dp(2.0f));
-    // Where the newest note's envelope is now: a line at its level.
+
+    cyui::EnvelopeData data { { points.data(), at }, {} };
     if (card_.live && env >= 0 && static_cast<std::size_t>(env) < card_.heard.envelopes.size())
-        if (const auto now = card_.heard.envelopes[static_cast<std::size_t>(env)]; std::isfinite(now)) {
-            const auto at = y(std::clamp(static_cast<double>(now), 0.0, 1.0));
-            list->AddLine(ImVec2(origin.x + dp(4.0f), at), ImVec2(origin.x + size.x - dp(4.0f), at), theme::alpha(p.modulation, 0.55f),
-                          dp(1.0f));
-            list->AddCircleFilled(ImVec2(origin.x + size.x - dp(5.0f), at), dp(3.5f), p.modulation);
-        }
+        if (const auto now = card_.heard.envelopes[static_cast<std::size_t>(env)]; std::isfinite(now))
+            data.level = std::clamp(static_cast<double>(now), 0.0, 1.0);
+
+    cyui::EnvelopeOptions options;
+    options.time = { 0, total };
+    options.timePower = 0.6;
+    options.margins = { 4, 6, 4, 4 };
+    options.backgroundColor = p.bg0;
+    options.frameRounding = 4;
+    options.borderWidth = 0;
+    options.curveColor = sourceColour(1 + env);
+    options.curveWidth = 2;
+    options.fillAlpha = 0.18f;
+    options.levelLineColor = theme::alpha(p.modulation, 0.55f);
+    options.levelDotColor = p.modulation;
+    options.levelDotRadius = 3.5f;
+    options.levelDotInset = 1;
+    options.phaseLines = options.phaseLabels = false;
+    ImGui::PushID(env);
+    cyui::envelope("##prismEnvelope", data, size, options);
+    ImGui::PopID();
 }
 
 void PrismView::drawLfo(const int lfo, const ImVec2 origin, const ImVec2 size)
@@ -977,8 +983,7 @@ void PrismView::drawModulators(const float width, const float height)
     const auto origin = ImGui::GetCursorScreenPos();
     if (modulator_ < 4) {
         const auto env = modulator_;
-        drawEnvelope(env, origin, displaySize);
-        ImGui::Dummy(displaySize);
+        drawEnvelope(env, displaySize);
         ImGui::SameLine();
         ImGui::BeginGroup();
         const auto base = prism::envBase(env);

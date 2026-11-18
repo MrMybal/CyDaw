@@ -48,6 +48,38 @@ int main() {
     engine::PolySynthGraphPlan instrument;
     require(graph.compilePolySynthGraph(instrument).wasOk(),
             "native instrument compiler accepts empty MIDI graph");
+    const auto ambre = graph.editorAddNode("ambre-synth", {.4f, .4f});
+    const auto ambreValues = [&] { return graph.editorSynthValues(ambre).value().second; };
+    const auto decayIndex = engine::synth::parameterIndex(engine::synth::Model::ambre, "amp.decay");
+    const auto sustainIndex = engine::synth::parameterIndex(engine::synth::Model::ambre, "amp.sustain");
+    const auto original = ambreValues();
+    const auto prefix = "node." + base::Text(static_cast<std::int64_t>(ambre)) + ".ambre.amp.";
+    using ParameterValue = app::GraphDocument::ParameterValue;
+    const ParameterValue initial[]{{prefix + "decay", original[decayIndex]}, {prefix + "sustain", original[sustainIndex]}};
+    const ParameterValue preview[]{{prefix + "decay", 1.5}, {prefix + "sustain", 0.25}};
+    const auto history = graph.editorHistorySteps();
+    const auto revision = graph.editorParameterRevision();
+    graph.editorBeginParameterGesture(initial);
+    graph.editorPreviewParameters(preview);
+    graph.processPendingChanges();
+    require(graph.editorHistorySteps() == history && graph.editorParameterRevision() == revision,
+            "Ambre preview keeps history and gesture revision stable");
+    require(ambreValues()[decayIndex] == 1.5f && ambreValues()[sustainIndex] == 0.25f,
+            "both parameters are present in the live graph");
+    graph.editorEndParameterGesture(false);
+    require(ambreValues() == original && graph.editorHistorySteps() == history,
+            "cancelling a preview restores both parameters without a history entry");
+    graph.editorBeginParameterGesture(initial);
+    graph.editorPreviewParameters(preview);
+    graph.editorEndParameterGesture(true);
+    require(graph.editorHistorySteps() == history + 1 && graph.editorUndo() && ambreValues() == original,
+            "one graph undo restores both parameters of a committed gesture");
+    graph.editorBeginParameterGesture(initial);
+    graph.editorPreviewParameters(preview);
+    const auto beforePreset = graph.editorParameterRevision();
+    graph.editorInvalidateParameterGesture();
+    require(graph.editorParameterRevision() != beforePreset && ambreValues() == original,
+            "external replacement invalidates and restores the current preview first");
     require(base::Uuid().toString().length() == 32,
             "graph asset identifiers retain 128-bit encoding");
     app::SampleStore::shutdown();

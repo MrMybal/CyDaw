@@ -4493,6 +4493,7 @@ cydaw::engine::WavetableBankRef GraphDocument::voiceWavetableBank() const {
       "wavetable", [](const auto &card) { return card.wavetableBank; });
 }
 void GraphDocument::restore(const cydaw::base::Value &state) {
+  editorInvalidateParameterGesture();
   const auto profileEntry = cydaw::base::Time::getHighResolutionTicks();
   // Counted for this restore, not for the session: sitting next to the
   // per-call timings below, a running total reads as one of them.
@@ -10163,6 +10164,8 @@ void GraphDocument::resetEditHistory(const cydaw::base::Value *knownState) {
 void GraphDocument::commitEditHistory(const bool parameterChange) {
   if (restoringHistory_)
     return;
+  if (!parameterGesture_.empty())
+    editorInvalidateParameterGesture();
 
   auto nextState = serialise();
   if (editHistoryBaseline().isVoid()) {
@@ -10209,6 +10212,7 @@ void GraphDocument::restoreEditHistoryState(const cydaw::base::Value &state) {
     layoutChangedHandler_();
 }
 void GraphDocument::undoGraphEdit() {
+  editorInvalidateParameterGesture();
   flushParameterNotification();
   if (editingLocked_ || undoHistory_.empty())
     return;
@@ -10219,6 +10223,7 @@ void GraphDocument::undoGraphEdit() {
   setStatus(tr("nodes.status.undo"));
 }
 void GraphDocument::redoGraphEdit() {
+  editorInvalidateParameterGesture();
   flushParameterNotification();
   if (editingLocked_ || redoHistory_.empty())
     return;
@@ -11707,7 +11712,7 @@ void GraphDocument::processPendingChanges() {
     refreshGraphAssetValidation();
   if (std::exchange(parameterNotificationPending_, false))
     dispatchParameterNotification();
-  if (parameterHistoryPending_ && !parameterGestureActive_ &&
+  if (parameterHistoryPending_ && parameterGesture_.empty() &&
       base::Time::currentTimeMillis() - lastParameterUiChangeTimeMs_ >= 180)
     commitQueuedParameterHistory();
 }

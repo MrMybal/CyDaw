@@ -1,7 +1,7 @@
 # CyDAW 2 — modular CyUI integration
 
-The published fallback CyUI pin is `7a793e9281e78572818d85e9cf856d779a7792a1` (1.2.0),
-from https://github.com/MrMybal/CyUI, under its [MIT licence](https://github.com/MrMybal/CyUI/blob/7a793e9281e78572818d85e9cf856d779a7792a1/LICENSE).
+CyUI is pinned to `6ef01cfcdb197f3a89d64618ce5ef8818c704728` (1.2.0),
+from https://github.com/MrMybal/CyUI, under its [MIT licence](https://github.com/MrMybal/CyUI/blob/6ef01cfcdb197f3a89d64618ce5ef8818c704728/LICENSE).
 The complete licence and upstream notices are shipped in `Licenses/CyUI`, so
 reading them does not require access to the source repository.
 Integration uses FetchContent;
@@ -189,58 +189,17 @@ suite. This update does not establish a CPU performance improvement or validate
 Linux/macOS execution; the bounded draw budgets are implementation limits, not
 benchmark results. The earlier DSP comparison evidence remains unchanged.
 
-## Local envelope API integration (2026-11-18)
+## Instrument envelopes
 
-The new curve APIs are currently uncommitted in `D:/_Project/CyImgui_Interface`.
-The local validation build explicitly overrides the FetchContent source directory;
-it does not modify, commit or publish the dependency checkout. The fallback pin
-above does not contain these APIs. `CyUI.cmake` now rejects an outdated SDK with
-a message identifying the override, rather than compiling a second local fill.
-Update that published pin only after an upstream commit containing the APIs exists.
+Prisme uses the read-only CyUI envelope. CyDaw supplies the original AHDSR samples
+in seconds. CyUI applies the 0.6 power scaling and draws the frame and level marker
+with Prisme's palette and padding.
 
-Prisme and SynthView call `cyui::drawCurveFill` directly with their existing
-screen points, palette/source colors and opacity. Their outlines are still drawn
-once by the host. The uncommitted `ui::fillUnderCurve` helper has been removed.
-The original sampled interpolation, stage widths, nonlinear time mapping, dp
-sizes, drag handles, knob bindings and live-level overlay are unchanged. No audio
-engine, envelope parameter or DSP source is modified.
+Ambre uses the editable envelope in both its device card and editor. Its X axis
+uses fractions of the plot width. CyDaw still samples the curve and converts the
+handle positions to synth parameters. The decay handle updates time and sustain
+as a single gesture. Graph previews are published for playback while the pointer
+moves. Releasing it commits one Undo entry. Escape and preset replacement cancel
+the preview. The other synths use the shared `drawCurveFill` on their own canvases.
 
-The read-only `cyui::envelope` widget is exercised with host-provided points and
-AHDSR stages in the integration tests. It is not forced into these two custom
-canvases: SynthView owns editable handles and stage widths, while Prisme uses its
-specific padding and source color. The current component exposes only categorical
-colors and fixed inset/phase-label geometry. Using it there would change required
-colors or layout. Standard displays can use it; a direct color/padding option
-would allow a future Prisme migration without recoloring vertices or changing the
-shared palette temporarily.
-
-Validation covers zero sustain, zero hold, zero stage durations, repeated points,
-NaN/Inf gaps, baseline crossings, nonlinear host curves, and 75/100/150/200 percent
-DPI geometry. Coverage checks inspect actual triangles instead of requiring the
-former helper's exact index count. They also ensure filling reserves no item and
-does not move the host cursor or replace existing interaction targets.
-
-Prisme is captured in a separate hidden 1800x1100 process, with a private temporary
-profile and only CyAudioCore's virtual audio backend. Both ENV 1 and the initially
-selected ENV 2 receive the test values. Captures cover zero sustain, nonlinear
-curves, zero durations and the live indicator during playback. Host parameters
-are checked again after drawing. The user's open session is left untouched.
-
-Reproduce with the previously configured native build and its frozen audio SDKs:
-
-```powershell
-cmake -S . -B build/cyaudio-sleep `
-  -DFETCHCONTENT_SOURCE_DIR_CYUI=D:/_Project/CyImgui_Interface `
-  -DCYDAW_DESKTOP_RUNTIME_ROOT=D:/_Project/CyDAW_Project/build/cyaudio-sleep/CyDAW2-envelope_artefacts
-cmake --build build/cyaudio-sleep --config Release --target CyDAW2 cydaw_cyui_tests --parallel 2
-ctest --test-dir build/cyaudio-sleep -C Release --output-on-failure `
-  -R '^cydaw_(cyui_tests|envelope_views|no_juce_production_graph|native_headless)$'
-```
-
-Source hashes before/after, compiler logs and JUnit results are retained under
-`output/cyui-envelopes-2026-11-18`. Captures and the isolated-process results are
-under `build/cyaudio-sleep/envelope-views-check`. The new renderer calls use only
-portable CyUI/ImGui APIs; the visual test is attached to the existing Windows
-desktop test block. Linux/macOS builds are not claimed as executed on this host.
-
-[Measured integration evidence and immutable source hashes](reports/CyUIEnvelopes.json).
+[Initial curve-fill validation and source hashes](reports/CyUIEnvelopes.json).
