@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <memory>
 #include <optional>
@@ -177,12 +178,13 @@ struct GraphTarget {
 
 class Commands final {
 public:
-    Commands(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request)
+    Commands(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request, bool selectInspectedGraph)
         : studio_(studio),
           engine_(studio.engine()),
           ui_(ui),
           request_(request),
-          command_(request.getProperty("cmd", cydaw::base::Value()).toString().toRawUTF8())
+          command_(request.getProperty("cmd", cydaw::base::Value()).toString().toRawUTF8()),
+          selectInspectedGraph_(selectInspectedGraph)
     {
     }
 
@@ -495,6 +497,16 @@ private:
         const auto name = spec.toString().trim();
         if (name.isEmpty())
             return std::nullopt;
+        if (name.startsWith("track-id:")) {
+            const auto digits = name.fromFirstOccurrenceOf(":", false, false).toStdString();
+            const auto end = digits.data() + digits.size();
+            std::uint64_t key{};
+            const auto parsed = std::from_chars(digits.data(), end, key);
+            if (parsed.ec != std::errc{} || parsed.ptr != end)
+                return std::nullopt;
+            const auto track = studio_.trackForKey(key);
+            return track ? std::optional<RemoteTrack>(remoteOf(*track)) : std::nullopt;
+        }
         // "master" is the master track (its devices); "bus:<name>" or
         // "bus:<id>" a bus, "bus:" alone the output one.
         if (name.equalsIgnoreCase("master")) {
@@ -574,12 +586,13 @@ private:
             target.slot = studio_.busGraph(track.busId);
             if (target.slot != nullptr) {
                 target.track = TrackRef::ofBus(track.busId);
-                ui_.selectTrack(*target.track);
+                if (selectInspectedGraph_)
+                    ui_.selectTrack(*target.track);
             }
         } else {
             target.track = track.ref();
             target.slot = studio_.graphFor(*target.track);
-            if (target.slot != nullptr)
+            if (target.slot != nullptr && selectInspectedGraph_)
                 ui_.selectTrack(*target.track);
         }
         if (track.master && !track.bus && target.slot != nullptr)
@@ -1049,6 +1062,7 @@ private:
     RemoteUi& ui_;
     const cydaw::base::Value& request_;
     const cydaw::base::Text command_;
+    const bool selectInspectedGraph_;
     std::unique_ptr<app::GraphDocument> scratchGraph_;
 };
 
@@ -6610,6 +6624,7 @@ cydaw::base::Value Commands::onUndoRedo()
         if (undo ? engine_.undoMidiEdit() : engine_.redoMidiEdit())
             studio_.markDirty();
     } else if (scope == "graph") {
+        done = false;
         // The selected track's graph, as the editor shows it.
         if (const auto selected = ui_.selectedTrack())
             if (auto* slot = studio_.graphFor(*selected)) {
@@ -6617,6 +6632,7 @@ cydaw::base::Value Commands::onUndoRedo()
                 if (changed) {
                     (void) studio_.publishGraph(*selected, true);
                     studio_.markDirty();
+                    done = true;
                 }
             }
     } else if (scope == "arrangement") {
@@ -7408,9 +7424,9 @@ cydaw::base::Value Commands::onSamples()
 
 } // namespace
 
-cydaw::base::Value handleRemoteCommand(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request)
+cydaw::base::Value handleRemoteCommand(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request, bool selectInspectedGraph)
 {
-    return Commands(studio, ui, request).run();
+    return Commands(studio, ui, request, selectInspectedGraph).run();
 }
 
 } // namespace cydaw::v2

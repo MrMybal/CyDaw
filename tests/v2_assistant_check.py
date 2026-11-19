@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import wave
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -44,8 +45,10 @@ class Fixture(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if messages[-1]["role"] == "tool":
-            applied = json.loads(messages[-1]["content"])
-            if applied.get("name") != "Assistant QA":
+            track = json.loads(messages[-2]["content"])
+            workshop = json.loads(messages[-1]["content"])
+            if track.get("name") != "Assistant QA" or not any(
+                    tab["name"] == "Assistant device" for tab in workshop.get("tabs", [])):
                 self.send_error(422, "CyDaw did not apply the tool")
                 return
         self.send_response(200)
@@ -64,12 +67,16 @@ class Fixture(BaseHTTPRequestHandler):
                 self.event({"content": " too long."}, "stop")
             else:
                 tools = {tool["function"]["name"] for tool in payload["tools"]}
-                assert "add_midi_track" in tools, tools
+                assert {"cy_tools_search", "cy_tools_describe", "cy_tools_call"} <= tools, tools
                 self.event({"content": "Creating the track."})
                 time.sleep(0.55)
-                self.event({"tool_calls": [{"index": 0, "id": "add-track", "type": "function",
-                            "function": {"name": "add_midi_track",
-                                         "arguments": json.dumps({"name": "Assistant QA"})}}]}, "tool_calls")
+                edits = [("add_midi_track", {"name": "Assistant QA"}), ("workshop", {
+                    "action": "new", "name": "Assistant device"})]
+                calls = [{"index": index, "id": f"edit-{index}", "type": "function",
+                          "function": {"name": "cy_tools_call", "arguments": json.dumps({
+                              "name": tool, "arguments": params})}}
+                         for index, (tool, params) in enumerate(edits)]
+                self.event({"tool_calls": calls}, "tool_calls")
             self.wfile.write(b"data: [DONE]\n\n")
             self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
@@ -144,6 +151,87 @@ def cli(exe, *arguments, env=None, data=None, expected=0):
     return json.loads(result.stdout)
 
 
+def apply(peer, tool, params=None):
+    response = peer.tool(tool, params)
+    assert not response["isError"], response
+    return response["structuredContent"]
+
+
+def error_code(response):
+    assert response["isError"], response
+    return json.loads(response["content"][0]["text"])["code"]
+
+
+def exercise_modes(args, peer, port, env, folder, track):
+    media = folder / "Media"
+    audio = media / "fixture.wav"
+    with wave.open(str(audio), "wb") as sound:
+        sound.setparams((1, 2, 48000, 0, "NONE", "not compressed"))
+        sound.writeframes(b"\x00\x08\xff\xf7" * 24000)
+    outside = folder / "outside.wav"
+    outside.write_bytes(audio.read_bytes())
+    refused = peer.tool("dj", {"action": "load", "deck": "A", "file": str(outside)})
+    assert error_code(refused) == "FileAccessDenied"
+    apply(peer, "dj", {"action": "load", "deck": "A", "file": str(audio)})
+    dj = cli(args.cli, f"--port={port}", "call", "dj", "-", env=env,
+             data='{"action":"mixer","crossfader":0.4,"decks":4}')
+    assert abs(dj["crossfader"] - 0.4) < 0.001 and dj["deckCount"] == 4, dj
+    wait_for(lambda: apply(peer, "dj", {"action": "status"})["decks"][0]["file"], 8, "DJ media load")
+    collection = apply(peer, "dj", {"action": "tracks", "query": "fixture", "limit": 1})
+    assert len(collection["tracks"]) <= 1 and "nextOffset" in collection, collection
+
+    cli(args.cli, f"--port={port}", "call", "foundry", "-", env=env,
+        data='{"action":"new","name":"QA Foundry"}')
+    imported = apply(peer, "foundry", {"action": "import", "file": str(audio), "track": 0})
+    assert imported["tabs"][imported["current"]]["tracks"][0]["clips"], imported
+    foundry_file = media / "qa.cyfoundry"
+    apply(peer, "foundry", {"action": "save_session", "path": str(foundry_file)})
+    assert foundry_file.is_file()
+
+    apply(peer, "cinema", {"action": "new", "name": "QA Cinema"})
+    grouped = apply(peer, "cinema", {"action": "group", "op": "add", "name": "Sound design"})
+    group = next(item["id"] for item in grouped["tabs"][grouped["current"]]["tracks"]
+                 if item["name"] == "Sound design")
+    cinema = apply(peer, "cinema", {"action": "add_subtrack", "groupId": group,
+                                  "type": "midi", "name": "Cues"})
+    child = next(item for item in cinema["tabs"][cinema["current"]]["tracks"] if item["name"] == "Cues")
+    assert child["parentId"] == group and child["midi"], cinema
+    apply(peer, "cinema", {"action": "container", "op": "focus", "id": child["id"]})
+    if args.ffmpeg:
+        movie = media / "fixture.mp4"
+        subprocess.run([args.ffmpeg, "-loglevel", "error", "-f", "lavfi", "-i",
+                        "testsrc2=size=160x96:rate=25:duration=1", "-c:v", "mpeg4", "-g", "1",
+                        "-pix_fmt", "yuv420p", movie], check=True)
+        apply(peer, "cinema", {"action": "video", "file": str(movie)})
+
+        def video_ready():
+            view = apply(peer, "cinema", {"action": "status"})
+            return view["tabs"][view["current"]].get("decoder", {}).get("width") == 160
+
+        wait_for(video_ready, 10, "Cinema video decoding")
+
+    graph = apply(peer, "get_track_graph", {"track": f"track-id:{track}"})
+    assert "nodes" in graph, graph
+    added = apply(peer, "add_node", {"track": "workshop", "key": "chorus"})
+    node = int(added["id"])
+    apply(peer, "set_node", {"track": "workshop", "nodeId": node, "title": "QA Chorus"})
+    changed = apply(peer, "get_track_graph", {"track": "workshop"})
+    assert any(item["id"] == node and item["name"] == "QA Chorus" for item in changed["nodes"]), changed
+    apply(peer, "workshop", {"action": "programs", "op": "add", "name": "QA Program"})
+    programs = apply(peer, "workshop", {"action": "programs", "op": "list"})["programs"]
+    assert any(item["name"] == "QA Program" for item in programs), programs
+    export = media / "Assistant device.cydawdevice"
+    apply(peer, "workshop", {"action": "device_export", "file": str(export)})
+    assert export.is_file()
+    assert error_code(peer.tool("workshop", {"action": "device_export", "file": str(export)})) == "DestinationExists"
+    target = media / "Plugin projects"
+    batch = apply(peer, "workshop", {"action": "plugin_export_batch", "folder": str(target),
+                                    "formats": ["VST3", "CLAP", "LV2"], "platforms": ["Windows"],
+                                    "build": False})
+    assert {item["format"] for item in batch["targets"]} == {"VST3", "CLAP", "LV2"}, batch
+    assert all((Path(item["project"]) / "CMakeLists.txt").is_file() for item in batch["targets"]), batch
+
+
 @contextmanager
 def instance(exe, environment, *arguments):
     legacy_port = free_port()
@@ -183,8 +271,10 @@ def run(args, folder, provider):
     assert cli(args.cli, "call", "session_status", expected=1)["code"] == "InstanceRequired"
 
     token = secrets.token_hex(32)
+    (folder / "Media").mkdir()
     env = dict(os.environ, APPDATA=str(folder / "Roaming"), LOCALAPPDATA=str(folder / "Local"),
-               CYDAW_NO_RECOVERY="1", CYDAW_TEST_VIRTUAL_AUDIO="1", CYDAW_MCP_TOKEN=token)
+               CYDAW_NO_RECOVERY="1", CYDAW_TEST_VIRTUAL_AUDIO="1", CYDAW_MCP_TOKEN=token,
+               CYDAW_MCP_FILE_ROOT=str(folder / "Media"))
     port = free_port()
     with instance(args.exe, env, f"--mcp-port={port}") as (process, legacy):
         peer = ExternalMcp(port, token)
@@ -196,6 +286,11 @@ def run(args, folder, provider):
         assert denied["isError"] and json.loads(denied["content"][0]["text"])["code"] == "AccessDenied", denied
         failure = cli(args.cli, f"--port={port}", "call", "set_tempo", "-", data='{"bpm":127}', env=env, expected=1)
         assert failure["code"] == "AccessDenied", failure
+        for tool in ("dj", "cinema", "foundry", "workshop"):
+            assert not peer.tool(tool, {"action": "status"})["isError"]
+        assert error_code(peer.tool("dj", {"action": "status", "show": True})) == "AccessDenied"
+        assert error_code(peer.tool("foundry", {"action": "status", "tab": 0})) == "AccessDenied"
+        assert error_code(peer.tool("workshop", {"action": "vst3_check", "productName": "Changed"})) == "AccessDenied"
         try:
             ExternalMcp(port, secrets.token_hex(32)).connect()
             raise AssertionError("Wrong bearer token was accepted")
@@ -228,6 +323,7 @@ def run(args, folder, provider):
         assert first["total"] == 2 and first["nextOffset"] == 1, first
         last = peer.tool("list_tracks", {"offset": first["nextOffset"]})["structuredContent"]
         assert last["tracks"][0]["kind"] == "bus", last
+        exercise_modes(args, peer, port, env, folder, track)
         assert peer.tool("set_tempo", {"bpm": "invalid"})["isError"]
         metrics = report.with_name("metrics.jsonl")
         log = wait_for(lambda: metrics.read_text("utf-8"), 5, "performance records")
@@ -239,6 +335,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", type=Path, required=True)
     parser.add_argument("--cli", type=Path, required=True)
+    parser.add_argument("--ffmpeg", type=Path)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="cydaw-assistant-") as temporary, \
             ThreadingHTTPServer(("127.0.0.1", 0), Fixture) as provider:

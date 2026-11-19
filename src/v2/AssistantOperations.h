@@ -6,6 +6,8 @@ namespace cydaw::v2 {
 
 using AssistantDispatch = std::function<cymcp::Json(const std::string&, const cymcp::Json&, const cymcp::CallContext&)>;
 
+bool assistantReadOnly(const std::string& tool, const cymcp::Json& arguments);
+
 // With no dispatcher, the native factory catalogue remains usable offline.
 std::shared_ptr<cymcp::Registry> makeAssistantRegistry(AssistantDispatch = {},
                                                      std::shared_ptr<std::atomic_bool> allowEdits = {});

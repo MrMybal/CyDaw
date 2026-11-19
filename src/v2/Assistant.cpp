@@ -19,11 +19,107 @@ namespace cydaw::v2 {
 namespace {
 using cymcp::Json;
 
+std::filesystem::path pathFromUtf8(const std::string& text)
+{
+    return std::filesystem::path(std::u8string(text.begin(), text.end()));
+}
+
+bool pluginExport(const std::string& action)
+{
+    return action == "vst3_export" || action == "clap_export" || action == "lv2_export"
+           || action == "plugin_export" || action == "plugin_export_batch";
+}
+
+void authorizeFileArguments(const std::string& tool, Json& args, const std::filesystem::path& folder)
+{
+    const auto action = args.value("action", std::string{});
+    const auto exportPlugin = tool == "workshop" && pluginExport(action);
+    const auto writeFile = tool == "workshop" && action == "device_export";
+    const auto record = tool == "dj" && action == "record" && args.value("on", true);
+    const auto writePath = record || ((tool == "foundry" || tool == "cinema")
+        && (action == "save" || action == "save_session" || action == "export"));
+
+    const auto require = [&](const char* key) {
+        if (!args.contains(key) || args.at(key).get_ref<const std::string&>().empty())
+            throw cymcp::Error("InvalidArguments", std::string("Provide an explicit ") + key + " inside the allowed folder");
+    };
+    if (exportPlugin) require("folder");
+    if (writeFile) require("file");
+    if (writePath) require("path");
+
+    // These are the path-bearing arguments of the existing mode commands.
+    const auto authorize = [&](const char* key) {
+        const auto arg = args.find(key);
+        if (arg == args.end() || !arg->is_string() || arg->get_ref<const std::string&>().empty())
+            return;
+        if (folder.empty())
+            throw cymcp::Error("FileAccessDenied", "Choose an allowed media/export folder in the assistant");
+        std::error_code error;
+        const auto root = std::filesystem::canonical(folder, error);
+        if (!folder.is_absolute() || error || !std::filesystem::is_directory(root, error) || error)
+            throw cymcp::Error("FileAccessDenied", "The assistant's allowed folder is unavailable");
+        auto selected = pathFromUtf8(arg->get_ref<const std::string&>());
+        if (!selected.is_absolute())
+            throw cymcp::Error("FileAccessDenied", "An absolute path in the allowed folder is required");
+        for (const auto& part : selected.relative_path())
+            if (part.native().find(static_cast<std::filesystem::path::value_type>(':')) != std::filesystem::path::string_type::npos)
+                throw cymcp::Error("FileAccessDenied", "Alternate streams are outside the allowed folder");
+        const auto keyName = std::string_view(key);
+        if (writeFile && keyName == "file")
+            selected.replace_extension(".cydawdevice");
+        if (action == "save_session" && keyName == "path")
+            selected.replace_extension(tool == "cinema" ? ".cycinema" : ".cyfoundry");
+        if (std::filesystem::is_symlink(std::filesystem::symlink_status(selected, error)))
+            throw cymcp::Error("FileAccessDenied", "Select the target file instead of a symbolic link");
+        error.clear();
+        const auto path = std::filesystem::weakly_canonical(selected, error);
+        if (error)
+            throw cymcp::Error("FileAccessDenied", "Could not resolve the requested path");
+        const auto relative = path.lexically_relative(root);
+        if (relative.empty() || relative.has_root_path() || *relative.begin() == "..")
+            throw cymcp::Error("FileAccessDenied", "The requested path is outside the assistant's allowed folder");
+        if ((keyName == "path" && writePath) || (keyName == "file" && writeFile)) {
+            if (relative == "." || std::filesystem::exists(path, error) || error)
+                throw cymcp::Error("DestinationExists", "Choose a new file. Confirm overwrites from the CyDaw interface.");
+        }
+        if (keyName == "folder" && exportPlugin && (relative == "." ||
+            (std::filesystem::exists(path, error) && !std::filesystem::is_empty(path, error)) || error))
+            throw cymcp::Error("DestinationExists", "Choose an empty or new subfolder for the plugin export");
+        *arg = cymcp::path_utf8(path);
+    };
+    for (const auto* key : {"file", "path", "folder", "sample", "testFile"})
+        authorize(key);
+    if (tool == "dj" && action == "folders") {
+        authorize("add");
+        authorize("remove");
+    }
+}
+
+void pageRemoteResult(const std::string& tool, const Json& args, Json& result)
+{
+    const char* field = tool == "list_devices" || tool == "list_my_devices" ? "devices"
+        : tool == "instrument_choices" ? "instruments" : nullptr;
+    if (field == nullptr || !result.contains(field) || !result[field].is_array())
+        return;
+    auto& items = result[field];
+    const auto total = items.size();
+    const auto offset = std::min(args.value("offset", std::size_t{}), total);
+    const auto end = std::min(offset + args.value("limit", std::size_t{50}), total);
+    auto page = Json::array();
+    for (auto index = offset; index < end; ++index)
+        page.push_back(std::move(items[index]));
+    items = std::move(page);
+    result["total"] = total;
+    result["nextOffset"] = end < total ? Json(end) : Json(nullptr);
+}
+
 struct SessionDispatch {
     Studio& studio;
     RemoteUi& ui;
     std::shared_ptr<std::atomic_bool> edits = std::make_shared<std::atomic_bool>(false);
     std::atomic_bool closing{false};
+    std::filesystem::path fileRoot = pathFromUtf8(
+        cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_MCP_FILE_ROOT", {}).toStdString());
 
     std::string trackId(const TrackRef& track) const { return std::to_string(studio.routingKey(track)); }
 
@@ -52,9 +148,10 @@ struct SessionDispatch {
             return {{"tracks", std::move(result)}, {"total", tracks.size()},
                     {"nextOffset", end < tracks.size() ? Json(end) : Json(nullptr)}};
         }
-        if (!edits->load())
+        const auto readOnly = assistantReadOnly(tool, args);
+        if (!readOnly && !edits->load())
             throw cymcp::Error("PermissionDenied", "Session edits are disabled in CyDaw");
-        if (studio.isRecording() || engine.isMidiRecording() || engine.isMasterExporting())
+        if (!readOnly && (studio.isRecording() || engine.isMidiRecording() || engine.isMasterExporting()))
             throw cymcp::Error("Busy", "Finish recording or exporting first");
         if (tool == "set_track_mix" || tool == "add_midi_clip") {
             const auto tracks = studio.tracks();
@@ -86,7 +183,7 @@ struct SessionDispatch {
             studio.markDirty();
             return {{"clipId", std::to_string(clip)}};
         }
-        if (tool == "undo" || tool == "redo") {
+        if ((tool == "undo" || tool == "redo") && args.at("scope") != "graph") {
             const auto midi = args.at("scope") == "midi";
             const auto done = tool == "undo" ? (midi ? engine.undoMidiEdit() : engine.undoArrangementEdit())
                                               : (midi ? engine.redoMidiEdit() : engine.redoArrangementEdit());
@@ -112,12 +209,29 @@ struct SessionDispatch {
             return {{"trackId", trackId(*track)}, {"name", studio.trackName(*track).toStdString()}};
         }
 
+        const auto action = args.value("action", std::string{});
+        authorizeFileArguments(tool, args, fileRoot);
+        if (tool == "workshop" && action == "save" && !args.value("asNew", false)
+            && studio.workshop().file != cydaw::base::File{})
+            throw cymcp::Error("DestinationExists", "Use device_export for a new file, or save the current file from CyDaw");
+        if (tool == "workshop" && (action == "close" || action == "close_tab")) {
+            const auto requested = args.value("id", std::uint64_t{});
+            const auto id = requested == 0 ? studio.activeWorkshopTab() : requested;
+            for (const auto& tab : studio.workshopTabs())
+                if (tab.id == id && tab.unsaved)
+                    throw cymcp::Error("UnsavedChanges", "Save the workshop device or close it from the CyDaw interface");
+        }
+        if (tool == "dj" && action == "tracks" && !args.contains("limit"))
+            args["limit"] = 50;
         args["cmd"] = tool;
         const auto request = cydaw::base::JSON::parse(cydaw::base::Text::fromUTF8(args.dump().c_str()));
-        const auto reply = handleRemoteCommand(studio, ui, request);
+        const auto reply = handleRemoteCommand(studio, ui, request, !readOnly);
         if (!static_cast<bool>(reply.getProperty("ok", false)))
             throw cymcp::Error("EditFailed", reply.getProperty("error", {}).toString().toStdString());
-        return cymcp::parse_json(cydaw::base::JSON::toString(reply.getProperty("result", {}), true).toStdString());
+        auto result = cymcp::parse_json(cydaw::base::JSON::toString(reply.getProperty("result", {}), true).toStdString(),
+                                        16 * 1024 * 1024);
+        pageRemoteResult(tool, args, result);
+        return result;
     }
 };
 
@@ -268,6 +382,19 @@ struct Assistant::Impl {
         });
     }
 
+    void chooseFileRoot()
+    {
+        const auto current = cymcp::path_utf8(session->fileRoot);
+        fileDialog = std::make_unique<cydaw::base::FileDialog>(tr("Dossier de fichiers autorisé", "Allowed file folder"),
+            cydaw::base::File(cydaw::base::Text::fromUTF8(current.c_str())));
+        fileDialog->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+            [this](const auto& chooser) {
+                const auto selected = chooser.getResult();
+                if (selected.isDirectory())
+                    session->fileRoot = pathFromUtf8(selected.getFullPathName().toStdString());
+            });
+    }
+
     void discover()
     {
         discoveryCancellation = {};
@@ -368,7 +495,7 @@ struct Assistant::Impl {
     std::unique_ptr<cymcp::ChatPanel> panel;
     std::unique_ptr<cydaw::base::FileDialog> fileDialog;
     int port{}, cacheSeconds{30}, selectedProvider{}, contextKiB{128};
-    bool settings{true}, history{}, compact{};
+    bool settings{true}, history{}, compact{true};
     std::array<char, 512> baseUrl{}, apiKey{};
     std::array<char, 256> model{};
     std::string error, token;
@@ -462,6 +589,14 @@ void Assistant::draw(bool& open)
                 ImGui::SliderInt(tr("Fenêtre de contexte (Kio)", "Context window (KiB)"), &state.contextKiB, 0, 1024);
                 ImGui::Checkbox(tr("Découverte des outils à la demande", "Discover tools on demand"), &state.compact);
                 ImGui::Checkbox(tr("Conserver l’historique local", "Keep local history"), &state.history);
+                if (ImGui::Button(tr("Dossier médias et exports…", "Media and export folder…")))
+                    state.chooseFileRoot();
+                if (!state.session->fileRoot.empty()) {
+                    ImGui::SameLine();
+                    if (ImGui::Button(tr("Retirer l’accès", "Remove access")))
+                        state.session->fileRoot.clear();
+                    ImGui::TextWrapped("%s", cymcp::path_utf8(state.session->fileRoot).c_str());
+                }
                 const auto connect = ImGui::Button(tr("Connecter", "Connect"));
                 const auto restore = state.history && ImGui::Button(tr("Restaurer", "Restore"));
                 ImGui::EndDisabled();

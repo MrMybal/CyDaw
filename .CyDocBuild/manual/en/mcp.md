@@ -5,7 +5,7 @@ description: Use the same CyDaw session tools from the assistant, terminal and a
 section: Develop / Public API
 order: 100
 parent: developer-api
-revision: 8f6b04dba3cc47d7
+revision: b7c45067fb4c9dec
 ---
 
 ## Open the assistant {#overview}
@@ -36,9 +36,22 @@ Without `--port`, the CLI can show schemas and query the factory effect catalogu
 
 Pass inline JSON, `-` for standard input, or `@PATH` for a UTF-8 JSON file. Results go to stdout. Errors go to stderr with a nonzero exit code. `--version` shows the SDK version and source revision.
 
-The native tools cover session status, track and effect listings, transport, tempo and meter, looping, MIDI tracks and empty clips, buses, track mixing and the MIDI or arrangement undo history. Use the `trackId` returned by `list_tracks` for edits. Use `nextOffset` to request the next page. File access, saving, exporting, plugin installation, device settings and external application tools are outside this registry. These actions stay in their existing workflows.
+The chat, CLI and MCP server use the same catalogue. Use `list` to discover all the tools and `describe NAME` to inspect the arguments. Read actions such as `{"action":"status"}` work in read-only mode. An action that also opens a workspace or selects a tab requires **Allow session edits**.
 
-**Discover tools on demand** is optional for the assistant. The server’s catalogue cache uses a 30-second TTL by default. Set `--mcp-cache-seconds=0` to disable it, or reconnect to refresh discovery. Live reads and edits always run against the current session. `--mcp-metrics` writes timing, byte counts, status and cache metadata to `%APPDATA%/CyDAW/Assistant/metrics.jsonl`. The log excludes tool arguments, results, messages and credentials.
+| Workspace | Commands |
+| --- | --- |
+| Studio | Session and track status, transport, tempo, loop, mix, MIDI tracks and clips, buses and undo |
+| Graphs | Read graphs and devices, edit and wire nodes, set parameters, work with modulation, containers and racks |
+| Cinema | Use `cinema` for sessions, video and soundtrack, buses, subtrack containers, clips and audio export |
+| DJ Mix | Use `dj` for decks, cues, loops, grid, mixer, effects, recording and collection |
+| Foundry | Use `foundry` for sessions, import, tracks, editing, processing, playback and export |
+| Plugin Workshop | Use `workshop` for devices, tabs, links, simulator, export checks, VST3/CLAP/LV2 builds and portable graph export |
+
+For graph tools, use `"track":"track-id:<trackId>"` with the ID from `list_tracks`, or `"track":"workshop"` for the workshop graph. Use `nextOffset` to continue paged lists.
+
+For file commands, choose **Media and export folder** under **Connection**. An automated instance can set `CYDAW_MCP_FILE_ROOT` to an absolute folder before launching CyDaw. Pass absolute file paths inside that folder. Use a fresh destination for file exports and an empty or new directory for plugin exports. To overwrite an existing file, use the application’s save or export controls. Plugin builds use CyDaw’s own source configuration.
+
+**Discover tools on demand** is enabled by default in the assistant. The server’s catalogue cache uses a 30-second TTL by default. Set `--mcp-cache-seconds=0` to disable it, or reconnect to refresh discovery. Live reads and edits always run against the current session. `--mcp-metrics` writes timing, byte counts, status and cache metadata to `%APPDATA%/CyDAW/Assistant/metrics.jsonl`. The log excludes tool arguments, results, messages and credentials.
 
 ## Python bridge compatibility {#python-bridge}
 

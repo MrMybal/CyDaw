@@ -2,12 +2,26 @@
 
 #include <cydaw/engine/EffectCatalogue.h>
 
-#include <set>
+#include <algorithm>
 
 namespace cydaw::v2 {
 namespace {
 
 using cymcp::Json;
+
+const Json& legacyCatalogue()
+{
+    static const auto catalogue = [] {
+        static constexpr std::string_view chunks[] = {
+#include "AssistantLegacyCatalogue.inc"
+        };
+        std::string data;
+        for (const auto chunk : chunks)
+            data += chunk;
+        return cymcp::parse_json(data);
+    }();
+    return catalogue;
+}
 
 Json object(Json properties = Json::object(), Json required = Json::array())
 {
@@ -62,28 +76,53 @@ Json factoryEffects(const Json& args)
 
 } // namespace
 
+bool assistantReadOnly(const std::string& tool, const Json& arguments)
+{
+    if (!arguments.is_object())
+        return false;
+    if (tool == "list_factory_effects" || tool == "session_status" || tool == "list_tracks")
+        return true;
+    const auto& catalogue = legacyCatalogue();
+    const auto spec = catalogue.find(tool);
+    if (spec == catalogue.end())
+        return false;
+    if (spec->at("readOnly").get<bool>())
+        return true;
+    const auto field = arguments.find("action");
+    if (field != arguments.end() && !field->is_string())
+        return false;
+    const auto& action = field == arguments.end() ? spec->at("defaultAction") : *field;
+    if (tool == "workshop" && action == "programs" && arguments.contains("op") && arguments.at("op") != "list")
+        return false;
+    const auto& reads = spec->at("reads");
+    const auto allowed = reads.find(action.get_ref<const std::string&>());
+    if (allowed == reads.end())
+        return false;
+    for (auto entry = arguments.begin(); entry != arguments.end(); ++entry)
+        if (entry.key() != "action" && !(entry.key() == "show" && entry.value() == false)
+            && std::find(allowed->begin(), allowed->end(), Json(entry.key())) == allowed->end())
+            return false;
+    return true;
+}
+
 std::shared_ptr<cymcp::Registry> makeAssistantRegistry(AssistantDispatch dispatch,
                                                      std::shared_ptr<std::atomic_bool> allowEdits)
 {
-    // The catalogue is immutable after construction and published to callers only after registration.
-    auto reads = std::make_shared<std::set<std::string>>();
     auto registry = std::make_shared<cymcp::Registry>(cymcp::Policy(
-        [reads, allowEdits](const cymcp::CallContext&, const std::string& name, const Json&) {
-            return reads->contains(name) || (allowEdits && allowEdits->load())
+        [allowEdits](const cymcp::CallContext&, const std::string& name, const Json& arguments) {
+            return assistantReadOnly(name, arguments) || (allowEdits && allowEdits->load())
                 ? cymcp::Decision::allow : cymcp::Decision::deny;
         }));
     const auto add = [&](std::string name, const char* description, Json input, Json output,
                          bool readOnly = true, bool offline = false) {
-        if (readOnly)
-            reads->insert(name);
         registry->add({name, description, std::move(input), std::move(output), readOnly,
-                       [dispatch, allowEdits, name, readOnly, offline](const Json& arguments, const cymcp::CallContext& context) {
+                       [dispatch, allowEdits, name, offline](const Json& arguments, const cymcp::CallContext& context) {
                            context.cancellation.check();
                            if (offline)
                                return factoryEffects(arguments);
                            if (!dispatch)
                                throw cymcp::Error("InstanceRequired", "Connect to a running CyDaw session");
-                           if (!readOnly && (!allowEdits || !allowEdits->load()))
+                           if (!assistantReadOnly(name, arguments) && (!allowEdits || !allowEdits->load()))
                                throw cymcp::Error("PermissionDenied", "Session edits are disabled in CyDaw");
                            // The dispatcher also checks this permission on the message thread.
                            return dispatch(name, arguments, context);
@@ -132,10 +171,14 @@ std::shared_ptr<cymcp::Registry> makeAssistantRegistry(AssistantDispatch dispatc
         object({{"trackId", trackIdField}, {"name", nameField}, {"startBeats", number("number", 0, 100000)},
                 {"lengthBeats", number("number", 0.25, 10000)}}, {"trackId", "name", "startBeats", "lengthBeats"}),
         object({{"clipId", type("string")}}, {"clipId"}), false);
-    const auto undoInput = object({{"scope", choices({"arrangement", "midi"})}}, {"scope"});
+    const auto undoInput = object({{"scope", choices({"arrangement", "midi", "graph"})}}, {"scope"});
     const auto undoOutput = object({{"done", type("boolean")}}, {"done"});
     add("undo", "Undo the last action in the selected CyDaw edit history, which may include user edits.", undoInput, undoOutput, false);
     add("redo", "Redo the last undone action in the selected CyDaw edit history.", undoInput, undoOutput, false);
+    for (const auto& [name, spec] : legacyCatalogue().items()) {
+        const auto& description = spec.at("description").get_ref<const std::string&>();
+        add(name, description.c_str(), spec.at("input"), spec.at("output"), spec.at("readOnly").get<bool>());
+    }
     return registry;
 }
 

@@ -256,6 +256,7 @@ public:
 };
 
 // One request ({"cmd": "...", ...}) answered.
-[[nodiscard]] cydaw::base::Value handleRemoteCommand(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request);
+[[nodiscard]] cydaw::base::Value handleRemoteCommand(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request,
+                                                     bool selectInspectedGraph = true);
 
 } // namespace cydaw::v2

@@ -1781,8 +1781,15 @@ cydaw::base::Value DjView::command(const cydaw::base::Value& request)
     if (action == "tracks") {
         cydaw::base::Array<cydaw::base::Value> list;
         const auto query = request.getProperty("query", cydaw::base::Value()).toString().toLowerCase();
+        const auto paged = request.hasProperty("offset") || request.hasProperty("limit");
+        const auto offset = static_cast<int>(std::clamp(number(request, "offset", 0), 0.0, 1'000'000.0));
+        const auto limit = static_cast<int>(std::clamp(number(request, "limit", 50), 1.0, 200.0));
+        int matched = 0;
         for (const auto& track : library_->tracks()) {
             if (query.isNotEmpty() && !(track.title + " " + track.artist + " " + track.file.getFileName()).toLowerCase().contains(query))
+                continue;
+            const auto index = matched++;
+            if (paged && (index < offset || list.size() == limit))
                 continue;
             auto* item = new cydaw::base::Object();
             item->setProperty("file", track.file.getFullPathName());
@@ -1798,6 +1805,11 @@ cydaw::base::Value DjView::command(const cydaw::base::Value& request)
             list.add(cydaw::base::Value(item));
         }
         result->setProperty("tracks", list);
+        if (paged) {
+            result->setProperty("total", matched);
+            const auto end = offset + list.size();
+            result->setProperty("nextOffset", end < matched ? cydaw::base::Value(end) : cydaw::base::Value{});
+        }
     }
     result->setProperty("trackCount", static_cast<int>(library_->tracks().size()));
     return cydaw::base::Value(result);

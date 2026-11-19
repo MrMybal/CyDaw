@@ -3541,8 +3541,10 @@ cydaw::base::Result Studio::saveWorkshop(cydaw::base::File& written, const bool 
             base = "Device";
         // Never over another device: a number tells them apart.
         target = folder.getChildFile(base + ".cydawdevice");
-        for (auto number = 2; target.exists() && target != workshop_->file && number < 1'000; ++number)
+        for (auto number = 2; target.exists() && number < 1'000; ++number)
             target = folder.getChildFile(base + " " + cydaw::base::Text(number) + ".cydawdevice");
+        if (target.exists())
+            return cydaw::base::Result::fail(ui::Ls("Aucun nom de fichier disponible", "No unused device filename"));
     }
     if (!target.replaceWithText(cydaw::base::JSON::toString(deviceDocument(graph, workshop_->instrument), false)))
         return cydaw::base::Result::fail(ui::Ls("Impossible d'écrire ", "Could not write ") + target.getFullPathName());

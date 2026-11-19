@@ -5,7 +5,7 @@ description: Piloter une session CyDaw depuis l’assistant, le terminal ou un c
 section: Développer / API publique
 order: 100
 parent: developer-api
-sourceRevision: 8f6b04dba3cc47d7
+sourceRevision: b7c45067fb4c9dec
 ---
 
 ## Ouvrir l’assistant {#overview}
@@ -36,9 +36,22 @@ Sans `--port`, le CLI peut afficher les schémas et interroger le catalogue d’
 
 Fournir les arguments en JSON, avec `-` pour l’entrée standard ou `@CHEMIN` pour un fichier JSON UTF-8. Les résultats sont écrits sur stdout et les erreurs sur stderr avec un code de sortie non nul. `--version` indique la version et la révision source du SDK.
 
-Le registre natif couvre l’état de session, les listes de pistes et d’effets, le transport, le tempo et la signature, la boucle, les pistes et clips MIDI vides, les bus, le mixage des pistes et l’annulation MIDI ou Arrangement. Utiliser le `trackId` retourné par `list_tracks` pour modifier une piste et `nextOffset` pour demander la page suivante. L’accès aux fichiers, la sauvegarde, l’export, l’installation de plugins, les réglages de périphériques et les outils d’autres applications suivent leurs parcours existants.
+Le chat, le CLI et le serveur MCP utilisent le même catalogue. `list` affiche les outils et `describe NOM` détaille les arguments. Les consultations comme `{"action":"status"}` fonctionnent en lecture seule. Une action qui ouvre un mode ou sélectionne un onglet requiert **Autoriser les modifications de session**.
 
-**Découverte des outils à la demande** est un réglage du chat. Le cache du catalogue MCP dure 30 secondes par défaut. `--mcp-cache-seconds=0` le désactive et une reconnexion rafraîchit la découverte. Les lectures et modifications utilisent l’état courant de la session. `--mcp-metrics` enregistre les durées, les volumes en octets, les statuts et le cache dans `%APPDATA%/CyDAW/Assistant/metrics.jsonl`. Ce journal exclut les arguments, les résultats, les messages et les secrets.
+| Espace de travail | Commandes |
+| --- | --- |
+| Studio | État de session et des pistes, transport, tempo, boucle, mixage, pistes et clips MIDI, bus et annulation |
+| Graphes | Lire les graphes, insérer et câbler les nœuds, régler leurs paramètres, gérer les modulations, conteneurs et racks |
+| Cinéma | Utiliser `cinema` pour les sessions, la vidéo et sa bande-son, les bus, conteneurs de sous-pistes, clips et exports audio |
+| Mix DJ | Utiliser `dj` pour les platines, cues, boucles, grille, mixeur, effets, enregistrement et collection |
+| Fonderie | Utiliser `foundry` pour les sessions, imports, pistes, montage, traitements, lecture et exports |
+| Atelier Plugin | Utiliser `workshop` pour les périphériques, onglets, liens, simulateur, vérifications et builds VST3/CLAP/LV2, et l’export du graphe portable |
+
+Pour les graphes de piste, utiliser `"track":"track-id:<trackId>"` avec l’identifiant fourni par `list_tracks`. Pour le graphe de l’Atelier, utiliser `"track":"workshop"`. `nextOffset` indique le début de la page suivante.
+
+Pour les commandes qui utilisent des fichiers, choisir **Dossier médias et exports** dans **Connexion**. Pour une instance automatisée, définir `CYDAW_MCP_FILE_ROOT` sur un dossier absolu avant de démarrer CyDaw. Fournir des chemins absolus dans ce dossier. Utiliser un nouveau fichier pour les exports et un dossier neuf ou vide pour les exports de plugins. Pour écraser un fichier existant, utiliser les commandes de sauvegarde ou d’export de l’interface. Les builds de plugins utilisent la configuration source de CyDaw.
+
+**Découverte des outils à la demande** est activée par défaut dans le chat. Le cache du catalogue MCP dure 30 secondes par défaut. `--mcp-cache-seconds=0` le désactive et une reconnexion rafraîchit la découverte. Les lectures et modifications utilisent l’état courant de la session. `--mcp-metrics` enregistre les durées, les volumes en octets, les statuts et le cache dans `%APPDATA%/CyDAW/Assistant/metrics.jsonl`. Ce journal exclut les arguments, les résultats, les messages et les secrets.
 
 ## Compatibilité avec la passerelle Python {#python-bridge}
 
