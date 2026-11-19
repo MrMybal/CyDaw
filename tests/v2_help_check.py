@@ -2,7 +2,10 @@
 import argparse,json,os,socket,subprocess,tempfile,time
 from pathlib import Path
 def main():
- p=argparse.ArgumentParser();p.add_argument('--exe',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--port',type=int,default=48064);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
+ p=argparse.ArgumentParser();p.add_argument('--exe',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--port',type=int,default=48064)
+ p.add_argument('--assistant-enabled',action='store_true',help='The Help menu starts with the AI assistant entry.')
+ a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
+ manual_row, shortcuts_row=(67,108) if a.assistant_enabled else (43,86)
  with tempfile.TemporaryDirectory(prefix='cydaw-help-') as tmp:
   scratch=Path(tmp);locations=scratch/'locations.json'
   locations.write_text(json.dumps(dict(format='CyDAW Locations',version=1,folders={k:str(scratch/k) for k in ('cache','devices','pluginExports','presets','mixes','foundry','banks','downloads','companion','aiModels','soundModels','processings')})),encoding='utf-8')
@@ -34,10 +37,10 @@ def main():
     events(dict(type='move',x=270,y=12),dict(type='down'),dict(type='up'))
     q(cmd='snapshot',path=str((a.output/'help-menu.png').resolve()))
     beforeMenu=help()['requests']
-    events(dict(type='move',x=315,y=43),dict(type='down'),dict(type='up'))
+    events(dict(type='move',x=315,y=manual_row),dict(type='down'),dict(type='up'))
     assert help()['requests']==beforeMenu+1,'real Help > User manual'
     events(dict(type='move',x=270,y=12),dict(type='down'),dict(type='up'))
-    events(dict(type='move',x=315,y=86),dict(type='down'),dict(type='up'))
+    events(dict(type='move',x=315,y=shortcuts_row),dict(type='down'),dict(type='up'))
     assert help()['url'].endswith('#/en/shortcuts'),'real Help > Keyboard shortcuts'
     assert help()['engine']=='CyDoc';before=help()['requests'];shortcut()
     current=help();assert current['requests']==before+1 and current['url'].startswith('file:///') and current['launchSuppressed']

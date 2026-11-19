@@ -1,6 +1,10 @@
-# Serveur MCP CyDAW
+# Passerelle MCP stdio de CyDaw
 
-[Documentation](https://MrMybal.github.io/CyDaw/Documentation.html#/fr/mcp) — le lecteur CyDoc en français, ouvert sur le serveur MCP.
+[Documentation française](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/mcp) · [English documentation](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/mcp)
+
+Pour l’assistant intégré, `cydawctl` ou un client MCP Streamable HTTP, ouvrir **Aide → Assistant IA → Connexion**. Ces trois accès partagent le registre natif qui couvre Studio, les graphes, Cinéma, Mix DJ, Fonderie et l’Atelier Plugin. Le manuel CyDoc fourni avec l’application décrit la connexion, les droits et les premiers appels.
+
+Les instructions ci-dessous concernent les clients qui lancent la passerelle Python via stdio.
 
 Un agent (Claude Code, Claude Desktop, tout client MCP) pilote CyDAW par
 ce serveur : ouvrir un projet ou un modèle, poser des pistes et des notes,

@@ -5,7 +5,7 @@ description: Use the same CyDaw session tools from the assistant, terminal and a
 section: Develop / Public API
 order: 100
 parent: developer-api
-revision: b7c45067fb4c9dec
+revision: 17a1ba4efa3b6af5
 ---
 
 ## Open the assistant {#overview}
@@ -41,11 +41,11 @@ The chat, CLI and MCP server use the same catalogue. Use `list` to discover all 
 | Workspace | Commands |
 | --- | --- |
 | Studio | Session and track status, transport, tempo, loop, mix, MIDI tracks and clips, buses and undo |
-| Graphs | Read graphs and devices, edit and wire nodes, set parameters, work with modulation, containers and racks |
-| Cinema | Use `cinema` for sessions, video and soundtrack, buses, subtrack containers, clips and audio export |
-| DJ Mix | Use `dj` for decks, cues, loops, grid, mixer, effects, recording and collection |
-| Foundry | Use `foundry` for sessions, import, tracks, editing, processing, playback and export |
-| Plugin Workshop | Use `workshop` for devices, tabs, links, simulator, export checks, VST3/CLAP/LV2 builds and portable graph export |
+| [Graphs](doc:graphs) | Read graphs and devices, edit and wire nodes, set parameters, work with modulation, containers and racks |
+| [Cinema](doc:cinema) | Use `cinema` for sessions, video and soundtrack, buses, subtrack containers, clips and audio export |
+| [DJ Mix](doc:dj) | Use `dj` for decks, cues, loops, grid, mixer, effects, recording and collection |
+| [Foundry](doc:foundry) | Use `foundry` for sessions, import, tracks, editing, processing, playback and export |
+| [Plugin Workshop](doc:workshop) | Use `workshop` for devices, tabs, links, simulator, export checks, VST3/CLAP/LV2 builds and portable graph export |
 
 For graph tools, use `"track":"track-id:<trackId>"` with the ID from `list_tracks`, or `"track":"workshop"` for the workshop graph. Use `nextOffset` to continue paged lists.
 
@@ -68,7 +68,14 @@ The application listens on `127.0.0.1`; `--control-port=N` changes the port and 
 ## Operate a session {#workflow}
 Start by checking the project, active workspace and transport. Ask the client to create or select a track, add an instrument or effect, then adjust the intended parameter. Use the returned track/node IDs rather than assuming a track’s visual position is its identity. Confirm a render’s destination before calling `export_mix`.
 
-The tool catalog also includes dedicated Foundry, Cinema and workshop operations. Their contexts are separate from the Studio project. An operation’s successful reply does not prove that the selected audio output is connected to your speakers; check [audio setup](doc:setup) when nothing is heard.
+For example, ask the chat to list the buses and subtracks in the open Cinema session. The equivalent read-only CLI call is `cinema` with `action: status`. Use `dj`, `foundry` or `workshop` with the same action to inspect those workspaces. To inspect the active Workshop device graph, use `get_track_graph` with `track: workshop`.
+
+```powershell
+'{"action":"status"}' | .\cydawctl.exe --port=47830 call cinema -
+'{"track":"workshop"}' | .\cydawctl.exe --port=47830 call get_track_graph -
+```
+
+After reviewing a result, enable session edits to ask for a specific change. Name the workspace and the target track, tab or deck. For media and exports, give a path inside the allowed folder above. Check [audio setup](doc:setup) if a successful action produces no audible result.
 
 ## Recover from a connection problem {#troubleshooting}
 Verify the executable path, local port and matching token. Close a stale client connection, reconnect, then request the current status before retrying edits. The bridge has no third-party Python dependency. Avoid sending logs or project paths to services you have not chosen to use.

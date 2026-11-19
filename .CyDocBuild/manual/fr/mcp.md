@@ -5,7 +5,7 @@ description: Piloter une session CyDaw depuis l’assistant, le terminal ou un c
 section: Développer / API publique
 order: 100
 parent: developer-api
-sourceRevision: b7c45067fb4c9dec
+sourceRevision: 17a1ba4efa3b6af5
 ---
 
 ## Ouvrir l’assistant {#overview}
@@ -41,11 +41,11 @@ Le chat, le CLI et le serveur MCP utilisent le même catalogue. `list` affiche l
 | Espace de travail | Commandes |
 | --- | --- |
 | Studio | État de session et des pistes, transport, tempo, boucle, mixage, pistes et clips MIDI, bus et annulation |
-| Graphes | Lire les graphes, insérer et câbler les nœuds, régler leurs paramètres, gérer les modulations, conteneurs et racks |
-| Cinéma | Utiliser `cinema` pour les sessions, la vidéo et sa bande-son, les bus, conteneurs de sous-pistes, clips et exports audio |
-| Mix DJ | Utiliser `dj` pour les platines, cues, boucles, grille, mixeur, effets, enregistrement et collection |
-| Fonderie | Utiliser `foundry` pour les sessions, imports, pistes, montage, traitements, lecture et exports |
-| Atelier Plugin | Utiliser `workshop` pour les périphériques, onglets, liens, simulateur, vérifications et builds VST3/CLAP/LV2, et l’export du graphe portable |
+| [Graphes](doc:graphs) | Lire les graphes, insérer et câbler les nœuds, régler leurs paramètres, gérer les modulations, conteneurs et racks |
+| [Cinéma](doc:cinema) | Utiliser `cinema` pour les sessions, la vidéo et sa bande-son, les bus, conteneurs de sous-pistes, clips et exports audio |
+| [Mix DJ](doc:dj) | Utiliser `dj` pour les platines, cues, boucles, grille, mixeur, effets, enregistrement et collection |
+| [Fonderie](doc:foundry) | Utiliser `foundry` pour les sessions, imports, pistes, montage, traitements, lecture et exports |
+| [Atelier Plugin](doc:workshop) | Utiliser `workshop` pour les périphériques, onglets, liens, simulateur, vérifications et builds VST3/CLAP/LV2, et l’export du graphe portable |
 
 Pour les graphes de piste, utiliser `"track":"track-id:<trackId>"` avec l’identifiant fourni par `list_tracks`. Pour le graphe de l’Atelier, utiliser `"track":"workshop"`. `nextOffset` indique le début de la page suivante.
 
@@ -68,7 +68,14 @@ L’application écoute sur `127.0.0.1` ; `--control-port=N` change le port et `
 ## Agir sur une session {#workflow}
 Commencer par consulter le projet, le mode actif et le transport. Demander au client de créer ou sélectionner une piste, d’ajouter un instrument ou un effet, puis d’ajuster le paramètre voulu. Employer les identifiants de piste/nœud renvoyés plutôt que de confondre position visuelle et identité. Confirmer la destination du rendu avant `export_mix`.
 
-Le catalogue propose aussi des opérations propres à la Fonderie, au Cinéma et à l’atelier. Leurs contextes sont distincts du projet Studio. Une réponse réussie ne prouve pas que la sortie audio choisie est reliée aux enceintes ; consulter les [réglages audio](doc:setup) en cas de silence.
+Par exemple, demander au chat de lister les bus et sous-pistes de la session Cinéma ouverte. La commande CLI équivalente en lecture seule est `cinema` avec `action: status`. Utiliser `dj`, `foundry` ou `workshop` avec la même action pour consulter ces espaces. Pour lire le graphe du périphérique actif de l’Atelier, utiliser `get_track_graph` avec `track: workshop`.
+
+```powershell
+'{"action":"status"}' | .\cydawctl.exe --port=47830 call cinema -
+'{"track":"workshop"}' | .\cydawctl.exe --port=47830 call get_track_graph -
+```
+
+Après avoir vérifié le résultat, autoriser les modifications et demander une action précise. Indiquer l’espace de travail et la piste, l’onglet ou la platine à modifier. Pour les médias et les exports, fournir un chemin dans le dossier autorisé ci-dessus. Consulter les [réglages audio](doc:setup) si une commande réussit sans produire de son.
 
 ## Résoudre une erreur de connexion {#troubleshooting}
 Vérifier le chemin de l’exécutable, le port local et le jeton partagé. Fermer une connexion client périmée, reconnecter, puis consulter l’état actuel avant de reprendre les modifications. La passerelle ne demande pas de dépendance Python externe. Éviter de transmettre journaux ou chemins de projets à des services dont l’utilisation n’a pas été choisie.

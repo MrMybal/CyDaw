@@ -25,7 +25,8 @@ class PackageTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        for name in ('CMakeLists.txt', 'LICENSE', 'README.md', 'docs/V2_TEST_BUILD.md',
+        for name in ('CMakeLists.txt', 'LICENSE', 'README.md', 'README.fr.md', 'VERSION.md', 'VERSION.fr.md',
+                     'docs/V2_TEST_BUILD.md',
                      'content/factory/catalogue.json', 'build/CyDAW 2.exe', 'build/CyDAWPluginWorker.exe',
                      'build/fonts/Roboto-Medium.ttf', 'build/fonts/Cousine-Regular.ttf',
                      'build/i18n/en.json', 'build/Licenses/FFmpeg/LICENSE-LGPL-3.0.txt',
@@ -59,6 +60,8 @@ class PackageTests(unittest.TestCase):
         archive = pack.package(self.root / 'build', self.root / 'out', True)
         with zipfile.ZipFile(archive) as bundle:
             names = bundle.namelist()
+            for entry in ('README.md', 'README.fr.md', 'VERSION.md', 'VERSION.fr.md'):
+                self.assertTrue(any(n.endswith('/' + entry) for n in names), entry)
             self.assertTrue(any(n.endswith('/ALPHA.txt') for n in names))
             self.assertTrue(any(n.endswith('/avcodec-1.dll') for n in names))
             self.assertTrue(any(n.endswith('/Licenses/FFmpeg/sources/ffmpeg.tar.gz') for n in names))

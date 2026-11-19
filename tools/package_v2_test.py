@@ -102,7 +102,8 @@ def package(build, output, alpha=False):
         if (factory / 'catalogue.json').is_file():
             shutil.copytree(factory, stage / 'Factory', ignore=shutil.ignore_patterns('*.flac', '*.wav', 'Sound Models'))
         shutil.copy2(ROOT / 'LICENSE', stage / 'LICENSE')
-        shutil.copy2(ROOT / 'README.md', stage / 'README.md')
+        for name in ('README.md', 'README.fr.md', 'VERSION.md', 'VERSION.fr.md'):
+            shutil.copy2(ROOT / name, stage / name)
         for notice in (ROOT / 'third_party/imgui/LICENSE.txt', ROOT / 'third_party/zstd/LICENSE'):
             if notice.is_file():
                 destination = stage / 'Licenses' / notice.parent.name

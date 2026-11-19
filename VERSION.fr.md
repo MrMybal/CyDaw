@@ -2,12 +2,24 @@
 
 [Retour au README](README.fr.md) · [English](VERSION.md)
 
-**0.79.0 · Alpha 1 · Windows x64**<br>
-**Tag : `v2-0.79.0-alpha.1` · 17 novembre 2026**
+**0.79.0 · Alpha 3 · Windows x64**<br>
+**Tag `v2-0.79.0-alpha.3`**
 
 Le nom public reste CyDaw. Les cibles de compilation, l’exécutable `CyDAW 2.exe` et les tags conservent leur nomenclature interne.
 
-## Moteur audio natif
+## Alpha 3 · Assistant IA et automatisation
+
+- Ouvrir **Aide → Assistant IA** pour connecter une API ou un service de modèles local compatible. Le chat, `cydawctl` et le serveur MCP local partagent 50 outils.
+- Piloter les graphes, Cinéma, Mix DJ, Fonderie et l’Atelier Plugin en plus de Studio. Les modifications requièrent **Autoriser les modifications de session**. Les commandes d’import et d’export utilisent le dossier médias et exports choisi.
+- L’archive portable inclut le CLI, les notices CyMCPSDK et le guide hors ligne mis à jour en anglais et en français. [Guide de l’assistant et de MCP](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/mcp).
+
+[Télécharger l’Alpha 3](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.3/CyDAW2-0.79.0-Windows-x64-Alpha.zip) · [Publication](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.3) · [SHA-256](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.3/SHA256SUMS.txt)
+
+## Alpha 2 · Instruments et livraison de session
+
+Jouer les instruments VST3 et CLAP en MIDI et router leurs sorties supplémentaires vers le mixeur. Cette mise à jour a aussi introduit la carte de tempo et le rendu de session. [Alpha 2](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.2).
+
+## Alpha 1 · Moteur audio natif
 
 Cette Alpha remplace l’intégration JUCE par **CyAudioCore**, qui utilise sa dépendance **CyDSP** pour les traitements natifs. Le desktop, le worker isolé, les périphériques audio/MIDI, les codecs et les exports VST3/CLAP/LV2 natifs compilent sans JUCE. Les anciens adaptateurs, éditeurs et outils JUCE ont été retirés ; les rapports historiques de comparaison restent consultables.
 
@@ -19,7 +31,7 @@ Cette Alpha remplace l’intégration JUCE par **CyAudioCore**, qui utilise sa d
 - Retours CUE ASIO corrigés, longueur exacte des enregistrements WAV et silence après pause DJ lors des transitions Studio/Cinéma.
 - Aide CyDoc illustrée anglais/français, intégralement consultable hors ligne.
 
-[Télécharger l’Alpha Windows](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/CyDAW2-0.79.0-Windows-x64-Alpha.zip) · [État de publication](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.1) · [SHA-256](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.1/SHA256SUMS.txt)
+[Alpha 1](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.1).
 
 Extraire l’archive complète et conserver DLL, documentation, polices et notices avec l’exécutable. Les banques d’usine se téléchargent séparément. Les projets personnels de test et les modèles de son inachevés sont exclus.
 
