@@ -1,0 +1,20 @@
+cmake_minimum_required(VERSION 3.24)
+project(CyDawMultiOutputCheck VERSION 1.0.0 LANGUAGES C CXX)
+
+set(VST3_SDK_DIR "" CACHE PATH "Local Steinberg VST3 SDK")
+if(NOT EXISTS "${VST3_SDK_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "Set VST3_SDK_DIR to the existing local SDK")
+endif()
+set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SMTG_ENABLE_VSTGUI_SUPPORT OFF CACHE BOOL "" FORCE)
+set(SMTG_CREATE_MODULE_INFO OFF CACHE BOOL "" FORCE)
+set(SMTG_CREATE_PLUGIN_LINK OFF CACHE BOOL "" FORCE)
+set(SMTG_RUN_VST_VALIDATOR OFF CACHE BOOL "" FORCE)
+add_subdirectory("${VST3_SDK_DIR}" sdk EXCLUDE_FROM_ALL)
+set(public_sdk_SOURCE_DIR "${VST3_SDK_DIR}/public.sdk")
+smtg_add_vst3plugin(CyDawMultiOutput SOURCES_LIST
+    Vst3MultiOutput.cpp
+    "${public_sdk_SOURCE_DIR}/source/vst/vstsinglecomponenteffect.cpp")
+target_compile_features(CyDawMultiOutput PRIVATE cxx_std_20)
+target_link_libraries(CyDawMultiOutput PRIVATE sdk)
