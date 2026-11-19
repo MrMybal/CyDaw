@@ -1,15 +1,48 @@
 ---
 id: mcp
-title: Control a session with MCP
-description: Connect an MCP client and operate a local CyDAW session.
+title: AI assistant, command line and MCP
+description: Use the same CyDaw session tools from the assistant, terminal and an external MCP client.
 section: Develop / Public API
 order: 100
 parent: developer-api
-revision: 34a4876056e9ddf1
+revision: 8f6b04dba3cc47d7
 ---
 
-## Connect the local bridge {#overview}
-CyDAW’s Python MCP server translates client requests into commands on the application’s local control port. It can inspect a session, create tracks and notes, adjust devices, operate the transport and render a mix. These operations change the active session: save your project first.
+## Open the assistant {#overview}
+
+Open **Help → AI assistant**. Choose an API or a local service such as Ollama or LM Studio. Start the local service separately. The **Detect providers** button checks for compatible configurations and local services. Leave the model field empty to use the provider’s catalogue, or enter an exact model ID. An API key can come from the selected provider’s environment variable or the masked field. Use an explicit key with a custom endpoint.
+
+The provider receives your messages and the results of any tools it calls. Attach files only when you want to send them to that provider. **Stop** cancels the active turn and keeps the partial reply. Enable **Keep local history** before connecting to save the conversation on this computer and use **Restore** to reopen it. The context slider limits what goes to the provider while retaining the stored conversation. Set it to zero for the full history.
+
+## Connect a terminal or MCP client {#native}
+
+In the assistant, select **Enable local MCP** and **Copy token**. Configure the client for Streamable HTTP at `http://127.0.0.1:PORT/mcp` with `Authorization: Bearer TOKEN`. The port shown in the assistant identifies the instance. For a scripted launch, set `CYDAW_MCP_TOKEN` in both processes to the same random value of at least 32 characters, then start the desired instance:
+
+```powershell
+& '.\CyDAW 2.exe' --mcp-port=47830 --control-port=0
+.\cydawctl.exe --port=47830 list
+.\cydawctl.exe --port=47830 describe set_tempo
+.\cydawctl.exe --port=47830 call session_status
+'{"bpm":132}' | .\cydawctl.exe --port=47830 call set_tempo -
+```
+
+Enable **Allow session edits** before the last command, or launch an unattended instance with `--mcp-allow-edits`. Save any changes from CyDaw. Use `--silent` for a hidden session with muted speakers. The SDK endpoint is bound to loopback and requires the bearer token. It supports MCP discovery and tool calls over HTTP, including legacy MCP initialisation. Start the existing Python bridge for clients that require stdio.
+
+Without `--port`, the CLI can show schemas and query the factory effect catalogue without starting the app:
+
+```powershell
+'{"limit":3}' | .\cydawctl.exe call list_factory_effects -
+```
+
+Pass inline JSON, `-` for standard input, or `@PATH` for a UTF-8 JSON file. Results go to stdout. Errors go to stderr with a nonzero exit code. `--version` shows the SDK version and source revision.
+
+The native tools cover session status, track and effect listings, transport, tempo and meter, looping, MIDI tracks and empty clips, buses, track mixing and the MIDI or arrangement undo history. Use the `trackId` returned by `list_tracks` for edits. Use `nextOffset` to request the next page. File access, saving, exporting, plugin installation, device settings and external application tools are outside this registry. These actions stay in their existing workflows.
+
+**Discover tools on demand** is optional for the assistant. The server’s catalogue cache uses a 30-second TTL by default. Set `--mcp-cache-seconds=0` to disable it, or reconnect to refresh discovery. Live reads and edits always run against the current session. `--mcp-metrics` writes timing, byte counts, status and cache metadata to `%APPDATA%/CyDAW/Assistant/metrics.jsonl`. The log excludes tool arguments, results, messages and credentials.
+
+## Python bridge compatibility {#python-bridge}
+
+CyDAW’s original Python MCP server translates requests into commands on a separate local control port. It retains its existing command catalogue, including note editing, devices and mix export.
 
 ## Start from your MCP client {#connection}
 1. Build or install CyDAW and locate `CyDAW 2.exe`.

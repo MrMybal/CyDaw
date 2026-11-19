@@ -1,15 +1,48 @@
 ---
 id: mcp
-title: Piloter une session avec MCP
-description: Connecter un client MCP et agir sur une session CyDAW locale.
+title: Assistant IA, ligne de commande et MCP
+description: Piloter une session CyDaw depuis l’assistant, le terminal ou un client MCP externe.
 section: Développer / API publique
 order: 100
 parent: developer-api
-sourceRevision: 34a4876056e9ddf1
+sourceRevision: 8f6b04dba3cc47d7
 ---
 
-## Connecter la passerelle locale {#overview}
-Le serveur MCP Python de CyDAW traduit les requêtes du client en commandes sur le port de contrôle local de l’application. Il peut consulter la session, créer pistes et notes, régler les périphériques, piloter le transport et rendre un mixage. Ces opérations modifient la session active : enregistrer le projet auparavant.
+## Ouvrir l’assistant {#overview}
+
+Ouvrir **Aide → Assistant IA**. Choisir une API ou un service local tel qu’Ollama ou LM Studio. Démarrer le service local séparément. **Détecter les fournisseurs** vérifie les configurations et services locaux compatibles. Laisser le modèle vide pour consulter le catalogue du fournisseur ou saisir son identifiant exact. La clé API peut provenir de la variable d’environnement du fournisseur sélectionné ou du champ masqué. Saisir une clé explicitement pour une URL personnalisée.
+
+Le fournisseur reçoit vos messages et les résultats des outils qu’il appelle. Joindre uniquement les fichiers que vous souhaitez lui transmettre. **Arrêter** annule le tour et conserve la réponse partielle. Cocher **Conserver l’historique local** avant de se connecter, puis utiliser **Restaurer** pour reprendre cette conversation. Le réglage du contexte limite l’historique envoyé au fournisseur. La valeur zéro envoie tout l’historique.
+
+## Connecter un terminal ou un client MCP {#native}
+
+Dans l’assistant, cliquer sur **Activer MCP local** puis **Copier le jeton**. Configurer le client en Streamable HTTP avec `http://127.0.0.1:PORT/mcp` et l’en-tête `Authorization: Bearer JETON`. Le port affiché dans l’assistant identifie l’instance. Pour un lancement scripté, définir `CYDAW_MCP_TOKEN` dans les deux processus avec la même valeur aléatoire d’au moins 32 caractères, puis lancer l’instance voulue.
+
+```powershell
+& '.\CyDAW 2.exe' --mcp-port=47830 --control-port=0
+.\cydawctl.exe --port=47830 list
+.\cydawctl.exe --port=47830 describe set_tempo
+.\cydawctl.exe --port=47830 call session_status
+'{"bpm":132}' | .\cydawctl.exe --port=47830 call set_tempo -
+```
+
+Cocher **Autoriser les modifications de session** avant la dernière commande, ou démarrer une instance dédiée avec `--mcp-allow-edits`. Enregistrer les modifications dans CyDaw. Utiliser `--silent` pour une session masquée dont les enceintes sont coupées. Le serveur SDK écoute sur la boucle locale et exige le jeton. Il prend en charge les versions MCP avec initialisation de session et la découverte par HTTP. Pour un client qui exige stdio, utiliser la passerelle Python existante.
+
+Sans `--port`, le CLI peut afficher les schémas et interroger le catalogue d’effets natifs sans lancer l’application.
+
+```powershell
+'{"limit":3}' | .\cydawctl.exe call list_factory_effects -
+```
+
+Fournir les arguments en JSON, avec `-` pour l’entrée standard ou `@CHEMIN` pour un fichier JSON UTF-8. Les résultats sont écrits sur stdout et les erreurs sur stderr avec un code de sortie non nul. `--version` indique la version et la révision source du SDK.
+
+Le registre natif couvre l’état de session, les listes de pistes et d’effets, le transport, le tempo et la signature, la boucle, les pistes et clips MIDI vides, les bus, le mixage des pistes et l’annulation MIDI ou Arrangement. Utiliser le `trackId` retourné par `list_tracks` pour modifier une piste et `nextOffset` pour demander la page suivante. L’accès aux fichiers, la sauvegarde, l’export, l’installation de plugins, les réglages de périphériques et les outils d’autres applications suivent leurs parcours existants.
+
+**Découverte des outils à la demande** est un réglage du chat. Le cache du catalogue MCP dure 30 secondes par défaut. `--mcp-cache-seconds=0` le désactive et une reconnexion rafraîchit la découverte. Les lectures et modifications utilisent l’état courant de la session. `--mcp-metrics` enregistre les durées, les volumes en octets, les statuts et le cache dans `%APPDATA%/CyDAW/Assistant/metrics.jsonl`. Ce journal exclut les arguments, les résultats, les messages et les secrets.
+
+## Compatibilité avec la passerelle Python {#python-bridge}
+
+La passerelle MCP Python de CyDAW transmet les requêtes sur le port de contrôle historique. Elle conserve son catalogue de commandes, notamment l’édition de notes, les périphériques et le rendu du mixage.
 
 ## Démarrer depuis le client MCP {#connection}
 1. Compiler ou installer CyDAW et repérer `CyDAW 2.exe`.

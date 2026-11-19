@@ -28,8 +28,9 @@ SERVER_INFO = {"name": "cydaw", "version": "0.77.0"}
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("CYDAW_CONTROL_PORT", "47820"))
 HERE = os.path.dirname(os.path.abspath(__file__))
-# CyDAW 2 as built in build/agent-graph.
-DEFAULT_EXE = os.path.normpath(os.path.join(
+INSTALLED_EXE = os.path.normpath(os.path.join(HERE, "..", "..", "CyDAW 2.exe"))
+# Keep the source-tree convention for existing configurations.
+DEFAULT_EXE = INSTALLED_EXE if os.path.isfile(INSTALLED_EXE) else os.path.normpath(os.path.join(
     HERE, "..", "..", "build", "agent-graph", "CyDAW2_artefacts", "Release",
     "CyDAW 2.exe"))
 EXE = os.environ.get("CYDAW_EXE", DEFAULT_EXE)

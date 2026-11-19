@@ -40,6 +40,13 @@ def package(build, output, alpha=False):
     output.mkdir(parents=True, exist_ok=True)
     name = 'CyDAW2-%s-Windows-x64-%s' % (version(), 'Alpha' if alpha else 'test')
     required = [build / 'CyDAW 2.exe', build / 'CyDAWPluginWorker.exe']
+    executables = list(required)
+    cli = build / 'cydawctl.exe'
+    sdk_notices = build / 'Licenses/CyMCPSDK'
+    if cli.is_file() or sdk_notices.is_dir():
+        executables.append(cli)
+        required.extend((cli, sdk_notices / 'LICENSE', sdk_notices / 'THIRD_PARTY_NOTICES.md',
+                         build / 'Licenses/CyUI/third_party/md4c/LICENSE.md'))
     for component in ('avcodec', 'avformat', 'avutil', 'swscale', 'swresample'):
         candidates = list(build.glob(component + '-*.dll'))
         if not candidates:
@@ -83,7 +90,7 @@ def package(build, output, alpha=False):
         temporary = Path(temporary)
         stage = temporary / name
         stage.mkdir()
-        for file in required[:2] + sorted(build.glob('*.dll')):
+        for file in executables + sorted(build.glob('*.dll')):
             shutil.copy2(file, stage / file.name)
         for folder in ('fonts', 'i18n', 'tools', 'Licenses', 'JSFX', 'ControlPlugins'):
             source = build / folder

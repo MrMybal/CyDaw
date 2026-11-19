@@ -4,6 +4,9 @@
 #include <cydaw/midi/LiveInput.h>
 #include <cydaw/audio/Devices.h>
 #include <cydaw/base/Process.h>
+#if defined(CYDAW_HAS_ASSISTANT)
+#include "Assistant.h"
+#endif
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
@@ -269,6 +272,9 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
 
 AppUi::~AppUi()
 {
+#if defined(CYDAW_HAS_ASSISTANT)
+    assistant_.reset();
+#endif
     controllers_.reset();
     transportSync_.reset();
     if (studio_.keepsSettings()) {
@@ -289,6 +295,14 @@ AppUi::~AppUi()
         }
     }
 }
+
+#if defined(CYDAW_HAS_ASSISTANT)
+void AppUi::configureAssistant(int port, std::string token, bool allowEdits, int cacheSeconds, bool metrics)
+{
+    assistant_ = std::make_unique<Assistant>(studio_, *this);
+    assistant_->configure(port, std::move(token), allowEdits, cacheSeconds, metrics);
+}
+#endif
 
 cydaw::base::File AppUi::layoutFile() const
 {
@@ -1295,6 +1309,12 @@ void AppUi::frame()
     JsfxView::drawQuitPrompts();
     contextMenus_->draw();
     drawDialogs();
+#if defined(CYDAW_HAS_ASSISTANT)
+    if (showAssistant_ && !assistant_)
+        assistant_ = std::make_unique<Assistant>(studio_, *this);
+    if (assistant_)
+        assistant_->draw(showAssistant_);
+#endif
 
     if (showDemo_)
         ImGui::ShowDemoWindow(&showDemo_);
@@ -3310,6 +3330,11 @@ void AppUi::drawMenuBar()
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu(ui::labelId(L("Aide", "Help"), "menuHelp").c_str())) {
+#if defined(CYDAW_HAS_ASSISTANT)
+        if (ImGui::MenuItem(L("Assistant IA…", "AI assistant…"), nullptr, showAssistant_))
+            showAssistant_ = !showAssistant_;
+        ImGui::Separator();
+#endif
         if (ImGui::MenuItem(L("Manuel utilisateur", "User manual"), "Ctrl+F1")) openManual();
         if (ImGui::MenuItem(L("Aide pour cet éditeur", "Help for this editor"), "Ctrl+Shift+F1")) openContextHelp();
         ImGui::Separator();

@@ -21,6 +21,7 @@ set_target_properties(cydaw_zstd PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 option(CYDAW_BUILD_TESTS "Build the dependency-free core tests" ON)
 option(CYDAW_BUILD_DESKTOP "Build CyDaw with native CyAudioCore audio and CyUI interface" ON)
+option(CYDAW_ENABLE_ASSISTANT "Build the CyMCPSDK assistant, CLI and MCP server" ON)
 set(cydaw_asio_default OFF)
 if(WIN32 AND CYDAW_BUILD_DESKTOP)
     set(cydaw_asio_default ON)
@@ -568,6 +569,30 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
                 "Runtime output root; override to build beside an already running portable copy")
             set_target_properties(CyDAW2 PROPERTIES OUTPUT_NAME "CyDAW 2"
                 RUNTIME_OUTPUT_DIRECTORY "${CYDAW_DESKTOP_RUNTIME_ROOT}/$<CONFIG>")
+            if(CYDAW_ENABLE_ASSISTANT)
+                include(cmake/CyMCPSDK.cmake)
+                target_sources(CyDAW2 PRIVATE src/v2/Assistant.cpp src/v2/AssistantOperations.cpp)
+                target_compile_definitions(CyDAW2 PRIVATE CYDAW_HAS_ASSISTANT=1)
+                target_link_libraries(CyDAW2 PRIVATE CyMCP::ChatUI CyMCP::MCP)
+                add_executable(cydawctl src/v2/AssistantMain.cpp src/v2/AssistantOperations.cpp)
+                target_compile_features(cydawctl PRIVATE cxx_std_20)
+                target_include_directories(cydawctl PRIVATE include "${CYDAW_CYDSP_SOURCE_DIR}/include")
+                target_compile_options(cydawctl PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
+                target_compile_definitions(cydawctl PRIVATE CYDAW_MCP_REVISION="${cydaw_mcp_revision}")
+                target_link_libraries(cydawctl PRIVATE CyMCP::MCP)
+                set_target_properties(cydawctl PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CYDAW_DESKTOP_RUNTIME_ROOT}/$<CONFIG>")
+                add_dependencies(CyDAW2 cydawctl)
+                cydaw_copy_cymcp_notices(CyDAW2)
+                if(CYDAW_BUILD_TESTS)
+                    set_property(SOURCE src/v2/Assistant.cpp src/v2/Main.cpp APPEND PROPERTY
+                        COMPILE_DEFINITIONS CYDAW_ASSISTANT_TESTING=1)
+                    add_test(NAME cydaw2_assistant COMMAND "${Python3_EXECUTABLE}"
+                        "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_assistant_check.py"
+                        --exe "$<TARGET_FILE:CyDAW2>" --cli "$<TARGET_FILE:cydawctl>")
+                    set_tests_properties(cydaw2_assistant PROPERTIES TIMEOUT 100)
+                endif()
+
+            endif()
             include(cmake/NativeDesktopResources.cmake)
             cydaw_native_desktop_resources(CyDAW2)
             # Header-only Link transport (no audio sharing) and JACK's dynamically loaded control API.
@@ -935,6 +960,10 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/samples/classify_samples.py"
                     "$<TARGET_FILE_DIR:CyDAW2>/tools/samples"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:CyDAW2>/tools/mcp"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tools/mcp/cydaw_mcp_server.py"
+                    "$<TARGET_FILE_DIR:CyDAW2>/tools/mcp"
                 # The Python companion (sound matching), run when Python is there.
                 COMMAND ${CMAKE_COMMAND} -E copy_directory
                     "${CMAKE_CURRENT_SOURCE_DIR}/tools/companion/cydaw_companion"

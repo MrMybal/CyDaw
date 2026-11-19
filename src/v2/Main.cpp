@@ -5,6 +5,9 @@
 #include "SamplerMapFile.h"
 #include <cydaw/base/File.h>
 #include "AppUi.h"
+#if defined(CYDAW_ASSISTANT_TESTING)
+#include "Assistant.h"
+#endif
 #include "NativeDspRuntime.h"
 
 #include <cydaw/engine/BiquadDesign.h>
@@ -69,6 +72,15 @@ struct LaunchOptions {
     cydaw::base::File displayTest;
     bool effectsTest {};
     int controlPort { 47'820 };
+#if defined(CYDAW_HAS_ASSISTANT)
+    int mcpPort {};
+    int mcpCacheSeconds { 30 };
+    bool mcpAllowEdits {};
+    bool mcpMetrics {};
+#if defined(CYDAW_ASSISTANT_TESTING)
+    int assistantCheckPort {};
+#endif
+#endif
     int detach {};
 };
 
@@ -111,6 +123,20 @@ LaunchOptions parseOptions(const cydaw::base::Text& commandLine)
             options.detach = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
         else if (value.startsWith("--control-port="))
             options.controlPort = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
+#if defined(CYDAW_HAS_ASSISTANT)
+        else if (value.startsWith("--mcp-port="))
+            options.mcpPort = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
+        else if (value.startsWith("--mcp-cache-seconds="))
+            options.mcpCacheSeconds = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
+        else if (value == "--mcp-allow-edits")
+            options.mcpAllowEdits = true;
+        else if (value == "--mcp-metrics")
+            options.mcpMetrics = true;
+#if defined(CYDAW_ASSISTANT_TESTING)
+        else if (value.startsWith("--assistant-check-port="))
+            options.assistantCheckPort = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
+#endif
+#endif
         else if (value == "--register-project-files")
             options.registerProjectFiles = true;
         else if (value == "--audio-settings")
@@ -1098,6 +1124,26 @@ public:
         }
         if (options_.silent || probe)
             studio_->engine().setMasterGain(-60.0f);
+
+#if defined(CYDAW_HAS_ASSISTANT)
+        if (!probe && (options_.mcpPort != 0 || options_.mcpAllowEdits || options_.mcpMetrics || options_.mcpCacheSeconds != 30)) {
+            if (options_.mcpPort < 0 || options_.mcpPort > 65535 || options_.mcpCacheSeconds < 0 || options_.mcpCacheSeconds > 3600)
+                throw std::runtime_error("Invalid MCP port or cache duration");
+            const auto token = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_MCP_TOKEN", {}).toStdString();
+            window_->content().ui().configureAssistant(options_.mcpPort, token, options_.mcpAllowEdits,
+                                                        options_.mcpCacheSeconds, options_.mcpMetrics);
+        }
+#if defined(CYDAW_ASSISTANT_TESTING)
+        if (options_.assistantCheckPort > 0 && options_.silent && noRecovery_
+            && cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_TEST_VIRTUAL_AUDIO", {}) == "1") {
+            auto& ui = window_->content().ui();
+            if (ui.assistant() == nullptr || options_.assistantCheckPort > 65535)
+                throw std::runtime_error("Assistant check requires a configured test instance and local provider port");
+            ui.showDialog("assistant");
+            ui.assistant()->beginCheck(options_.assistantCheckPort);
+        }
+#endif
+#endif
 
         // The control port an agent drives CyDAW through (tools/mcp): 127.0.0.1,
         // port 47820 unless --control-port=N says otherwise, none for 0 or a probe.

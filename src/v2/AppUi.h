@@ -58,11 +58,18 @@ class TransportSync;
 class Controllers;
 class JsfxView;
 class HelpDocumentation;
+#if defined(CYDAW_HAS_ASSISTANT)
+class Assistant;
+#endif
 
 class AppUi final : public RemoteUi {
 public:
     AppUi(Studio& studio, ImGuiHost& host);
     ~AppUi() override;
+#if defined(CYDAW_HAS_ASSISTANT)
+    void configureAssistant(int port, std::string token, bool allowEdits, int cacheSeconds, bool metrics);
+    Assistant* assistant() noexcept { return assistant_.get(); }
+#endif
 
     // Called once the ImGui context exists: layout, settings.
     void initialise();
@@ -129,6 +136,10 @@ public:
             showAudioSettings_ = showSoundCard_ = true;
         else if (name == "companion")
             showCompanion_ = true;
+#if defined(CYDAW_HAS_ASSISTANT)
+        else if (name == "assistant")
+            showAssistant_ = true;
+#endif
         else if (name == "locations")
             state_.openLocations = true;
         else if (name == "banks")
@@ -317,6 +328,10 @@ public:
     void beforeNewFrame();
 
 private:
+#if defined(CYDAW_HAS_ASSISTANT)
+    std::unique_ptr<Assistant> assistant_;
+    bool showAssistant_ {};
+#endif
     float midiBounceTailSeconds_ { 4.0f };
     // Runs the action once the unsaved changes are saved or dropped, or
     // at once when there are none.
