@@ -2,7 +2,7 @@ include(FetchContent)
 
 set(CYDAW_CYMCPSDK_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../CyMCPSDK" CACHE PATH
     "Local CyMCPSDK source checkout used in preference to the published pin")
-set(cydaw_mcp_revision 34d4bcae126bc83d1a2925b5047dac36e3d09d92)
+set(cydaw_mcp_revision e562c731a146d599e3404718ea8414bb5b96b66d)
 foreach(component IN ITEMS HTTP PLATFORM MCP AI CHAT_UI)
     set(CYMCP_BUILD_${component} ON)
 endforeach()

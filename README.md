@@ -12,8 +12,8 @@
     </td>
     <td width="300" align="right" valign="top">
       <p><sub>Application license</sub><br><a href="LICENSE"><strong>AGPL-3.0</strong></a></p>
-      <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.79.0 · Alpha 3</strong></a><br><strong>ALPHA</strong></p>
-      <p><a href="https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.3/CyDAW2-0.79.0-Windows-x64-Alpha.zip"><strong>Download</strong></a><br><sub>Windows x64 · portable ZIP</sub></p>
+      <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.79.0 · Alpha 4</strong></a><br><strong>ALPHA</strong></p>
+      <p><a href="https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.4/CyDAW2-0.79.0-Windows-x64-Alpha.zip"><strong>Download</strong></a><br><sub>Windows x64 · portable ZIP</sub></p>
     </td>
   </tr>
 </table>
@@ -29,7 +29,7 @@
 
 **CyDaw** is an open-source digital audio workstation for musicians, sound designers and audio creators. Compose and arrange music, perform a DJ set, edit recordings, work to picture or build your own instruments and effects.
 
-> **ALPHA · 0.79.0 · Alpha 3**
+> **ALPHA · 0.79.0 · Alpha 4**
 >
 > Experimental Windows x64 release for testing and feedback. Read the [version notes and known limitations](VERSION.md).
 
@@ -75,7 +75,7 @@ Connect typed audio, MIDI and control ports, expose parameters and prepare prese
 - **Controllers:** learn MIDI/OSC mappings, gamepad or computer-keyboard controls, ranges, curves and bidirectional feedback.
 - **Project interchange:** readers for Ableton Live, Bitwig, Studio One, REAPER, FL Studio, Ardour, LMMS, Zrythm, DAWproject and AAF; fidelity varies. Read the import report and compare against a reference render.
 - **Sound library:** local folders and downloadable banks, categories, favourites and tempo/key filters; optional description search uses a separately downloaded model.
-- **AI assistant and automation:** **Help → AI assistant**, `cydawctl` and local MCP share 50 tools for Studio, graphs, Cinema, DJ Mix, Foundry and Plugin Workshop. [Assistant and MCP guide](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/mcp).
+- **AI assistant and automation:** **Help → AI assistant**, `cydawctl` and local MCP share 50 tools for Studio, graphs, Cinema, DJ Mix, Foundry and Plugin Workshop. Enable local MCP and copy its address to connect with the default **Free** profile. [Assistant and MCP guide](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/mcp).
 - **English and French:** application UI and illustrated documentation, with HTML navigation, search, images and diagrams.
 
 ## Sound banks and documentation
@@ -88,9 +88,9 @@ Open **Help > User manual** or press **Ctrl+F1** for the manual that matches you
 
 ## Installation
 
-The portable **Alpha 3** package is for **Windows 10/11 x64**.
+The portable **Alpha 4** package is for **Windows 10/11 x64**.
 
-1. [Download CyDaw 0.79.0 Alpha 3](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.3/CyDAW2-0.79.0-Windows-x64-Alpha.zip). [Release notes](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.3) and [SHA-256 checksums](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.3/SHA256SUMS.txt) accompany it.
+1. [Download CyDaw 0.79.0 Alpha 4](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.4/CyDAW2-0.79.0-Windows-x64-Alpha.zip). [Release notes](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.4) and [SHA-256 checksums](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.4/SHA256SUMS.txt) accompany it.
 2. Extract the complete ZIP to a writable folder. Keep the DLLs, plugin worker, fonts, translations and license folders beside the executable.
 3. Start **`CyDAW 2.exe`** (the internal executable name), select **Windows Audio / WASAPI** in audio settings and choose the output channels connected to your speakers.
 4. Download any wanted sound banks in **Options > Sound banks**. The Windows Alpha includes WASAPI and ASIO (PortAudio with the GPL SDK). VST2 is not supported.
@@ -137,7 +137,7 @@ CyDaw is distributed under the [GNU Affero General Public License v3](LICENSE) (
 | [Dear ImGui](https://github.com/ocornut/imgui) | [MIT](third_party/imgui/LICENSE.txt) | Native UI; bundled stb helpers retain their notices. |
 | [CyUI](https://github.com/MrMybal/CyUI) | [MIT](https://github.com/MrMybal/CyUI/blob/6ef01cfcdb197f3a89d64618ce5ef8818c704728/LICENSE) | Shared UI controls and audio views. Source access depends on repository permissions. |
 | [CyUI editor components](https://github.com/MrMybal/CyUI) | [MIT and permissive component terms](https://github.com/MrMybal/CyUI/blob/6ef01cfcdb197f3a89d64618ce5ef8818c704728/THIRD_PARTY_NOTICES.md) | ImGuiColorTextEdit, Lexilla, Scintilla headers and SciTE language data. Notices in `Licenses/CyUI`. |
-| [CyMCPSDK](https://github.com/MrMybal/CyMCPSDK) | [MIT](https://github.com/MrMybal/CyMCPSDK/blob/791d4d7d7680213b282ec8529d248a10f8494d77/LICENSE) | Built-in chat, native MCP server and CLI. Notices in `Licenses/CyMCPSDK`. |
+| [CyMCPSDK](https://github.com/MrMybal/CyMCPSDK) | [MIT](https://github.com/MrMybal/CyMCPSDK/blob/e562c731a146d599e3404718ea8414bb5b96b66d/LICENSE) | Built-in chat, native MCP server and CLI. Notices in `Licenses/CyMCPSDK`. |
 | [CLAP](https://github.com/free-audio/clap) | [MIT](third_party/clap/LICENSE) | Plugin worker host API and native CLAP export. |
 | [LV2](https://lv2plug.in/) | [ISC](third_party/lv2/COPYING) | Native export API/metadata; CyAudioCore supplies the LV2 host runtime and its notices. |
 | [ysfx](https://github.com/jpcima/ysfx) | [Apache-2.0](third_party/ysfx/LICENSE) | JSFX compiler/runtime inside the isolated worker. |
@@ -156,7 +156,7 @@ This table indexes the main components; it does not replace their transitive not
 ## References and links
 
 - [Product website](https://mrmybal.github.io/CyDaw/) · [English manual](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/welcome) · [Manuel en français](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/welcome).
-- [Version notes](VERSION.md) · [Alpha 3](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.3) · [All releases](https://github.com/MrMybal/CyDaw/releases).
+- [Version notes](VERSION.md) · [Alpha 4](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.4) · [All releases](https://github.com/MrMybal/CyDaw/releases).
 - [Source repository](https://github.com/MrMybal/CyDaw) · [Issue tracker](https://github.com/MrMybal/CyDaw/issues).
 
 <details>

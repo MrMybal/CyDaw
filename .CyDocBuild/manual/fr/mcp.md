@@ -5,7 +5,7 @@ description: Piloter une session CyDaw depuis l’assistant, le terminal ou un c
 section: Développer / API publique
 order: 100
 parent: developer-api
-sourceRevision: 9134684511698e48
+sourceRevision: 25a331a57a124715
 ---
 
 ## Ouvrir l’assistant {#overview}
@@ -27,10 +27,10 @@ Dans l’assistant, cliquer sur **Activer MCP local**, puis sur **Copier l’adr
 
 Le choix **Profil MCP local** est enregistré pour les prochains lancements. Arrêter le serveur avant de changer de profil. Pour Jeton seul et Protégé, utiliser **Copier le jeton** et configurer l’en-tête `Authorization: Bearer JETON`. Le chat utilise **Autoriser les modifications de session** quel que soit le profil du serveur.
 
-Pour lancer une instance depuis le terminal avec le profil Free par défaut.
+Les commandes suivantes lancent une instance en Free et s’y connectent. L’option s’applique à cette instance.
 
 ```powershell
-& '.\CyDAW 2.exe' --mcp-port=47830 --control-port=0
+& '.\CyDAW 2.exe' --mcp-port=47830 --mcp-profile=free --control-port=0
 .\cydawctl.exe --port=47830 list
 .\cydawctl.exe --port=47830 describe set_tempo
 .\cydawctl.exe --port=47830 call session_status

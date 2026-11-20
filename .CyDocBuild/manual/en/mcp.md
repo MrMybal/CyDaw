@@ -5,7 +5,7 @@ description: Use the same CyDaw session tools from the assistant, terminal and a
 section: Develop / Public API
 order: 100
 parent: developer-api
-revision: 9134684511698e48
+revision: 25a331a57a124715
 ---
 
 ## Open the assistant {#overview}
@@ -27,10 +27,10 @@ In the assistant, select **Enable local MCP**, then **Copy address**. With the d
 
 The **Local MCP profile** selection is saved for future launches. Stop the server before switching profiles. For Token only and Protected, use **Copy token** and configure `Authorization: Bearer TOKEN`. The chat uses **Allow session edits** independently of the server's profile.
 
-To launch an instance from a terminal using the default Free profile:
+Use the following commands to launch an instance with Free and connect to it. The launch option applies to this instance.
 
 ```powershell
-& '.\CyDAW 2.exe' --mcp-port=47830 --control-port=0
+& '.\CyDAW 2.exe' --mcp-port=47830 --mcp-profile=free --control-port=0
 .\cydawctl.exe --port=47830 list
 .\cydawctl.exe --port=47830 describe set_tempo
 .\cydawctl.exe --port=47830 call session_status

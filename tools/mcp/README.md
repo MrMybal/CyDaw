@@ -2,7 +2,7 @@
 
 [Documentation française](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/mcp) · [English documentation](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/mcp)
 
-Pour l’assistant intégré, `cydawctl` ou un client MCP Streamable HTTP, ouvrir **Aide → Assistant IA → Connexion**. Ces trois accès partagent le registre natif qui couvre Studio, les graphes, Cinéma, Mix DJ, Fonderie et l’Atelier Plugin. Le manuel CyDoc fourni avec l’application décrit la connexion, les droits et les premiers appels.
+Pour un client MCP Streamable HTTP, ouvrir **Aide → Assistant IA** dans CyDaw. Cliquer sur **Activer MCP local**, puis sur **Copier l’adresse**. Le profil **Free**, utilisé en l’absence de choix enregistré, autorise les appels locaux avec cette adresse seule. **Local contrôlé**, **Jeton seul** et **Protégé** restent disponibles. Le chat, cydawctl et le serveur local partagent le même registre. Le manuel fourni avec l’application détaille les quatre profils.
 
 Les instructions ci-dessous concernent les clients qui lancent la passerelle Python via stdio.
 

@@ -2,10 +2,18 @@
 
 [Back to README](README.md) · [Français](VERSION.fr.md)
 
-**0.79.0 · Alpha 3 · Windows x64**<br>
-**Release tag `v2-0.79.0-alpha.3`**
+**0.79.0 · Alpha 4 · Windows x64**<br>
+**Release tag `v2-0.79.0-alpha.4`**
 
 CyDaw is the public product name. Build targets, the executable `CyDAW 2.exe` and versioned release tags retain internal naming.
+
+## Alpha 4 · Local MCP access profiles
+
+- CyMCPSDK 0.7.2 adds four local MCP access profiles. **Free** is the default when no profile was selected. After enabling the server, the loopback address is enough to connect and edit a session.
+- **Local controlled** checks session permissions, **Token only** requires a bearer token and **Protected** requires both the token and permission to edit. Saved selections carry over.
+- Use **Help → AI assistant → Enable local MCP**, then **Copy address**. Argument validation still applies. The bilingual offline guide documents the profiles and command-line options.
+
+[Download Alpha 4](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.4/CyDAW2-0.79.0-Windows-x64-Alpha.zip) · [Release](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.79.0-alpha.4) · [SHA-256](https://github.com/MrMybal/CyDaw/releases/download/v2-0.79.0-alpha.4/SHA256SUMS.txt)
 
 ## Alpha 3 · AI assistant and automation
 
