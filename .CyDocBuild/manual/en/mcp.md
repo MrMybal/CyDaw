@@ -5,7 +5,7 @@ description: Use the same CyDaw session tools from the assistant, terminal and a
 section: Develop / Public API
 order: 100
 parent: developer-api
-revision: 17a1ba4efa3b6af5
+revision: 9134684511698e48
 ---
 
 ## Open the assistant {#overview}
@@ -16,7 +16,18 @@ The provider receives your messages and the results of any tools it calls. Attac
 
 ## Connect a terminal or MCP client {#native}
 
-In the assistant, select **Enable local MCP** and **Copy token**. Configure the client for Streamable HTTP at `http://127.0.0.1:PORT/mcp` with `Authorization: Bearer TOKEN`. The port shown in the assistant identifies the instance. For a scripted launch, set `CYDAW_MCP_TOKEN` in both processes to the same random value of at least 32 characters, then start the desired instance:
+In the assistant, select **Enable local MCP**, then **Copy address**. With the default **Free** profile, a Streamable HTTP client only needs `http://127.0.0.1:PORT/mcp`. Any process on this computer can call the registered operations, including edits, once MCP is enabled. The application still validates arguments and media/export destinations.
+
+| Profile | Connection | Session edits over MCP |
+| --- | --- | --- |
+| Free | Address | Allowed |
+| Local controlled | Address | Controlled by **Allow session edits** |
+| Token only | Address and bearer token | Allowed |
+| Protected | Address and bearer token | Controlled by **Allow session edits** |
+
+The **Local MCP profile** selection is saved for future launches. Stop the server before switching profiles. For Token only and Protected, use **Copy token** and configure `Authorization: Bearer TOKEN`. The chat uses **Allow session edits** independently of the server's profile.
+
+To launch an instance from a terminal using the default Free profile:
 
 ```powershell
 & '.\CyDAW 2.exe' --mcp-port=47830 --control-port=0
@@ -26,7 +37,7 @@ In the assistant, select **Enable local MCP** and **Copy token**. Configure the 
 '{"bpm":132}' | .\cydawctl.exe --port=47830 call set_tempo -
 ```
 
-Enable **Allow session edits** before the last command, or launch an unattended instance with `--mcp-allow-edits`. Save any changes from CyDaw. Use `--silent` for a hidden session with muted speakers. The SDK endpoint is bound to loopback and requires the bearer token. It supports MCP discovery and tool calls over HTTP, including legacy MCP initialisation. Start the existing Python bridge for clients that require stdio.
+Use `--mcp-profile=free`, `local_controlled`, `token_only` or `protected` to override the saved profile for that process. When launching a token profile with `--mcp-port`, set `CYDAW_MCP_TOKEN` to the same random value of at least 32 characters in CyDaw and `cydawctl`. Use `--mcp-allow-edits` to enable edits for the chat and controlled profiles at startup. Save any changes from CyDaw. Use `--silent` for a hidden session with muted speakers. For clients that require stdio, use the Python bridge.
 
 Without `--port`, the CLI can show schemas and query the factory effect catalogue without starting the app:
 
@@ -36,7 +47,7 @@ Without `--port`, the CLI can show schemas and query the factory effect catalogu
 
 Pass inline JSON, `-` for standard input, or `@PATH` for a UTF-8 JSON file. Results go to stdout. Errors go to stderr with a nonzero exit code. `--version` shows the SDK version and source revision.
 
-The chat, CLI and MCP server use the same catalogue. Use `list` to discover all the tools and `describe NAME` to inspect the arguments. Read actions such as `{"action":"status"}` work in read-only mode. An action that also opens a workspace or selects a tab requires **Allow session edits**.
+The chat, CLI and MCP server use the same catalogue. Use `list` to discover all the tools and `describe NAME` to inspect the arguments. Under a controlled profile, a pure read such as `{"action":"status"}` remains available with session edits disabled. Opening a workspace or selecting a tab counts as an edit.
 
 | Workspace | Commands |
 | --- | --- |
@@ -75,7 +86,7 @@ For example, ask the chat to list the buses and subtracks in the open Cinema ses
 '{"track":"workshop"}' | .\cydawctl.exe --port=47830 call get_track_graph -
 ```
 
-After reviewing a result, enable session edits to ask for a specific change. Name the workspace and the target track, tab or deck. For media and exports, give a path inside the allowed folder above. Check [audio setup](doc:setup) if a successful action produces no audible result.
+After reviewing a result, enable session edits if you are using the chat or a controlled profile. Name the workspace and the target track, tab or deck. For media and exports, give a path inside the allowed folder above. Check [audio setup](doc:setup) if a successful action produces no audible result.
 
 ## Recover from a connection problem {#troubleshooting}
-Verify the executable path, local port and matching token. Close a stale client connection, reconnect, then request the current status before retrying edits. The bridge has no third-party Python dependency. Avoid sending logs or project paths to services you have not chosen to use.
+Verify the executable path, local port and matching token if the selected profile requires one. Close a stale client connection, reconnect, then request the current status before retrying edits. The bridge has no third-party Python dependency. Avoid sending logs or project paths to services you have not chosen to use.

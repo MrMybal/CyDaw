@@ -5,7 +5,7 @@ description: Piloter une session CyDaw depuis l’assistant, le terminal ou un c
 section: Développer / API publique
 order: 100
 parent: developer-api
-sourceRevision: 17a1ba4efa3b6af5
+sourceRevision: 9134684511698e48
 ---
 
 ## Ouvrir l’assistant {#overview}
@@ -16,7 +16,18 @@ Le fournisseur reçoit vos messages et les résultats des outils qu’il appelle
 
 ## Connecter un terminal ou un client MCP {#native}
 
-Dans l’assistant, cliquer sur **Activer MCP local** puis **Copier le jeton**. Configurer le client en Streamable HTTP avec `http://127.0.0.1:PORT/mcp` et l’en-tête `Authorization: Bearer JETON`. Le port affiché dans l’assistant identifie l’instance. Pour un lancement scripté, définir `CYDAW_MCP_TOKEN` dans les deux processus avec la même valeur aléatoire d’au moins 32 caractères, puis lancer l’instance voulue.
+Dans l’assistant, cliquer sur **Activer MCP local**, puis sur **Copier l’adresse**. Avec le profil **Free** par défaut, un client Streamable HTTP a seulement besoin de `http://127.0.0.1:PORT/mcp`. Une fois MCP activé, tout processus sur cet ordinateur peut appeler les opérations enregistrées, y compris les modifications. L’application valide les arguments ainsi que les destinations des médias et des exports.
+
+| Profil | Connexion | Modifications de session par MCP |
+| --- | --- | --- |
+| Free | Adresse | Autorisées |
+| Local contrôlé | Adresse | Selon **Autoriser les modifications de session** |
+| Jeton seul | Adresse et jeton d’accès | Autorisées |
+| Protégé | Adresse et jeton d’accès | Selon **Autoriser les modifications de session** |
+
+Le choix **Profil MCP local** est enregistré pour les prochains lancements. Arrêter le serveur avant de changer de profil. Pour Jeton seul et Protégé, utiliser **Copier le jeton** et configurer l’en-tête `Authorization: Bearer JETON`. Le chat utilise **Autoriser les modifications de session** quel que soit le profil du serveur.
+
+Pour lancer une instance depuis le terminal avec le profil Free par défaut.
 
 ```powershell
 & '.\CyDAW 2.exe' --mcp-port=47830 --control-port=0
@@ -26,7 +37,7 @@ Dans l’assistant, cliquer sur **Activer MCP local** puis **Copier le jeton**. 
 '{"bpm":132}' | .\cydawctl.exe --port=47830 call set_tempo -
 ```
 
-Cocher **Autoriser les modifications de session** avant la dernière commande, ou démarrer une instance dédiée avec `--mcp-allow-edits`. Enregistrer les modifications dans CyDaw. Utiliser `--silent` pour une session masquée dont les enceintes sont coupées. Le serveur SDK écoute sur la boucle locale et exige le jeton. Il prend en charge les versions MCP avec initialisation de session et la découverte par HTTP. Pour un client qui exige stdio, utiliser la passerelle Python existante.
+Utiliser `--mcp-profile=free`, `local_controlled`, `token_only` ou `protected` pour remplacer le profil enregistré le temps du processus. Pour un profil à jeton lancé avec `--mcp-port`, définir `CYDAW_MCP_TOKEN` avec la même valeur aléatoire d’au moins 32 caractères dans CyDaw et `cydawctl`. `--mcp-allow-edits` autorise les modifications au démarrage pour le chat et les profils contrôlés. Enregistrer les modifications dans CyDaw. Utiliser `--silent` pour une session masquée dont les enceintes sont coupées. Pour un client qui exige stdio, utiliser la passerelle Python.
 
 Sans `--port`, le CLI peut afficher les schémas et interroger le catalogue d’effets natifs sans lancer l’application.
 
@@ -36,7 +47,7 @@ Sans `--port`, le CLI peut afficher les schémas et interroger le catalogue d’
 
 Fournir les arguments en JSON, avec `-` pour l’entrée standard ou `@CHEMIN` pour un fichier JSON UTF-8. Les résultats sont écrits sur stdout et les erreurs sur stderr avec un code de sortie non nul. `--version` indique la version et la révision source du SDK.
 
-Le chat, le CLI et le serveur MCP utilisent le même catalogue. `list` affiche les outils et `describe NOM` détaille les arguments. Les consultations comme `{"action":"status"}` fonctionnent en lecture seule. Une action qui ouvre un mode ou sélectionne un onglet requiert **Autoriser les modifications de session**.
+Le chat, le CLI et le serveur MCP utilisent le même catalogue. `list` affiche les outils et `describe NOM` détaille les arguments. Un profil contrôlé permet les consultations comme `{"action":"status"}` lorsque les modifications sont désactivées. Ouvrir un espace de travail ou sélectionner un onglet compte comme une modification.
 
 | Espace de travail | Commandes |
 | --- | --- |
@@ -75,7 +86,7 @@ Par exemple, demander au chat de lister les bus et sous-pistes de la session Cin
 '{"track":"workshop"}' | .\cydawctl.exe --port=47830 call get_track_graph -
 ```
 
-Après avoir vérifié le résultat, autoriser les modifications et demander une action précise. Indiquer l’espace de travail et la piste, l’onglet ou la platine à modifier. Pour les médias et les exports, fournir un chemin dans le dossier autorisé ci-dessus. Consulter les [réglages audio](doc:setup) si une commande réussit sans produire de son.
+Après avoir vérifié le résultat, autoriser les modifications si vous utilisez le chat ou un profil contrôlé. Indiquer l’espace de travail et la piste, l’onglet ou la platine à modifier. Pour les médias et les exports, fournir un chemin dans le dossier autorisé ci-dessus. Consulter les [réglages audio](doc:setup) si une commande réussit sans produire de son.
 
 ## Résoudre une erreur de connexion {#troubleshooting}
-Vérifier le chemin de l’exécutable, le port local et le jeton partagé. Fermer une connexion client périmée, reconnecter, puis consulter l’état actuel avant de reprendre les modifications. La passerelle ne demande pas de dépendance Python externe. Éviter de transmettre journaux ou chemins de projets à des services dont l’utilisation n’a pas été choisie.
+Vérifier le chemin de l’exécutable, le port local et le jeton partagé si le profil sélectionné en exige un. Fermer une connexion client périmée, reconnecter, puis consulter l’état actuel avant de reprendre les modifications. La passerelle ne demande pas de dépendance Python externe. Éviter de transmettre journaux ou chemins de projets à des services dont l’utilisation n’a pas été choisie.

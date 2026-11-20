@@ -60,6 +60,7 @@ class JsfxView;
 class HelpDocumentation;
 #if defined(CYDAW_HAS_ASSISTANT)
 class Assistant;
+struct AssistantOptions;
 #endif
 
 class AppUi final : public RemoteUi {
@@ -67,7 +68,7 @@ public:
     AppUi(Studio& studio, ImGuiHost& host);
     ~AppUi() override;
 #if defined(CYDAW_HAS_ASSISTANT)
-    void configureAssistant(int port, std::string token, bool allowEdits, int cacheSeconds, bool metrics);
+    void configureAssistant(const AssistantOptions&);
     Assistant* assistant() noexcept { return assistant_.get(); }
 #endif
 

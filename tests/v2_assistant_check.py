@@ -103,11 +103,12 @@ def wait_for(condition, seconds, description):
 
 
 class ExternalMcp:
-    def __init__(self, port, token):
+    def __init__(self, port, token=None):
         self.url = f"http://127.0.0.1:{port}/mcp"
-        self.headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json",
-                        "Accept": "application/json, text/event-stream",
+        self.headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
                         "MCP-Protocol-Version": "2025-11-25"}
+        if token is not None:
+            self.headers["Authorization"] = f"Bearer {token}"
         self.next_id = 0
 
     def request(self, method, params=None, notification=False):
@@ -273,36 +274,82 @@ def run(args, folder, provider):
     token = secrets.token_hex(32)
     (folder / "Media").mkdir()
     env = dict(os.environ, APPDATA=str(folder / "Roaming"), LOCALAPPDATA=str(folder / "Local"),
-               CYDAW_NO_RECOVERY="1", CYDAW_TEST_VIRTUAL_AUDIO="1", CYDAW_MCP_TOKEN=token,
+               CYDAW_NO_RECOVERY="1", CYDAW_TEST_VIRTUAL_AUDIO="1",
                CYDAW_MCP_FILE_ROOT=str(folder / "Media"))
+    env.pop("CYDAW_MCP_TOKEN", None)
+    authenticated = dict(env, CYDAW_MCP_TOKEN=token)
+    settings = folder / "Roaming/CyDAW/Assistant/mcp-settings.json"
+
+    # Both a fresh configuration and an existing one without a profile use Free.
+    for previous in (None, {"previousSetting": True}, {"profile": None}):
+        if previous is not None:
+            settings.parent.mkdir(parents=True, exist_ok=True)
+            settings.write_text(json.dumps(previous), encoding="utf-8")
+        port = free_port()
+        with instance(args.exe, env, f"--mcp-port={port}") as (process, legacy):
+            peer = ExternalMcp(port)
+            wait_for(peer.connect, 18, "default Free instance")
+            assert process.poll() is None and legacy("status")["ok"]
+            assert apply(peer, "session_status")["tempo"] > 0
+            assert apply(peer, "set_tempo", {"bpm": 127})["tempo"] == 127
+            assert apply(peer, "session_status")["tempo"] == 127
+            assert peer.tool("set_tempo", {"bpm": "invalid"})["isError"]
+            assert apply(peer, "session_status")["tempo"] == 127
+        if previous is not None:
+            assert json.loads(settings.read_text("utf-8")) == previous
+
+    def require_token(port):
+        for candidate in (None, secrets.token_hex(32)):
+            try:
+                ExternalMcp(port, candidate).connect()
+            except HTTPError as error:
+                assert error.code == 401
+            else:
+                raise AssertionError("An absent or wrong bearer token was accepted")
+
+    # A stored selection survives restarts and an explicit launch-only override.
+    settings.write_text(json.dumps({"profile": "protected"}), encoding="utf-8")
     port = free_port()
-    with instance(args.exe, env, f"--mcp-port={port}") as (process, legacy):
+    with instance(args.exe, authenticated, f"--mcp-port={port}"):
         peer = ExternalMcp(port, token)
-        wait_for(peer.connect, 18, "authenticated read-only instance")
-        assert process.poll() is None
-        assert legacy("status")["ok"]
-        assert not peer.tool("session_status")["isError"]
+        wait_for(peer.connect, 18, "stored Protected instance")
+        require_token(port)
+        assert apply(peer, "session_status")["tempo"] > 0
         denied = peer.tool("set_tempo", {"bpm": 127})
-        assert denied["isError"] and json.loads(denied["content"][0]["text"])["code"] == "AccessDenied", denied
-        failure = cli(args.cli, f"--port={port}", "call", "set_tempo", "-", data='{"bpm":127}', env=env, expected=1)
+        assert error_code(denied) == "AccessDenied", denied
+        failure = cli(args.cli, f"--port={port}", "call", "set_tempo", "-", data='{"bpm":127}',
+                      env=authenticated, expected=1)
         assert failure["code"] == "AccessDenied", failure
+        cli(args.cli, f"--port={port}", "call", "session_status", env=env, expected=1)
         for tool in ("dj", "cinema", "foundry", "workshop"):
             assert not peer.tool(tool, {"action": "status"})["isError"]
         assert error_code(peer.tool("dj", {"action": "status", "show": True})) == "AccessDenied"
         assert error_code(peer.tool("foundry", {"action": "status", "tab": 0})) == "AccessDenied"
         assert error_code(peer.tool("workshop", {"action": "vst3_check", "productName": "Changed"})) == "AccessDenied"
-        try:
-            ExternalMcp(port, secrets.token_hex(32)).connect()
-            raise AssertionError("Wrong bearer token was accepted")
-        except HTTPError as error:
-            assert error.code == 401
+
+    port = free_port()
+    with instance(args.exe, env, f"--mcp-port={port}", "--mcp-profile=local_controlled"):
+        peer = ExternalMcp(port)
+        wait_for(peer.connect, 18, "Local controlled instance")
+        assert apply(peer, "session_status")["tempo"] > 0
+        assert error_code(peer.tool("set_tempo", {"bpm": 127})) == "AccessDenied"
+    assert json.loads(settings.read_text("utf-8")) == {"profile": "protected"}
+
+    settings.write_text(json.dumps({"profile": "token_only"}), encoding="utf-8")
+    port = free_port()
+    with instance(args.exe, authenticated, f"--mcp-port={port}"):
+        peer = ExternalMcp(port, token)
+        wait_for(peer.connect, 18, "stored Token only instance")
+        require_token(port)
+        assert apply(peer, "set_tempo", {"bpm": 127})["tempo"] == 127
 
     port = free_port()
     report = folder / "Roaming/CyDAW/Assistant/check.json"
-    with instance(args.exe, env, f"--mcp-port={port}", "--mcp-allow-edits", "--mcp-metrics",
-                  "--mcp-cache-seconds=0", f"--assistant-check-port={provider.server_port}"):
-        peer = ExternalMcp(port, token)
-        wait_for(peer.connect, 18, "authenticated writable instance")
+    with instance(args.exe, env, f"--mcp-port={port}", "--mcp-profile=free",
+                  "--mcp-allow-edits", "--mcp-metrics", "--mcp-cache-seconds=0",
+                  f"--assistant-check-port={provider.server_port}"):
+        peer = ExternalMcp(port)
+        wait_for(peer.connect, 18, "Free instance with chat enabled")
         assert any(tool["name"] == "list_tracks" for tool in peer.request("tools/list")["tools"])
         assert cli(args.cli, f"--port={port}", "describe", "set_tempo", env=env)["name"] == "set_tempo"
         tempo = cli(args.cli, f"--port={port}", "call", "set_tempo", "-", data='{"bpm":132}', env=env)
@@ -328,7 +375,7 @@ def run(args, folder, provider):
         metrics = report.with_name("metrics.jsonl")
         log = wait_for(lambda: metrics.read_text("utf-8"), 5, "performance records")
         assert "set_tempo" in log and token not in log and "Assistant QA" not in log and "Test clip" not in log
-    print("CyDaw CLI, native authenticated MCP and widget chat passed")
+    print("CyDaw Free, Local controlled, Token only, Protected, CLI and widget chat passed")
 
 
 def main():

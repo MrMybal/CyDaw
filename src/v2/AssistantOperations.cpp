@@ -106,25 +106,25 @@ bool assistantReadOnly(const std::string& tool, const Json& arguments)
 }
 
 std::shared_ptr<cymcp::Registry> makeAssistantRegistry(AssistantDispatch dispatch,
-                                                     std::shared_ptr<std::atomic_bool> allowEdits)
+                                                     std::shared_ptr<std::atomic_bool> editGate,
+                                                     cymcp::LocalAccessProfile profile)
 {
-    auto registry = std::make_shared<cymcp::Registry>(cymcp::Policy(
-        [allowEdits](const cymcp::CallContext&, const std::string& name, const Json& arguments) {
-            return assistantReadOnly(name, arguments) || (allowEdits && allowEdits->load())
+    const auto access = cymcp::local_access_settings(profile);
+    auto policy = access.control_operations ? cymcp::Policy(
+        [editGate](const cymcp::CallContext&, const std::string& name, const Json& arguments) {
+            return assistantReadOnly(name, arguments) || (editGate && editGate->load())
                 ? cymcp::Decision::allow : cymcp::Decision::deny;
-        }));
+        }) : cymcp::Policy::allow_all();
+    auto registry = std::make_shared<cymcp::Registry>(std::move(policy));
     const auto add = [&](std::string name, const char* description, Json input, Json output,
                          bool readOnly = true, bool offline = false) {
         registry->add({name, description, std::move(input), std::move(output), readOnly,
-                       [dispatch, allowEdits, name, offline](const Json& arguments, const cymcp::CallContext& context) {
+                       [dispatch, name, offline](const Json& arguments, const cymcp::CallContext& context) {
                            context.cancellation.check();
                            if (offline)
                                return factoryEffects(arguments);
                            if (!dispatch)
                                throw cymcp::Error("InstanceRequired", "Connect to a running CyDaw session");
-                           if (!assistantReadOnly(name, arguments) && (!allowEdits || !allowEdits->load()))
-                               throw cymcp::Error("PermissionDenied", "Session edits are disabled in CyDaw");
-                           // The dispatcher also checks this permission on the message thread.
                            return dispatch(name, arguments, context);
                        }});
     };

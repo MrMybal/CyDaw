@@ -123,7 +123,7 @@ struct SessionDispatch {
 
     std::string trackId(const TrackRef& track) const { return std::to_string(studio.routingKey(track)); }
 
-    Json handle(const std::string& tool, Json args)
+    Json handle(const std::string& tool, Json args, bool controlOperations)
     {
         auto& engine = studio.engine();
         if (tool == "session_status")
@@ -149,7 +149,7 @@ struct SessionDispatch {
                     {"nextOffset", end < tracks.size() ? Json(end) : Json(nullptr)}};
         }
         const auto readOnly = assistantReadOnly(tool, args);
-        if (!readOnly && !edits->load())
+        if (!readOnly && controlOperations && !edits->load())
             throw cymcp::Error("PermissionDenied", "Session edits are disabled in CyDaw");
         if (!readOnly && (studio.isRecording() || engine.isMidiRecording() || engine.isMasterExporting()))
             throw cymcp::Error("Busy", "Finish recording or exporting first");
@@ -236,19 +236,19 @@ struct SessionDispatch {
 };
 
 Json dispatchOnUi(const std::weak_ptr<SessionDispatch>& weak, const std::string& tool,
-                  const Json& args, const cymcp::CallContext& context)
+                  const Json& args, const cymcp::CallContext& context, bool controlOperations)
 {
     auto stop = context.cancellation.child();
     stop.deadline = std::min(stop.deadline, cymcp::Clock::now() + std::chrono::seconds(25));
     auto reply = std::make_shared<std::promise<Json>>();
     auto result = reply->get_future();
-    if (!cydaw::base::EventLoop::post([weak, stop, reply, tool, args] {
+    if (!cydaw::base::EventLoop::post([weak, stop, reply, tool, args, controlOperations] {
             try {
                 stop.check();
                 const auto session = weak.lock();
                 if (!session || session->closing.load())
                     throw cymcp::Error("AppClosing", "CyDaw is closing");
-                reply->set_value(session->handle(tool, args));
+                reply->set_value(session->handle(tool, args, controlOperations));
             } catch (...) {
                 reply->set_exception(std::current_exception());
             }
@@ -285,14 +285,83 @@ cydaw::base::File assistantDirectory()
     return cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory)
         .getChildFile("CyDAW/Assistant");
 }
+
+using cymcp::LocalAccessProfile;
+struct McpProfile {
+    LocalAccessProfile value;
+    const char* key;
+    const char* french;
+    const char* english;
+};
+
+constexpr std::array mcpProfiles{
+    McpProfile{LocalAccessProfile::free, "free", "Free", "Free"},
+    McpProfile{LocalAccessProfile::local_controlled, "local_controlled", "Local contrôlé", "Local controlled"},
+    McpProfile{LocalAccessProfile::token_only, "token_only", "Jeton seul", "Token only"},
+    McpProfile{LocalAccessProfile::protected_access, "protected", "Protégé", "Protected"}
+};
+
+const McpProfile* findMcpProfile(std::string_view key)
+{
+    const auto it = std::find_if(mcpProfiles.begin(), mcpProfiles.end(),
+                                 [key](const auto& profile) { return key == profile.key; });
+    return it == mcpProfiles.end() ? nullptr : &*it;
+}
+
+cydaw::base::File mcpSettingsFile()
+{
+    return assistantDirectory().getChildFile("mcp-settings.json");
+}
+
+const McpProfile& loadMcpProfile()
+{
+    const auto file = mcpSettingsFile();
+    if (!file.existsAsFile())
+        return mcpProfiles.front();
+    const auto settings = Json::parse(file.loadFileAsString().toStdString(), nullptr, false);
+    if (settings.is_object() && (!settings.contains("profile") || settings.at("profile").is_null()))
+        return mcpProfiles.front();
+    if (settings.contains("profile") && settings.at("profile").is_string())
+        if (const auto* profile = findMcpProfile(settings.at("profile").get_ref<const std::string&>()))
+            return *profile;
+    // An unsupported explicit selection must not silently grant full local access.
+    return mcpProfiles.back();
+}
 } // namespace
 
 struct Assistant::Impl {
     Impl(Studio& studio, RemoteUi& ui)
         : session(new SessionDispatch{studio, ui}),
-          registry(makeAssistantRegistry([weak = std::weak_ptr(session)](const auto& tool, const auto& args, const auto& call) {
-              return dispatchOnUi(weak, tool, args, call);
-          }, session->edits)) {}
+          registry(makeRegistry(LocalAccessProfile::protected_access)) {}
+
+    std::shared_ptr<cymcp::Registry> makeRegistry(LocalAccessProfile profile) const
+    {
+        const auto access = cymcp::local_access_settings(profile);
+        return makeAssistantRegistry(
+            [weak = std::weak_ptr(session), control = access.control_operations]
+            (const auto& tool, const auto& args, const auto& call) {
+                return dispatchOnUi(weak, tool, args, call, control);
+            }, session->edits, profile);
+    }
+
+    cymcp::LocalAccessSettings access() const
+    {
+        return cymcp::local_access_settings(mcpProfile->value);
+    }
+
+    void chooseMcpProfile(const McpProfile& profile)
+    {
+        const auto file = mcpSettingsFile();
+        auto settings = Json::parse(file.loadFileAsString().toStdString(), nullptr, false);
+        if (!settings.is_object())
+            settings = Json::object();
+        settings["profile"] = profile.key;
+        const auto contents = settings.dump(2);
+        if (file.getParentDirectory().createDirectory().failed()
+            || !file.replaceWithText(cydaw::base::Text::fromUTF8(contents.c_str())))
+            throw cymcp::Error("FileError", tr("Impossible d’enregistrer le profil MCP", "Could not save the MCP profile"));
+        mcpProfile = &profile;
+    }
 
     ~Impl()
     {
@@ -306,6 +375,7 @@ struct Assistant::Impl {
         if (mcp) mcp->cancel_all();
         server.reset();
         mcp.reset();
+        mcpRegistry.reset();
         port = 0;
         token.clear();
     }
@@ -316,13 +386,23 @@ struct Assistant::Impl {
         cymcp::McpServerOptions options;
         options.cache_ttl = std::chrono::seconds(cacheSeconds);
         options.performance = metrics;
+        const auto local = access();
+        if (local.require_token && secret.size() < 32)
+            throw cymcp::Error("AuthenticationRequired", "Set CYDAW_MCP_TOKEN to at least 32 characters for this MCP profile");
         try {
-            mcp = std::make_unique<cymcp::McpServer>(*registry, "CyDaw", options);
-            server = std::make_unique<cymcp::LocalHttpServer>(secret, [this](const Json& request, const cymcp::CallContext& context) {
+            mcpRegistry = local.control_operations ? registry : makeRegistry(mcpProfile->value);
+            mcpRegistry->set_performance_monitor(metrics);
+            mcp = std::make_unique<cymcp::McpServer>(*mcpRegistry, "CyDaw", options);
+            const auto endpoint = [this](const Json& request, const cymcp::CallContext& context) {
                 return mcp->handle(request, context);
-            });
+            };
+            if (local.require_token)
+                server = std::make_unique<cymcp::LocalHttpServer>(secret, endpoint);
+            else
+                server = std::make_unique<cymcp::LocalHttpServer>(cymcp::LocalHttpServer::UnauthenticatedLoopback{}, endpoint);
             port = server->start(requested);
-            token = std::move(secret);
+            if (local.require_token)
+                token = std::move(secret);
         } catch (...) {
             stopServer();
             throw;
@@ -489,6 +569,8 @@ struct Assistant::Impl {
     std::shared_ptr<SessionDispatch> session;
     std::shared_ptr<cymcp::Registry> registry;
     std::shared_ptr<cymcp::PerformanceMonitor> metrics;
+    const McpProfile* mcpProfile = &loadMcpProfile();
+    std::shared_ptr<cymcp::Registry> mcpRegistry;
     std::unique_ptr<cymcp::McpServer> mcp;
     std::unique_ptr<cymcp::LocalHttpServer> server;
     std::unique_ptr<cymcp::ChatController> chat;
@@ -525,20 +607,31 @@ void Assistant::beginCheck(int providerPort)
 #endif
 }
 
-void Assistant::configure(int port, std::string token, bool allowEdits, int cacheSeconds, bool metrics)
+void Assistant::configure(const AssistantOptions& settings)
 {
     auto& state = *impl_;
-    state.session->edits->store(allowEdits);
-    state.cacheSeconds = cacheSeconds;
-    if (metrics) {
+    if (settings.port < 0 || settings.port > 65535 || settings.cacheSeconds < 0 || settings.cacheSeconds > 3600)
+        throw std::runtime_error("Invalid MCP port or cache duration");
+    if (settings.profile) {
+        state.mcpProfile = findMcpProfile(*settings.profile);
+        if (!state.mcpProfile)
+            throw std::runtime_error("Invalid --mcp-profile. Use free, local_controlled, token_only or protected.");
+    }
+    state.session->edits->store(settings.allowEdits);
+    state.cacheSeconds = settings.cacheSeconds;
+    if (settings.metrics) {
         cymcp::PerformanceOptions options;
         const auto file = assistantDirectory().getChildFile("metrics.jsonl");
         options.jsonl_file = std::filesystem::u8path(file.getFullPathName().toStdString());
         state.metrics = std::make_shared<cymcp::PerformanceMonitor>(std::move(options));
         state.registry->set_performance_monitor(state.metrics);
     }
-    if (port != 0)
-        state.startServer(port, std::move(token));
+    if (settings.port != 0) {
+        auto token = state.access().require_token
+            ? cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_MCP_TOKEN", {}).toStdString()
+            : std::string{};
+        state.startServer(settings.port, std::move(token));
+    }
 }
 
 void Assistant::draw(bool& open)
@@ -560,6 +653,8 @@ void Assistant::draw(bool& open)
             auto edits = state.session->edits->load();
             if (ImGui::Checkbox(tr("Autoriser les modifications de session", "Allow session edits"), &edits))
                 state.session->edits->store(edits);
+            ui::tooltip(tr("S’applique au chat et aux profils Local contrôlé et Protégé.",
+                           "Applies to chat and the Local controlled and Protected profiles."));
             ImGui::SameLine();
             if (ImGui::Button(tr("Connexion…", "Connection…"))) state.settings = !state.settings;
             if (state.settings) {
@@ -603,12 +698,33 @@ void Assistant::draw(bool& open)
                 if (connect || restore) state.connect(restore);
                 ImGui::Separator();
             }
+            const McpProfile* selected = nullptr;
+            ImGui::BeginDisabled(state.port != 0);
+            if (ImGui::BeginCombo(tr("Profil MCP local", "Local MCP profile"),
+                                  tr(state.mcpProfile->french, state.mcpProfile->english))) {
+                for (const auto& profile : mcpProfiles) {
+                    const auto current = state.mcpProfile == &profile;
+                    if (ImGui::Selectable(tr(profile.french, profile.english), current) && !current)
+                        selected = &profile;
+                    if (current) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::EndDisabled();
+            if (selected) state.chooseMcpProfile(*selected);
+
             if (state.port == 0) {
-                if (ImGui::Button(tr("Activer MCP local", "Enable local MCP"))) state.startServer(0, cymcp::random_token());
+                if (ImGui::Button(tr("Activer MCP local", "Enable local MCP")))
+                    state.startServer(0, state.access().require_token ? cymcp::random_token() : std::string{});
             } else {
-                ImGui::Text("MCP  127.0.0.1:%d", state.port);
+                const auto url = "http://127.0.0.1:" + std::to_string(state.port) + "/mcp";
+                ImGui::TextUnformatted(url.c_str());
                 ImGui::SameLine();
-                if (ImGui::Button(tr("Copier le jeton", "Copy token"))) ImGui::SetClipboardText(state.token.c_str());
+                if (ImGui::Button(tr("Copier l’adresse", "Copy address"))) ImGui::SetClipboardText(url.c_str());
+                if (state.access().require_token) {
+                    ImGui::SameLine();
+                    if (ImGui::Button(tr("Copier le jeton", "Copy token"))) ImGui::SetClipboardText(state.token.c_str());
+                }
                 ImGui::SameLine();
                 if (ImGui::Button(tr("Arrêter MCP", "Stop MCP"))) state.stopServer();
             }

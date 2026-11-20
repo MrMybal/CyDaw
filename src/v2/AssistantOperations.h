@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cymcp/core.hpp>
+#include <cymcp/http.hpp>
 
 namespace cydaw::v2 {
 
@@ -8,8 +8,9 @@ using AssistantDispatch = std::function<cymcp::Json(const std::string&, const cy
 
 bool assistantReadOnly(const std::string& tool, const cymcp::Json& arguments);
 
-// With no dispatcher, the native factory catalogue remains usable offline.
+// Offline discovery and the chat use the controlled default. HTTP may opt into a different profile.
 std::shared_ptr<cymcp::Registry> makeAssistantRegistry(AssistantDispatch = {},
-                                                     std::shared_ptr<std::atomic_bool> allowEdits = {});
+                                                     std::shared_ptr<std::atomic_bool> editGate = {},
+                                                     cymcp::LocalAccessProfile = cymcp::LocalAccessProfile::protected_access);
 
 } // namespace cydaw::v2

@@ -13,8 +13,8 @@ constexpr std::string_view help =
     "Usage: cydawctl [--port=PORT] list | describe NAME | call NAME [JSON|-|@FILE]\n"
     "       cydawctl --help | --version\n"
     "Without --port, list and describe are local and list_factory_effects can be called offline.\n"
-    "To control a live session, start CyDaw with --mcp-port=PORT and set CYDAW_MCP_TOKEN\n"
-    "in both processes. Choose the port of the instance you want to control.\n"
+    "To control a live session, enable local MCP and choose its port, or start with --mcp-port=PORT.\n"
+    "Set CYDAW_MCP_TOKEN only for a profile that requires a token.\n"
     "Use - for JSON on stdin or @FILE for a UTF-8 JSON file. Results go to stdout.\n";
 
 constexpr std::size_t maxArguments = 64 * 1024;
@@ -109,8 +109,6 @@ int wmain(int argc, wchar_t** argv)
             else
                 throw cymcp::Error("InstanceRequired", "Use --port=PORT to call live operations");
         } else {
-            if (token.size() < 32)
-                throw cymcp::Error("AuthenticationRequired", "Set CYDAW_MCP_TOKEN to the instance's token (32 characters or more)");
             cymcp::McpClient client("http://127.0.0.1:" + std::to_string(port) + "/mcp", token);
             cymcp::Cancellation deadline;
             deadline.deadline = cymcp::Clock::now() + std::chrono::seconds(35);

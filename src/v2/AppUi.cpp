@@ -297,10 +297,10 @@ AppUi::~AppUi()
 }
 
 #if defined(CYDAW_HAS_ASSISTANT)
-void AppUi::configureAssistant(int port, std::string token, bool allowEdits, int cacheSeconds, bool metrics)
+void AppUi::configureAssistant(const AssistantOptions& options)
 {
     assistant_ = std::make_unique<Assistant>(studio_, *this);
-    assistant_->configure(port, std::move(token), allowEdits, cacheSeconds, metrics);
+    assistant_->configure(options);
 }
 #endif
 
